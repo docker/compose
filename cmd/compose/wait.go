@@ -63,8 +63,11 @@ func waitCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 }
 
 func runWait(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, opts *waitOptions) (int64, error) {
-	_, name, err := opts.projectOrName(ctx, dockerCli)
+	project, name, err := opts.projectOrName(ctx, dockerCli)
 	if err != nil {
+		return 0, err
+	}
+	if err := validateServiceNames(project, opts.services); err != nil {
 		return 0, err
 	}
 
