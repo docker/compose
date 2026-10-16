@@ -20,8 +20,10 @@ package compose
 
 import (
 	"context"
+	"strconv"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -110,6 +112,80 @@ func serviceContainer(service string) container.Summary {
 			api.ContainerNumberLabel: "1",
 		},
 	}
+}
+
+// stoppedServiceContainer builds a container summary of the given state for
+// replica num of service, carrying the labels collectObservedState reads.
+func stoppedServiceContainer(service string, num int, state container.ContainerState) container.Summary {
+	ctr := serviceContainer(service)
+	name := "prj-" + service + "-" + strconv.Itoa(num)
+	ctr.ID = name + "-id"
+	ctr.Names = []string{"/" + name}
+	ctr.State = state
+	ctr.Labels[api.ProjectLabel] = "prj"
+	ctr.Labels[api.ContainerNumberLabel] = strconv.Itoa(num)
+	return ctr
+}
+
+// TestStart_NoOpStartIsSilentAndOnlyListsContainers pins how start() wires
+// its plan: the observation is scoped to Start (only the container listing
+// reaches the daemon -- gomock fails on any network or volume listing), the
+// plan is start-only, and a no-op start (everything already running) starts
+// nothing and emits no event, not even the synthetic "Running" ones
+// up/create report.
+func TestStart_NoOpStartIsSilentAndOnlyListsContainers(t *testing.T) {
+	svc, apiClient, rec := newStartTestService(t)
+
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{
+			stoppedServiceContainer("web", 1, container.StateRunning),
+		}}, nil)
+
+	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project}, nil)
+	assert.NilError(t, err)
+	assert.Equal(t, len(rec.summary()), 0, "a no-op start must be silent: %v", rec.summary())
+}
+
+// TestStart_WaitTimeoutBoundsDependencyWaits pins that start() hands
+// StartOptions.WaitTimeout to the executor: --wait-timeout bounds a
+// depends_on wait even without --wait, and expiring reports the dependency
+// timeout while the dependent is never started.
+func TestStart_WaitTimeoutBoundsDependencyWaits(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	db := types.ServiceConfig{Name: "db", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	web.DependsOn = types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}}
+	project := &types.Project{Name: "prj", Services: types.Services{"db": db, "web": web}}
+
+	dbCtr := stoppedServiceContainer("db", 1, container.StateRunning)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{
+			dbCtr,
+			stoppedServiceContainer("web", 1, container.StateExited),
+		}}, nil)
+	// db never becomes healthy; no ContainerStart expectation for web
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), dbCtr.ID, gomock.Any()).
+		Return(client.ContainerInspectResult{Container: container.InspectResponse{
+			ID:   dbCtr.ID,
+			Name: "/prj-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		}}, nil).AnyTimes()
+
+	// the outer deadline only turns a missing wait-timeout into a prompt
+	// failure instead of a hang
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	err := svc.start(ctx, "prj", api.StartOptions{Project: project, WaitTimeout: 200 * time.Millisecond}, nil)
+	assert.Error(t, err, "timeout waiting for dependencies")
 }
 
 // TestGetDependencyCondition locks the --wait condition selection: a service

@@ -382,6 +382,90 @@ func TestPlanStart_NoContainerToStartFails(t *testing.T) {
 	assert.ErrorContains(t, err, `service "app" has no container to start`)
 }
 
+// Imperative parity (startService): the "no container to start" check is
+// project-wide. A service without a container next to existing ones is a
+// no-op for `compose start` (the other services still start); only a project
+// with no container at all fails.
+func TestPlanStart_NoContainerToStartIsProjectWide(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	web := serviceWithDeps("web", types.DependsOnConfig{"db": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "web": web},
+	}
+
+	t.Run("sibling service has a container", func(t *testing.T) {
+		observed := emptyObserved()
+		observed.Containers["db"] = []ObservedContainer{observedServiceContainer("db", 1, container.StateExited, "")}
+
+		plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+		assert.NilError(t, err)
+		assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StartContainer, start [start:db:1] {start}
+`)+"\n")
+	})
+
+	t.Run("dependency was never created", func(t *testing.T) {
+		observed := emptyObserved()
+		observed.Containers["web"] = []ObservedContainer{observedServiceContainer("web", 1, container.StateExited, "")}
+
+		plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+		assert.NilError(t, err)
+		assert.Equal(t, len(plan.Nodes), 1, "web must still start:\n%s", plan)
+	})
+
+	t.Run("only an orphan container exists", func(t *testing.T) {
+		observed := emptyObserved()
+		observed.Orphans = []ObservedContainer{observedServiceContainer("old", 1, container.StateExited, "")}
+
+		_, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+		assert.NilError(t, err)
+	})
+}
+
+// deploy.replicas: 0 is an unconditional no-op under scope Start: an
+// observed stopped container of such a service is left alone.
+func TestPlanStart_DeployReplicasZeroNeverStartsAnObservedContainer(t *testing.T) {
+	zero := 0
+	app := types.ServiceConfig{Name: "app", Deploy: &types.DeployConfig{Replicas: &zero}}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": app},
+	}
+	observed := emptyObserved()
+	observed.Containers["app"] = []ObservedContainer{observedServiceContainer("app", 1, container.StateExited, "")}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, len(plan.Nodes), 0, "deploy.replicas: 0 must not start anything:\n%s", plan)
+}
+
+// A relay is a shell-less scratch binary: pre_start has no process for the
+// hook container's VolumesFrom to share, so the hook is skipped when the
+// lowest-numbered stopped container of an ordinary service is a stale relay,
+// and that relay is started bare.
+func TestPlanStart_OrdinaryPathSkipsPreStartWhenLowestIsRelay(t *testing.T) {
+	db := types.ServiceConfig{
+		Name:     "db",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db},
+	}
+	relay := observedServiceContainer("db", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{relay}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, StartContainer, start [start:db:1] {start}
+`)+"\n")
+	assert.Assert(t, plan.Nodes[0].Operation.Service == nil, "a relay is started bare:\n%s", plan)
+}
+
 // A depends_on naming a service that is neither declared nor disabled is
 // the same hard error the imperative engine raises (shouldWaitForDependency
 // propagates it) — reachable via `compose start` without a compose file,
@@ -1037,6 +1121,133 @@ func TestPlanStart_ProviderPathPreStartGateDoesNotRetryPastARelay(t *testing.T) 
 		assert.Assert(t, n.Operation.Type != OpRunPreStart,
 			"pre_start must not run when the lowest-numbered stale container is a relay, even though a later one (#2) is not:\n%s", plan)
 	}
+}
+
+// The provider's restart node is one of its chain ends: a consumer of the
+// provider orders after it, so it cannot start before the relay is running.
+func TestPlanStart_ProviderRestartIsAChainEnd(t *testing.T) {
+	prov := types.ServiceConfig{Name: "prov"}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	web := serviceWithDeps("web", types.DependsOnConfig{"prov": {Condition: types.ServiceConditionStarted, Required: true}})
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov, "web": web},
+	}
+	relay := observedServiceContainer("prov", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed := emptyObserved()
+	observed.Containers["prov"] = []ObservedContainer{relay}
+	observed.Containers["web"] = []ObservedContainer{observedServiceContainer("web", 1, container.StateExited, "")}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	var provStart, webStart *PlanNode
+	for _, n := range plan.Nodes {
+		switch n.Operation.ResourceID {
+		case "service:prov:1":
+			provStart = n
+		case "service:web:1":
+			webStart = n
+		}
+	}
+	assert.Assert(t, provStart != nil && webStart != nil, "both services must start:\n%s", plan)
+	assert.Assert(t, slices.Contains(webStart.DependsOn, provStart), "web must order after the relay restart:\n%s", plan)
+}
+
+// A relay never gets post_start: it has no shell to exec the hook in.
+func TestPlanStart_ProviderRelayGetsNoPostStart(t *testing.T) {
+	prov := types.ServiceConfig{
+		Name:      "prov",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}},
+	}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	relay := observedServiceContainer("prov", 1, container.StateExited, "")
+	relay.Summary.Labels[api.RelayLabel] = "relay-abc123"
+	observed := emptyObserved()
+	observed.Containers["prov"] = []ObservedContainer{relay}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:prov:1, StartContainer, start [start:prov:1] {start}
+`)+"\n")
+}
+
+// pre_start is gated on no replica running at observation, on the provider
+// path as on the ordinary one.
+func TestPlanStart_ProviderPathPreStartSkippedWhenAReplicaIsRunning(t *testing.T) {
+	prov := types.ServiceConfig{
+		Name:     "prov",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"prov": prov},
+	}
+	observed := emptyObserved()
+	observed.Containers["prov"] = []ObservedContainer{
+		observedServiceContainer("prov", 1, container.StateRunning, ""),
+		observedServiceContainer("prov", 2, container.StateExited, ""),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:prov:2, StartContainer, start [start:prov:2] {start}
+`)+"\n")
+}
+
+// pre_start runs exactly once for the whole chain, on the first stale
+// container, after the provider's own dependencies, and gates every start.
+func TestPlanStart_ProviderPathPreStartRunsOnceBeforeTheChain(t *testing.T) {
+	db := types.ServiceConfig{Name: "db"}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	prov := serviceWithDeps("prov", types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}})
+	prov.PreStart = []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}}
+	prov.Provider = &types.ServiceProviderConfig{Type: "test"}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db, "prov": prov},
+	}
+	observed := emptyObserved()
+	observed.Containers["db"] = []ObservedContainer{observedServiceContainer("db", 1, container.StateRunning, "")}
+	// listed out of order: the hook still targets replica 1
+	observed.Containers["prov"] = []ObservedContainer{
+		observedServiceContainer("prov", 2, container.StateExited, ""),
+		observedServiceContainer("prov", 1, container.StateExited, ""),
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+
+	var wait, pre, start1, start2 *PlanNode
+	preStarts := 0
+	for _, n := range plan.Nodes {
+		switch {
+		case n.Operation.Type == OpWaitCondition:
+			wait = n
+		case n.Operation.Type == OpRunPreStart:
+			pre = n
+			preStarts++
+		case n.Operation.ResourceID == "service:prov:1" && n.Operation.Type == OpStartContainer:
+			start1 = n
+		case n.Operation.ResourceID == "service:prov:2" && n.Operation.Type == OpStartContainer:
+			start2 = n
+		}
+	}
+	assert.Equal(t, preStarts, 1, "pre_start must run once, not once per container:\n%s", plan)
+	assert.Assert(t, wait != nil && start1 != nil && start2 != nil, "unexpected plan:\n%s", plan)
+	assert.Assert(t, pre.Operation.Container != nil && pre.Operation.Container.ID == "myproject-prov-1-id",
+		"pre_start must target the first stale container:\n%s", plan)
+	assert.Assert(t, slices.Contains(pre.DependsOn, wait), "pre_start must wait on the provider's dependencies:\n%s", plan)
+	assert.Assert(t, slices.Contains(start1.DependsOn, pre), "the first start must wait on pre_start:\n%s", plan)
+	assert.Assert(t, slices.Contains(start2.DependsOn, start1), "the chain must continue after the first start:\n%s", plan)
 }
 
 // An optional (required: false) condition marks the shared wait node

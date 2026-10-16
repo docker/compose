@@ -24,6 +24,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -854,6 +855,93 @@ func TestExecRunPostStart_RunsHookAndStreamsToListener(t *testing.T) {
 	err := exec.execRunPostStart(t.Context(), Operation{Service: &service, Container: &ctr})
 	assert.NilError(t, err)
 	assert.DeepEqual(t, lines, []string{"post-start ok"})
+}
+
+// TestExecutePlanStartInjectsSecretsAndConfigsBeforeContainerStart pins that
+// a start node copies the service's secrets and configs into the container
+// before starting it, in that order.
+func TestExecutePlanStartInjectsSecretsAndConfigsBeforeContainerStart(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{
+		Name: "web",
+		ContainerSpec: types.ContainerSpec{
+			Secrets: []types.ServiceSecretConfig{{Source: "token"}},
+			Configs: []types.ServiceConfigObjConfig{{Source: "settings"}},
+		},
+	}
+	project := &types.Project{
+		Name:     "test",
+		Services: types.Services{"web": service},
+		Secrets:  types.Secrets{"token": types.SecretConfig{Name: "token", Content: "s3cret"}},
+		Configs:  types.Configs{"settings": types.ConfigObjConfig{Name: "settings", Content: "key=value"}},
+	}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+
+	secret := apiClient.EXPECT().CopyToContainer(gomock.Any(), "web-id", gomock.Any()).
+		Return(client.CopyToContainerResult{}, nil)
+	config := apiClient.EXPECT().CopyToContainer(gomock.Any(), "web-id", gomock.Any()).
+		Return(client.CopyToContainerResult{}, nil).After(secret)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "web-id", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(config)
+
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:web:1",
+		Cause:      "start",
+		Service:    &service,
+		Container:  &ctr,
+	}, "start:web:1")
+
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	assert.NilError(t, exec.run(t.Context(), plan))
+}
+
+// TestExecutePlanFailedPostStartFailsTheStart pins that a failing post_start
+// hook fails the plan and leaves the container's progression without its
+// Started event.
+func TestExecutePlanFailedPostStartFailsTheStart(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{
+		Name:      "web",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"fail"}}},
+	}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "web-id", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil)
+	apiClient.EXPECT().ExecCreate(gomock.Any(), "web-id", gomock.Any()).
+		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
+	serverConn, clientConn := net.Pipe()
+	_ = serverConn.Close()
+	apiClient.EXPECT().ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
+		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
+	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
+		Return(client.ExecInspectResult{ExitCode: 3}, nil)
+
+	plan := &Plan{}
+	start := plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:web:1",
+		Cause:      "start",
+		Service:    &service,
+		Container:  &ctr,
+	}, "start:web:1")
+	plan.addNode(Operation{
+		Type:       OpRunPostStart,
+		ResourceID: "service:web:1",
+		Cause:      "post_start hooks",
+		Service:    &service,
+		Container:  &ctr,
+	}, "start:web:1", start)
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test", Services: types.Services{"web": service}}, emptyObservedState("test"), nil)
+	err := exec.run(t.Context(), plan)
+	assert.ErrorContains(t, err, "hook exited with status 3")
+	assert.Assert(t, !slices.Contains(recorder.byID["Container test-web-1"], api.StatusStarted),
+		"a failed post_start must not report Started: %v", recorder.byID["Container test-web-1"])
 }
 
 // TestExecutePlanStartPhaseEventContract drives a full wait + enriched-start
