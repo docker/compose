@@ -238,6 +238,7 @@ func TestComposeService_Logs_FollowDoesNotStarveMonitor(t *testing.T) {
 
 	name := strings.ToLower(testProject)
 
+	expectNowAsDaemonTime(api)
 	api.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 		Return(client.ContainerListResult{
 			Items: []containerType.Summary{
@@ -309,6 +310,54 @@ func TestComposeService_Logs_FollowDoesNotStarveMonitor(t *testing.T) {
 	assert.NilError(t, <-done)
 }
 
+// TestComposeService_Logs_FollowFailsWithoutDaemonTime: `logs --follow` shares
+// the monitor, and a daemon whose time can't be read fails the command (the
+// error reaches Logs' caller, and the open log streams are brought down)
+// instead of following with no sound starting point for events.
+func TestComposeService_Logs_FollowFailsWithoutDaemonTime(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+
+	name := strings.ToLower(testProject)
+	unreachable := errors.New("daemon unreachable")
+
+	api.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, unreachable)
+	api.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []containerType.Summary{testContainer("service", "c1", false)}}, nil)
+	// the failure may cancel the group before the stream got as far as this
+	api.EXPECT().ContainerInspect(anyCancellableContext(), "c1", gomock.Any()).
+		Return(client.ContainerInspectResult{
+			Container: containerType.InspectResponse{ID: "c1", Config: &containerType.Config{Tty: false}},
+		}, nil).AnyTimes()
+	// a `--follow` stream that only ends with the command
+	r, w := io.Pipe()
+	t.Cleanup(func() { _ = w.Close() })
+	api.EXPECT().ContainerLogs(anyCancellableContext(), "c1", gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ client.ContainerLogsOptions) (io.ReadCloser, error) {
+			go func() {
+				<-ctx.Done()
+				_ = r.Close()
+			}()
+			return r, nil
+		}).AnyTimes()
+
+	done := make(chan error, 1)
+	go func() {
+		done <- tested.Logs(t.Context(), name, &testLogConsumer{}, compose.LogOptions{Follow: true})
+	}()
+	select {
+	case err := <-done:
+		assert.ErrorIs(t, err, unreachable)
+		assert.ErrorContains(t, err, "reading the daemon time to subscribe to container events")
+	case <-time.After(10 * time.Second):
+		t.Fatal("logs --follow did not return the error of its monitor")
+	}
+}
+
 // TestComposeService_Logs_FollowLimitsConcurrentStreamOpens guards against a
 // regression where removing the concurrency bound entirely for `--follow`
 // (to stop it starving the monitor, see
@@ -330,6 +379,7 @@ func TestComposeService_Logs_FollowLimitsConcurrentStreamOpens(t *testing.T) {
 	for _, id := range ids {
 		containerItems = append(containerItems, testContainer("service", id, false))
 	}
+	expectNowAsDaemonTime(api)
 	api.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 		Return(client.ContainerListResult{Items: containerItems}, nil).
 		Times(2) // selectLogsContainers, then the monitor's initialContainers
