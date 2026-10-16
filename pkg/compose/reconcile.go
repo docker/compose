@@ -1429,128 +1429,24 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 	return nil
 }
 
-// planProviderRelayRestart emits an OpStartContainer for the provider's own
-// observed, not-running container when the create phase didn't already
-// converge it (see planProviderStart's caller). Matches the imperative
-// engine's own behavior: the deleted startService/startServiceContainer
-// decided bare-vs-enriched PER CONTAINER (isRelayContainer(ctr)), never from
-// the service's currently declared type -- a service's provider: declaration
-// can change without an intervening `up`/create to converge the daemon to
-// match, so under pure ScopeStart the observed container here can be either
-// the real relay (bare start, no injection/hooks -- it's a shell-less
-// scratch binary) or a stale non-relay replica left over from before the
-// service became provider-backed (enriched start, same as any ordinary
-// replica, including post_start). Two Copilot review findings on the first,
-// relay-only version of this function: it silently dropped the non-relay
-// case entirely (a provider-declared service with a leftover normal
-// container returned success without starting anything), and the symmetric
-// gap in planServiceStart's own replica loop (enriching a container that
-// turns out to be a stale relay) is fixed there, not here.
+// planProviderRelayRestart plans the start of the provider's own observed,
+// not-running containers when the create phase didn't already converge them
+// (see planProviderStart's caller). The imperative engine decided
+// bare-vs-enriched PER CONTAINER (isRelayContainer), never from the service's
+// currently declared type: a provider: declaration can change without an
+// intervening `up`/create, so under pure ScopeStart the observed container
+// can be the real relay (bare start) or a stale non-relay replica left over
+// from before the service became provider-backed (enriched start, hooks
+// included). That is exactly what the ordinary replica chain does, so it is
+// shared with planServiceStart (chainStartReplicas).
 //
 // deps is the provider's own startPhaseDependencies: under pure ScopeStart
 // there is no Create->Start barrier separating this provider from its
-// siblings (unlike ScopeCreateStart's OpRunProvider, always a create-phase
-// node), so without its own depends_on wired in here, this node could start
-// before a required dependency's health/condition wait resolves -- a Copilot
-// review finding on an earlier version of this fix.
-//
-// Every not-running observed container is chained in sequence (docker-agent
-// review finding: the relay is uniquely named, so at most one can exist, but
-// a service transitioning to provider-backed without an intervening
-// reconciliation can leave several stale non-relay replicas behind -- the
-// first version of this function silently dropped every container after the
-// first). pre_start runs at most once, before the first non-relay candidate
-// in observed (container-number) order, exactly mirroring the imperative
-// engine's own lowestNumberedContainer(toStart) + isRelayContainer gate
-// (another Copilot review finding: the post_start-only version of this
-// enrichment dropped pre_start for this path entirely).
+// siblings, so without its own depends_on wired in here this node could start
+// before a required dependency's condition wait resolves.
 func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps []*PlanNode) *PlanNode {
-	// collectObservedState preserves the daemon's own container-list order,
-	// not replica-number order -- unlike startPhaseReplicas, which sorts
-	// before building its chain (see its own sort comment) to carry the
-	// plan's determinism. Without this, two stale containers could chain in
-	// list order instead of number order, making the plan non-deterministic
-	// run to run (Copilot review finding).
-	observed := slices.Clone(r.observed.Containers[service.Name])
-	slices.SortFunc(observed, func(a, b ObservedContainer) int { return cmp.Compare(a.Number, b.Number) })
-	anyRunning := false
-	for i := range observed {
-		if observed[i].State == container.StateRunning {
-			anyRunning = true
-			break
-		}
-	}
-
-	// pre_start's eligibility is decided once, from the first non-running
-	// container only -- exactly like planServiceStart's own gate and the old
-	// imperative engine's lowestNumberedContainer(toStart): if that one
-	// candidate is a relay, pre_start is skipped entirely for this chain,
-	// with no fallback to a later non-relay candidate. Checking !relay again
-	// inside the loop below (as a condition on *running* the hook) would
-	// instead retry the gate on every later replica, executing hooks in a
-	// state the relay guard was meant to suppress entirely (Copilot review
-	// finding).
-	preStartEligible := len(service.PreStart) > 0 && !anyRunning
-	for i := range observed {
-		if observed[i].State != container.StateRunning {
-			preStartEligible = preStartEligible && !isRelayContainer(observed[i].Summary)
-			break
-		}
-	}
-
-	prev := deps
-	preStarted := false
-	var chainEnd *PlanNode
-	for i := range observed {
-		oc := &observed[i]
-		if oc.State == container.StateRunning {
-			continue
-		}
-		resID := serviceReplicaID(service.Name, oc.Number)
-		relay := isRelayContainer(oc.Summary)
-
-		if !preStarted && preStartEligible {
-			serviceCopy := service
-			pre := r.plan.addNode(Operation{
-				Type:       OpRunPreStart,
-				ResourceID: resID,
-				Cause:      "pre_start hooks",
-				Service:    &serviceCopy,
-				Container:  &oc.Summary,
-			}, startGroupID(resID), prev...)
-			pre.Phase = PhaseStart
-			prev = []*PlanNode{pre}
-			preStarted = true
-		}
-
-		op := Operation{
-			Type:       OpStartContainer,
-			ResourceID: resID,
-			Cause:      "start",
-			Container:  &oc.Summary,
-		}
-		if !relay {
-			serviceCopy := service
-			op.Service = &serviceCopy
-		}
-		node := r.plan.addNode(op, startGroupID(resID), prev...)
-		node.Phase = PhaseStart
-		chainEnd = node
-		if !relay && len(service.PostStart) > 0 {
-			serviceCopy := service
-			post := r.plan.addNode(Operation{
-				Type:       OpRunPostStart,
-				ResourceID: resID,
-				Cause:      "post_start hooks",
-				Service:    &serviceCopy,
-				Container:  &oc.Summary,
-			}, startGroupID(resID), node)
-			post.Phase = PhaseStart
-			chainEnd = post
-		}
-		prev = []*PlanNode{chainEnd}
-	}
-	return chainEnd
+	replicas, anyRunning := r.startPhaseReplicas(service)
+	return r.chainStartReplicas(service, replicas, anyRunning, deps)
 }
 
 // observedAnyContainer reports whether the project owns at least one container
@@ -1627,7 +1523,19 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 		return nil
 	}
 
-	prev := depNodes
+	r.startChainEnds[service.Name] = []*PlanNode{r.chainStartReplicas(service, replicas, anyRunning, depNodes)}
+	return nil
+}
+
+// chainStartReplicas plans the start of replicas (ascending number) as one
+// sequential chain after prev: the service-wide pre_start hook when it is
+// eligible, then per replica inject+start and post_start, replica n+1 waiting
+// for the end of replica n's chain. It returns the end of the chain, nil when
+// there is no replica to start.
+func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []startReplica, anyRunning bool, prev []*PlanNode) *PlanNode {
+	if len(replicas) == 0 {
+		return nil
+	}
 
 	// pre_start runs once per service, only when no replica was running at
 	// observation — the imperative gating (initial up, force-recreate, or
@@ -1701,8 +1609,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 		}
 		prev = []*PlanNode{chainEnd}
 	}
-	r.startChainEnds[service.Name] = []*PlanNode{chainEnd}
-	return nil
+	return chainEnd
 }
 
 // planRecreateContainer decomposes container recreation into 4 atomic operations:
