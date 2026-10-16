@@ -36,6 +36,15 @@ func TestUpInteractiveHookLogs(t *testing.T) {
 			ServiceState("app", "exited"))
 }
 
+func TestUpInteractiveIgnoresHookRunnerExit(t *testing.T) {
+	NewScenario(t, "a foreground up must not take a pre_start runner's exit for the application's").
+		Step("up reports the exit code of the service, not the successful exit of its hook",
+			ComposeCmd("up", "--menu=false", "--exit-code-from", "app").MayFail().Within(60*time.Second),
+			ExitCode(3),
+			OutputContains("hook-ran"),
+			OutputContains("app-1 exited with code 3"))
+}
+
 func TestUpInteractiveImmediateExit(t *testing.T) {
 	NewScenario(t, "a foreground up --abort-on-container-exit must notice a container that exits as soon as it starts").
 		Step("up aborts on the instantly exiting container instead of waiting for the long-running one",
