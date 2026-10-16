@@ -1553,6 +1553,20 @@ func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps 
 	return chainEnd
 }
 
+// observedAnyContainer reports whether the project owns at least one container
+// on the daemon, orphans included.
+func (r *reconciler) observedAnyContainer() bool {
+	if len(r.observed.Orphans) > 0 {
+		return true
+	}
+	for _, ctrs := range r.observed.Containers {
+		if len(ctrs) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if service.Provider != nil {
 		return r.planProviderStart(service)
@@ -1577,10 +1591,13 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if err != nil {
 		return err
 	}
-	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart && service.GetScale() > 0 {
-		// imperative parity (startService): a scale>0 service with no
-		// container at all cannot be started — only reachable under scope
-		// Start, since CreateStart would have planned the missing creates
+	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart && service.GetScale() > 0 && !r.observedAnyContainer() {
+		// imperative parity (startService): the "no container to start" check
+		// is project-wide -- it receives the whole project's container list,
+		// so a service without a container next to existing ones is a no-op
+		// and only a project with no container at all fails. Only reachable
+		// under scope Start, since CreateStart would have planned the
+		// missing creates
 		return errNoContainerToStart(service.Name)
 	}
 	if len(replicas) == 0 {
