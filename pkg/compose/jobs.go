@@ -296,24 +296,9 @@ func scopedProjectForJob(project *types.Project, name string, job types.JobConfi
 	scoped := *project
 	services := make(types.Services, len(project.Services)+1)
 	for n, svc := range project.Services {
-		env := make(types.MappingWithEquals, len(svc.Environment))
-		for k, v := range svc.Environment {
-			env[k] = v
-		}
-		svc.Environment = env
-
-		labels := make(types.Labels, len(svc.CustomLabels))
-		for k, v := range svc.CustomLabels {
-			labels[k] = v
-		}
-		svc.CustomLabels = labels
-
-		svc.Volumes = append([]types.ServiceVolumeConfig{}, svc.Volumes...)
-		svc.Configs = append([]types.ServiceConfigObjConfig{}, svc.Configs...)
-
-		services[n] = svc
+		services[n] = withOwnMutableFields(svc)
 	}
-	services[name] = JobAsService(project, name, job)
+	services[name] = withOwnMutableFields(JobAsService(project, name, job))
 	scoped.Services = services
 
 	configs := make(types.Configs, len(project.Configs))
@@ -322,6 +307,27 @@ func scopedProjectForJob(project *types.Project, name string, job types.JobConfi
 	}
 	scoped.Configs = configs
 	return &scoped
+}
+
+// withOwnMutableFields returns svc with its own copy of the fields the
+// normalization passes mutate in place, so they never write through to the
+// ServiceConfig (or JobConfig) svc was copied from.
+func withOwnMutableFields(svc types.ServiceConfig) types.ServiceConfig {
+	env := make(types.MappingWithEquals, len(svc.Environment))
+	for k, v := range svc.Environment {
+		env[k] = v
+	}
+	svc.Environment = env
+
+	labels := make(types.Labels, len(svc.CustomLabels))
+	for k, v := range svc.CustomLabels {
+		labels[k] = v
+	}
+	svc.CustomLabels = labels
+
+	svc.Volumes = append([]types.ServiceVolumeConfig{}, svc.Volumes...)
+	svc.Configs = append([]types.ServiceConfigObjConfig{}, svc.Configs...)
+	return svc
 }
 
 // registerScheduledJobs registers the project's scheduled jobs with the

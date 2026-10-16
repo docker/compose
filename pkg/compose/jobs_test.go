@@ -148,9 +148,14 @@ func TestScopedProjectForJob(t *testing.T) {
 		},
 		Jobs: types.Jobs{
 			"backup": {
-				Name:          "backup",
-				Extensions:    types.Extensions{"x-team": "platform"},
-				ContainerSpec: types.ContainerSpec{Image: "backup-tool"},
+				Name:       "backup",
+				Extensions: types.Extensions{"x-team": "platform"},
+				ContainerSpec: types.ContainerSpec{
+					Image:       "backup-tool",
+					Environment: types.MappingWithEquals{"BAR": strPtr("original")},
+					Volumes:     []types.ServiceVolumeConfig{{Type: types.VolumeTypeImage, Source: "original", Target: "/data"}},
+					Configs:     []types.ServiceConfigObjConfig{{Source: "original"}},
+				},
 			},
 		},
 		Configs: types.Configs{
@@ -203,6 +208,21 @@ func TestScopedProjectForJob(t *testing.T) {
 		svc.CustomLabels["new"] = "added"
 		_, ok := project.Services["db"].CustomLabels["new"]
 		assert.Assert(t, !ok, "ensureImagesExists writes into a job's scoped CustomLabels map (via Labels.Add) concurrently with other jobs' registration — it must not be the shared project's map")
+	})
+
+	t.Run("the job's own Environment, Volumes and Configs are not shared with project.Jobs", func(t *testing.T) {
+		svc, err := scoped.GetService("backup")
+		assert.NilError(t, err)
+		// useAPISocket, ensureModels and ensureImagesExists mutate these in
+		// place on the scoped job service: project.Jobs must stay untouched.
+		svc.Environment["DOCKER_CONFIG"] = strPtr("added")
+		svc.Volumes[0].Source = "mutated"
+		svc.Configs[0].Source = "mutated"
+		original := project.Jobs["backup"]
+		_, ok := original.Environment["DOCKER_CONFIG"]
+		assert.Assert(t, !ok, "writing to the scoped job's Environment must not be visible on project.Jobs")
+		assert.Equal(t, original.Volumes[0].Source, "original")
+		assert.Equal(t, original.Configs[0].Source, "original")
 	})
 }
 
