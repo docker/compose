@@ -145,6 +145,30 @@ func TestProviderMigration(t *testing.T) {
 		OutputContains("test-1  | hello from provider"))
 }
 
+// TestProviderScaleReachesTheProvider locks that `compose scale` on a
+// provider-backed service neither fails nor multiplies the relay: the
+// requested count is passed through unmodified to the provider over its
+// control channel (get-service-config), which is free to act on it for the
+// real resource it manages, while Compose's own relay stays a single
+// container regardless. PROVIDER_DEMO_ENDPOINT publishes a real endpoint so
+// a relay container actually exists to assert singularity against; test is
+// included in the scale targets so it gets created in the same call and its
+// env records the exact value the provider received.
+func TestProviderScaleReachesTheProvider(t *testing.T) {
+	relayImage := "compose-relay-e2e"
+	s := providerScenario(t, "scale on a provider-backed service must reach the provider, not be rejected or applied to the relay")
+	s.CLI().RunCmd(t, "docker", "build", "-t", relayImage, "../../relay")
+	s.Env("PROVIDER_DEMO_ENDPOINT=1", "COMPOSE_RELAY_IMAGE="+relayImage)
+	s.Step("scale converges without error and the dependent sees the exact value the provider received",
+		ComposeCmd("scale", "db=5", "test=1"),
+		ContainerEnv("test", "DB_CONFIG_SCALE", "5"),
+		ServiceScale("db", 1)).
+		Step("a second scale updates the value without ever multiplying the relay",
+			ComposeCmd("scale", "db=7", "test=1"),
+			ContainerEnv("test", "DB_CONFIG_SCALE", "7"),
+			ServiceScale("db", 1))
+}
+
 func TestProviderPublishEndpoint(t *testing.T) {
 	// The example provider stands up a real endpoint on the host and
 	// publishes it; compose deploys a relay under the service's name, so the
