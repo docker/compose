@@ -31,6 +31,8 @@ import (
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/docker/secrets-engine/x/api"
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -47,6 +49,7 @@ const (
 var (
 	errNoUsername     = errors.New("no username for the session")
 	errSessionExpired = errors.New("the session has expired (not signed in to Docker Desktop?)")
+	errLookupTimeout  = errors.New("the secrets engine did not answer in time")
 )
 
 type hubSessions interface {
@@ -70,13 +73,15 @@ func newDesktopSession(name, serverAddress string, opts ...dockerhub.Option) *de
 		},
 		timeout: desktopLookupTimeout,
 		now:     time.Now,
+		tracer:  otel.Tracer(""),
 	}
 }
 
 // NewDesktopAuthProvider returns an AuthProvider that uses the Docker Desktop
 // session for Docker Hub, and fallback otherwise.
-func NewDesktopAuthProvider(fallback AuthProvider) AuthProvider {
+func NewDesktopAuthProvider(ctx context.Context, fallback AuthProvider) AuthProvider {
 	return &desktopAuthProvider{
+		ctx:        ctx,
 		fallback:   fallback,
 		hub:        sharedHubSession,
 		stagingHub: sharedStagingHubSession,
@@ -95,6 +100,9 @@ func connectDesktop(opts ...dockerhub.Option) (hubSessions, error) {
 }
 
 type desktopAuthProvider struct {
+	// ctx is the operation the provider was created for. GetAuthConfig takes
+	// no context, so lookups use this one.
+	ctx        context.Context
 	fallback   AuthProvider
 	hub        *desktopSession
 	stagingHub *desktopSession
@@ -102,7 +110,7 @@ type desktopAuthProvider struct {
 
 func (p *desktopAuthProvider) GetAuthConfig(registryHostname string) (clitypes.AuthConfig, error) {
 	if session := p.sessionFor(registryHostname); session != nil {
-		if auth, ok := session.auth(); ok {
+		if auth, ok := session.auth(p.ctx); ok {
 			if registryHost(registryHostname) == DHIRegistryHost {
 				auth.ServerAddress = DHIIndexServer
 			}
@@ -136,6 +144,7 @@ type desktopSession struct {
 	connect       func() (hubSessions, error)
 	timeout       time.Duration
 	now           func() time.Time
+	tracer        trace.Tracer
 
 	// mu serializes lookups so concurrent pulls share one request.
 	mu         sync.Mutex
@@ -145,18 +154,33 @@ type desktopSession struct {
 	validUntil time.Time
 }
 
-func (s *desktopSession) auth() (clitypes.AuthConfig, bool) {
+func (s *desktopSession) auth(ctx context.Context) (clitypes.AuthConfig, bool) {
+	ctx, span := s.tracer.Start(ctx, spanPrefix+"desktop-session",
+		trace.WithSpanKind(trace.SpanKindClient),
+		trace.WithAttributes(attrEnvironment.String(s.name)),
+	)
+	defer span.End()
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	now := s.now()
 	if now.Before(s.retryAt) {
+		span.SetAttributes(attrCache.String(cacheRetryBackoff), attrResult.String(resultSkipped))
 		return clitypes.AuthConfig{}, false
 	}
 	if s.cached != nil && now.Before(s.validUntil) {
+		span.SetAttributes(attrCache.String(cacheHit))
+		recordResult(ctx, span, nil)
 		return *s.cached, true
 	}
-	auth, validUntil, err := s.fetch()
+	span.SetAttributes(attrCache.String(cacheMiss))
+	auth, validUntil, err := s.fetch(ctx)
+	recordResult(ctx, span, err)
+	if err != nil && ctx.Err() != nil {
+		logrus.Debugf("looking up the %s session from Docker Desktop was canceled: %v", s.name, context.Cause(ctx))
+		return clitypes.AuthConfig{}, false
+	}
 	if err != nil {
 		s.retryAt = s.now().Add(retryInterval)
 		s.cached = nil
@@ -168,29 +192,36 @@ func (s *desktopSession) auth() (clitypes.AuthConfig, bool) {
 	return auth, true
 }
 
-func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
+func (s *desktopSession) fetch(ctx context.Context) (clitypes.AuthConfig, time.Time, error) {
+	span := trace.SpanFromContext(ctx)
+
 	if s.hub == nil {
-		hub, err := s.connect()
+		hub, err := traceCall(ctx, s.tracer, "connect", func(context.Context) (hubSessions, error) {
+			return s.connect()
+		})
 		if err != nil {
 			return clitypes.AuthConfig{}, time.Time{}, err
 		}
 		s.hub = hub
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
+	ctx, cancel := context.WithTimeoutCause(ctx, s.timeout, errLookupTimeout)
 	defer cancel()
 
-	session, err := s.hub.GetDefaultSession(ctx)
+	session, err := traceCall(ctx, s.tracer, "get-default-session", s.hub.GetDefaultSession)
 	if err != nil {
-		return clitypes.AuthConfig{}, time.Time{}, err
+		return clitypes.AuthConfig{}, time.Time{}, withLookupTimeout(ctx, err)
 	}
+
+	span.SetAttributes(attrTokenIsJWT.Bool(isJWT(session.AccessToken)))
 
 	// containerd treats a password without a username as a refresh token.
 	username := session.Claims.Username
+	span.SetAttributes(attrUsernameFromProfile.Bool(username == ""))
 	if username == "" {
-		profile, err := s.hub.GetDefaultProfile(ctx)
+		profile, err := traceCall(ctx, s.tracer, "get-default-profile", s.hub.GetDefaultProfile)
 		if err != nil {
-			return clitypes.AuthConfig{}, time.Time{}, fmt.Errorf("resolving the Docker Hub username: %w", err)
+			return clitypes.AuthConfig{}, time.Time{}, fmt.Errorf("resolving the Docker Hub username: %w", withLookupTimeout(ctx, err))
 		}
 		username = profile.Username
 	}
@@ -214,6 +245,15 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 	}, validUntil, nil
 }
 
+// withLookupTimeout marks err as caused by the lookup timeout when that is why
+// ctx ended, since client errors need not say so.
+func withLookupTimeout(ctx context.Context, err error) error {
+	if errors.Is(context.Cause(ctx), errLookupTimeout) && !errors.Is(err, errLookupTimeout) {
+		return fmt.Errorf("%w: %w", errLookupTimeout, err)
+	}
+	return err
+}
+
 func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
 	if exp := session.Claims.ExpiresAt; exp != nil {
 		return exp.Time, true
@@ -221,13 +261,30 @@ func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
 	return jwtExpiry(session.AccessToken)
 }
 
-func jwtExpiry(token string) (time.Time, bool) {
+func jwtPayload(token string) ([]byte, bool) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
-		return time.Time{}, false
+		return nil, false
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
 	if err != nil {
+		return nil, false
+	}
+	return payload, true
+}
+
+func isJWT(token string) bool {
+	payload, ok := jwtPayload(token)
+	if !ok {
+		return false
+	}
+	var claims map[string]json.RawMessage
+	return json.Unmarshal(payload, &claims) == nil
+}
+
+func jwtExpiry(token string) (time.Time, bool) {
+	payload, ok := jwtPayload(token)
+	if !ok {
 		return time.Time{}, false
 	}
 	var claims struct {
