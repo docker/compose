@@ -52,6 +52,8 @@ func pushCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 	pushCmd.Flags().BoolVar(&opts.IgnoreMissing, "ignore-missing", false, "Skip images that are not available locally instead of failing to push them")
 	pushCmd.Flags().BoolVar(&opts.IncludeDeps, "include-deps", false, "Also push images of services declared as dependencies")
 	pushCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Push without printing progress information")
+	pushCmd.Flags().MarkDeprecated("ignore-push-failures", "use --ignore-missing to skip images that are not available locally") //nolint:errcheck
+	pushCmd.MarkFlagsMutuallyExclusive("ignore-push-failures", "ignore-missing")
 
 	return pushCmd
 }
