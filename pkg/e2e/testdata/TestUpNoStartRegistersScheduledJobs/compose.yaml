@@ -1,0 +1,15 @@
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  # Fails on purpose: a successful run is removed on exit (RemoveOnSuccess),
+  # leaving nothing to observe — failing keeps the container around
+  # (RemoveOnFailure: false) so the fire is verifiable via container state.
+  backup:
+    image: alpine
+    command: sh -c 'exit 1'
+    triggers:
+      schedule:
+        - cron: "* * * * *"

@@ -32,6 +32,7 @@ import (
 	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
+	extensionclient "github.com/moby/extensions/client"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
@@ -39,6 +40,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
@@ -313,6 +315,11 @@ type composeService struct {
 	// logStreamDrainTimeout bounds the shutdown drain of re-attached log
 	// streams, see drainTimeout.
 	logStreamDrainTimeout time.Duration
+
+	jobsGRPCOnce  sync.Once
+	jobsExtClient *extensionclient.Client
+	jobsAPI       jobsv0.Jobs
+	jobsAPIErr    error
 }
 
 // Close releases any connections/resources held by the underlying clients.
@@ -323,6 +330,9 @@ func (s *composeService) Close() error {
 	var errs []error
 	if s.dockerCli != nil {
 		errs = append(errs, s.apiClient().Close())
+	}
+	if s.jobsExtClient != nil {
+		errs = append(errs, s.jobsExtClient.Close())
 	}
 	return errors.Join(errs...)
 }

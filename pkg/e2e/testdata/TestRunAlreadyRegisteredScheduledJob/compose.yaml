@@ -1,0 +1,12 @@
+services:
+  web:
+    image: alpine
+    command: sleep infinity
+jobs:
+  backup:
+    image: alpine
+    command: sh -c 'echo backup-ran'
+    tty: true
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"

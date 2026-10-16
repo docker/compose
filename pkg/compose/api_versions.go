@@ -48,6 +48,19 @@ const (
 	//  - interface_name was not configurable
 	//  - ImageList didn't support platform filtering
 	apiVersion149 = "1.49"
+
+	// apiVersionJobs is the first Docker Engine API version exposing the jobs
+	// API (one-shot and scheduled jobs).
+	//
+	// Placeholder: the jobs API is still an experimental engine capability
+	// that is part of no released engine, so this is the first version after
+	// the latest one known to Compose. Adjust it to the real version once the
+	// engine ships it.
+	//
+	// Before this version:
+	//  - Scheduled jobs cannot be registered, they are refused
+	//  - Manual jobs run as one-off service containers
+	apiVersionJobs = "1.57"
 )
 
 // Docker Engine version strings for user-facing error messages.

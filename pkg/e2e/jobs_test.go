@@ -20,16 +20,83 @@ package e2e
 
 import (
 	"testing"
+	"time"
 )
 
-// Scheduled jobs cannot run in this version: silently not scheduling them
-// would break the user's expectations, so up must refuse the whole project.
+// jobsAPIVersion is the first engine API version exposing the jobs API, see
+// apiVersionJobs in pkg/compose/api_versions.go, which it must follow. Below
+// it Compose degrades: manual jobs run as one-off services and scheduled
+// jobs are refused.
+const jobsAPIVersion = "1.57"
+
+// scheduledJobsRefused is the error of an engine without the jobs API refusing
+// the project of TestUpRejectsScheduledJobs.
+const scheduledJobsRefused = "scheduled jobs are not supported in this version: backup"
+
+// Without the jobs API, scheduled jobs cannot run: silently not scheduling
+// them would break the user's expectations, so every command bringing the
+// project up must refuse it as a whole, before creating anything.
 func TestUpRejectsScheduledJobs(t *testing.T) {
-	NewScenario(t, "up must reject a project declaring active scheduled jobs, before creating anything").
+	NewScenario(t, "up, create and start must reject a project declaring active scheduled jobs when the engine has no jobs API, before creating anything").
+		Requires(EngineAPIVersionBelow(jobsAPIVersion)).
 		Step("up fails naming the scheduled job",
 			ComposeCmd("up", "-d").MayFail(),
-			StderrContains("scheduled jobs are not supported in this version: backup"),
+			StderrContains(scheduledJobsRefused),
+			ServiceNotCreated("web")).
+		Step("create fails the same way",
+			ComposeCmd("create").MayFail(),
+			StderrContains(scheduledJobsRefused),
+			ServiceNotCreated("web")).
+		Step("start fails the same way",
+			ComposeCmd("start").MayFail(),
+			StderrContains(scheduledJobsRefused),
 			ServiceNotCreated("web"))
+}
+
+// A scheduled job registers with the engine instead of being rejected: up is
+// safely re-runnable on an unchanged spec, and the schedule fires on the
+// engine's own clock, independent of the client.
+func TestUpRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "up must register a project's scheduled jobs with the engine and let them fire on their own").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion)).
+		Step("up starts services and registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		Step("re-up is a no-op on the unchanged job spec, and the schedule fires on the engine's own clock",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
+}
+
+// run must build the exact same spec `up` already registered a scheduled
+// job with: CreateAndRun refuses schedule-trigger jobs outright, so run
+// routes through Create (idempotent on SpecHash) then Run instead. A run
+// invocation carries CLI/terminal-context defaults (Tty, StdinOpen,
+// ContainerName) that up's own registration never does — if those leaked
+// into the spec sent to Create, this would spuriously conflict with the
+// job up already registered, even though nothing in the compose file
+// changed.
+func TestRunAlreadyRegisteredScheduledJob(t *testing.T) {
+	NewScenario(t, "run must not conflict with a scheduled job up already registered with the identical spec").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion)).
+		Step("up registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		Step("run fires it manually without a SpecHash conflict",
+			ComposeCmd("run", "--rm", "backup"),
+			OutputContains("backup-ran"))
+}
+
+// --no-start's own path (Create, then registerScheduledJobs, then return
+// before Start) must still register scheduled jobs: it used to bypass Up
+// entirely by calling Create directly, silently skipping registration.
+func TestUpNoStartRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "up --no-start must still register a project's scheduled jobs with the engine").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion)).
+		Step("up --no-start creates but never starts web, yet the schedule still fires on its own",
+			ComposeCmd("up", "--no-start"),
+			ServiceState("web", "created"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
 }
 
 // A job runs through `compose run` exactly like a service would: its
@@ -42,6 +109,9 @@ func TestRunManualJob(t *testing.T) {
 			ComposeCmd("run", "--rm", "migrate"),
 			OutputContains("migration done"),
 			ServiceState("db", "running")).
+		Step("re-running the same manual job with several env vars must not conflict on spec hash",
+			ComposeCmd("run", "--rm", "migrate"),
+			OutputContains("migration done")).
 		Step("a scheduled job without explicit opt-out can be run manually",
 			ComposeCmd("run", "--rm", "backup"),
 			OutputContains("backup")).
@@ -93,6 +163,15 @@ func TestCreateRefusesJob(t *testing.T) {
 	NewScenario(t, "create must refuse a job by name, naming run as the right command").
 		Step("create fails naming the job",
 			ComposeCmd("create", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
+// up shares WithServices with create: the same translation must apply there too.
+func TestUpRefusesJob(t *testing.T) {
+	NewScenario(t, "up must refuse a job by name, naming run as the right command").
+		Step("up fails naming the job",
+			ComposeCmd("up", "-d", "migrate").MayFail(),
 			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
 			ServiceNotCreated("migrate"))
 }

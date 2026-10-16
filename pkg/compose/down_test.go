@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"sort"
 	"strings"
@@ -57,6 +58,14 @@ func TestDownRejectsInvalidImagePruneModeUpfront(t *testing.T) {
 		Images: "bogus",
 	})
 	assert.ErrorContains(t, err, `invalid image prune mode "bogus"`)
+}
+
+// noJobsDialer stands in for the jobs extension's gRPC dialer in tests that
+// reconstruct a project without a compose file (down's actualJobs lookup):
+// it fails to connect, which actualJobs treats the same as an engine with no
+// jobs feature — no jobs, no further mock expectations needed.
+func noJobsDialer(context.Context) (net.Conn, error) {
+	return nil, errors.New("no jobs dialer in tests")
 }
 
 func TestDown(t *testing.T) {
@@ -674,6 +683,10 @@ func prepareMocks(mockCtrl *gomock.Controller) (*mocks.MockAPIClient, *mocks.Moc
 	cli.EXPECT().Client().Return(api).AnyTimes()
 	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
 	cli.EXPECT().Out().Return(streams.NewOut(os.Stdout)).AnyTimes()
+	// down's actualJobs lookup calls Dialer() when it reconstructs a project
+	// without a compose file; AnyTimes() covers both that path and callers
+	// that pass an explicit Project and never reach it.
+	api.EXPECT().Dialer().Return(noJobsDialer).AnyTimes()
 	return api, cli
 }
 
