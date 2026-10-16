@@ -22,6 +22,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -198,14 +199,6 @@ func (s *composeService) execPreStartHook(
 		Condition: container.WaitConditionNextExit,
 	})
 
-	// Open the log stream before ContainerStart so a fast-exiting hook cannot
-	// race us to a 404. The dedicated logCtx lets us force the follow stream
-	// closed once the hook has exited, so a daemon that keeps the connection
-	// open cannot deadlock `<-logsDone`.
-	logCtx, cancelLogs := context.WithCancel(ctx)
-	defer cancelLogs()
-	logsDone, getTail := s.streamPreStartLogs(logCtx, containerID, service, index, listener)
-
 	if _, err := s.apiClient().ContainerStart(ctx, containerID, client.ContainerStartOptions{}); err != nil {
 		// AutoRemove is false, so we must remove the never-started container
 		// explicitly. A failed removal is logged so the orphan is visible.
@@ -219,12 +212,30 @@ func (s *composeService) execPreStartHook(
 		case <-waitRes.Result:
 		case <-ctx.Done():
 		}
-		cancelLogs()
-		<-logsDone
 		return err
 	}
 
+	// Open the log stream once the hook is started: on a container still in
+	// "created" state a follow stream ends at once, empty, so a stream opened
+	// before ContainerStart would never carry a line. A fast-exiting hook can't
+	// race us to a 404: the runner is retained after it exits (AutoRemove is
+	// off, runPreStart removes it once we return). The dedicated logCtx lets us
+	// force the follow stream closed, so a daemon that keeps the connection
+	// open cannot deadlock `<-logsDone`.
+	logCtx, cancelLogs := context.WithCancel(ctx)
+	defer cancelLogs()
+	logsDone, getTail := s.streamPreStartLogs(logCtx, containerID, service, index, listener)
+
 	waitErr := waitPreStart(ctx, service.Name, index, waitRes)
+	if ctx.Err() == nil {
+		// The daemon ends the follow stream itself once the hook has exited,
+		// after sending what it buffered: cancelling right away would cut that
+		// output off. Bounded, for a daemon that keeps the connection open.
+		select {
+		case <-logsDone:
+		case <-time.After(s.drainTimeout()):
+		}
+	}
 	cancelLogs()
 	<-logsDone
 	if waitErr != nil {

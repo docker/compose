@@ -23,7 +23,9 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
@@ -122,20 +124,20 @@ func TestPreStart_SuccessTwoHooksInOrder(t *testing.T) {
 	// Hook 1: wait (subscribe) → logs (subscribe) → start → remove.
 	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(scan)
-	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait1)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs1)
-	remove1 := expectSuccessRemove(apiClient, "hook-1").After(start1)
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(start1)
+	remove1 := expectSuccessRemove(apiClient, "hook-1").After(logs1)
 
 	// Hook 2 only runs after hook 1 has been removed.
 	wait2 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-2", gomock.Any()).
 		Return(waitResultExit(0)).After(remove1)
-	logs2 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-2", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait2)
 	start2 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-2", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs2)
-	expectSuccessRemove(apiClient, "hook-2").After(start2)
+		Return(client.ContainerStartResult{}, nil).After(wait2)
+	logs2 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-2", gomock.Any()).
+		Return(emptyLogs(), nil).After(start2)
+	expectSuccessRemove(apiClient, "hook-2").After(logs2)
 
 	err := tested.runPreStart(t.Context(), project, service, func(api.ContainerEvent) {})
 	assert.NilError(t, err)
@@ -157,10 +159,10 @@ func TestPreStart_FirstHookFailsStopsExecution(t *testing.T) {
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0), runnerSummary("hook-2", 1))
 	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(42)).After(scan)
-	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait1)
-	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs1)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(start1)
 	// Hook container is retained on failure — no ContainerRemove expected, and
 	// hook-2's runner is never touched.
 
@@ -284,11 +286,11 @@ func TestPreStart_SecondRunnerMissing(t *testing.T) {
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
 	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(scan)
-	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait1)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs1)
-	expectSuccessRemove(apiClient, "hook-1").After(start1)
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(start1)
+	expectSuccessRemove(apiClient, "hook-1").After(logs1)
 
 	err := tested.runPreStart(t.Context(), project, service, nil)
 	assert.ErrorContains(t, err, `service "web" pre_start[1]`)
@@ -524,10 +526,9 @@ func TestPreStart_ContainerStartFailurePropagates(t *testing.T) {
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
 	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(scan)
-	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait1)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, errors.New("daemon: container start failed")).After(logs1)
+		Return(client.ContainerStartResult{}, errors.New("daemon: container start failed")).After(wait1)
+	// No ContainerLogs: the log stream is only opened once the hook started.
 	// AutoRemove never fires when start fails, so the hook must drop the ghost
 	// container explicitly. This is distinct from the success-path removal
 	// (RemoveVolumes:true) — the never-started container has no logs to preserve.
@@ -640,12 +641,12 @@ func TestPreStart_DetachedModeAttachesLogs(t *testing.T) {
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
 	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(scan)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
 	// ContainerLogs MUST be called even with a nil listener.
 	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait1)
-	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs1)
-	expectSuccessRemove(apiClient, "hook-1")
+		Return(emptyLogs(), nil).After(start1)
+	expectSuccessRemove(apiClient, "hook-1").After(logs1)
 
 	err := tested.runPreStart(t.Context(), project, service, nil)
 	assert.NilError(t, err)
@@ -675,10 +676,10 @@ func TestPreStart_FailureIncludesTail(t *testing.T) {
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
 	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(1)).After(scan)
-	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(io.NopCloser(bytes.NewReader(logContent)), nil).After(wait1)
-	apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs1)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(io.NopCloser(bytes.NewReader(logContent)), nil).After(start1)
 	// Hook container is retained on failure — no ContainerRemove expected.
 
 	err := tested.runPreStart(t.Context(), project, service, nil)
@@ -686,6 +687,167 @@ func TestPreStart_FailureIncludesTail(t *testing.T) {
 	assert.ErrorContains(t, err, "pre_start[0]")
 	// Stderr content must be in the error (stderr bias).
 	assert.ErrorContains(t, err, "doesn't exist")
+}
+
+// blockingLogs is a log stream that delivers its content, then stays open until
+// its context is canceled, like a daemon that does not end the follow stream
+// when the container exits.
+type blockingLogs struct {
+	io.Reader
+	ctx context.Context
+}
+
+func (b *blockingLogs) Read(p []byte) (int, error) {
+	n, err := b.Reader.Read(p)
+	if err == io.EOF {
+		<-b.ctx.Done()
+	}
+	return n, err
+}
+
+func (b *blockingLogs) Close() error { return nil }
+
+// slowLogs is a log stream that delivers its content only after a delay,
+// honoring its context, like a daemon still flushing the output of a hook that
+// has already exited.
+type slowLogs struct {
+	io.Reader
+	ctx   context.Context
+	delay time.Duration
+	done  bool
+}
+
+func (s *slowLogs) Read(p []byte) (int, error) {
+	if !s.done {
+		s.done = true
+		select {
+		case <-time.After(s.delay):
+		case <-s.ctx.Done():
+			return 0, s.ctx.Err()
+		}
+	}
+	return s.Reader.Read(p)
+}
+
+func (s *slowLogs) Close() error { return nil }
+
+// TestPreStart_OutputReachesListener pins that a hook's output reaches the
+// listener: the log stream is opened once the hook is started (ordering
+// enforced by the expectations), since a follow stream opened on a runner
+// still in "created" state ends at once, empty.
+func TestPreStart_OutputReachesListener(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "hello"}}},
+		},
+	}
+
+	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0)).After(scan)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(io.NopCloser(bytes.NewReader(stdcopyFrame(1, "hello\n"))), nil).After(start1)
+	expectSuccessRemove(apiClient, "hook-1").After(logs1)
+
+	var lines []string
+	err := tested.runPreStart(t.Context(), project, service, func(e api.ContainerEvent) {
+		if e.Type == api.HookEventLog {
+			lines = append(lines, e.Line)
+		}
+	})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, lines, []string{"hello"})
+}
+
+// TestPreStart_FinishedHookOutputIsDrainedBeforeCutting pins the drain: a
+// hook that already exited must not have its log stream cut while the daemon
+// is still delivering the output it buffered.
+func TestPreStart_FinishedHookOutputIsDrainedBeforeCutting(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+	tested.logStreamDrainTimeout = 5 * time.Second
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "hello"}}},
+		},
+	}
+
+	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0)).After(scan)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ client.ContainerLogsOptions) (io.ReadCloser, error) {
+			return &slowLogs{Reader: bytes.NewReader(stdcopyFrame(1, "hello\n")), ctx: ctx, delay: 20 * time.Millisecond}, nil
+		}).After(start1)
+	expectSuccessRemove(apiClient, "hook-1").After(logs1)
+
+	var lines []string
+	var mu sync.Mutex
+	err := tested.runPreStart(t.Context(), project, service, func(e api.ContainerEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		if e.Type == api.HookEventLog {
+			lines = append(lines, e.Line)
+		}
+	})
+	assert.NilError(t, err)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.DeepEqual(t, lines, []string{"hello"})
+}
+
+// TestPreStart_FinishedHookDoesNotWaitForAnOpenLogStream pins that a daemon
+// keeping the log stream open after the hook exited cannot hang the run: the
+// stream is cut once the drain delay elapsed, with what it carried so far kept.
+func TestPreStart_FinishedHookDoesNotWaitForAnOpenLogStream(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+	tested.logStreamDrainTimeout = 50 * time.Millisecond
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"echo", "hello"}}},
+		},
+	}
+
+	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0)).After(scan)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ client.ContainerLogsOptions) (io.ReadCloser, error) {
+			return &blockingLogs{Reader: bytes.NewReader(stdcopyFrame(1, "hello\n")), ctx: ctx}, nil
+		}).After(start1)
+	expectSuccessRemove(apiClient, "hook-1").After(logs1)
+
+	var lines []string
+	var mu sync.Mutex
+	err := tested.runPreStart(t.Context(), project, service, func(e api.ContainerEvent) {
+		mu.Lock()
+		defer mu.Unlock()
+		if e.Type == api.HookEventLog {
+			lines = append(lines, e.Line)
+		}
+	})
+	assert.NilError(t, err)
+	mu.Lock()
+	defer mu.Unlock()
+	assert.DeepEqual(t, lines, []string{"hello"})
 }
 
 // ---------------------------------------------------------------------------
@@ -1068,12 +1230,10 @@ func TestPreStart_ContainerStartFailureAndRemoveFails(t *testing.T) {
 	}
 
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0))
-	apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(scan)
-	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil)
 	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, errors.New("start failed")).After(logs1)
+		Return(client.ContainerStartResult{}, errors.New("start failed")).After(wait1)
 	// Both the start AND the cleanup removal fail.
 	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
 		Return(client.ContainerRemoveResult{}, errors.New("removal failed")).After(start1)

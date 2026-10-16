@@ -106,6 +106,16 @@ func TestPreStartHookInError(t *testing.T) {
 			ServiceState("sample", "created"))
 }
 
+// The output of a failing hook is what tells why it failed: it must reach the
+// error, which is built from the log stream opened on the running hook.
+func TestPreStartHookFailureShowsOutput(t *testing.T) {
+	NewScenario(t, "a failing pre_start hook must report what it printed").
+		Step("up fails, and the error carries the hook's output",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains("hook-diagnostic-marker"))
+}
+
 // A retained runner from a failed run must not block the next one: it is a
 // stale hook container the reconciler has to observe and purge before
 // creating a fresh one under the same deterministic name, or the second up

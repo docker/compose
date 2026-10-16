@@ -1047,11 +1047,11 @@ func TestExecutePlanStartPhaseFullChainThroughCreateNode(t *testing.T) {
 	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0)).After(driftCheck)
 	wait := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
 		Return(waitResultExit(0)).After(scan)
-	logs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(wait)
 	hookStart := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(logs)
-	expectSuccessRemove(apiClient, "hook-1").After(hookStart)
+		Return(client.ContainerStartResult{}, nil).After(wait)
+	logs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(hookStart)
+	expectSuccessRemove(apiClient, "hook-1").After(logs)
 
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "new-id", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
