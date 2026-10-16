@@ -73,9 +73,17 @@ services:
       - "5000:5000"
     volumes:
       - .:/code
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
   redis:
     image: redis
 ```
+
+The `healthcheck` tells Compose how to determine whether a service is healthy. In
+this example, Compose runs `curl` inside the `web` container every 30 seconds
+to check port 5000 and considers the service healthy when the HTTP request
+succeeds. The image built for `web` must include `curl`.
 
 Contributing
 ------------
