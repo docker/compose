@@ -31,6 +31,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -131,6 +132,7 @@ type bakeBuild struct {
 	localWritePaths []string          // local cache destinations bake needs `--allow fs.write` for
 	entitlements    []string
 	secretsEnv      []string
+	jobs            int // bake `--jobs` limit, 0 for unlimited
 }
 
 func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
@@ -177,6 +179,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
+	bake.jobs = bakeJobs(bake.cfg, s.maxConcurrency, buildx.Version)
 	args := bakeArgs(bake, metadataFile, options)
 	logrus.Debugf("Executing bake with args: %v", args)
 
@@ -498,10 +501,54 @@ func bakeArgs(bake *bakeBuild, metadataFile string, options api.BuildOptions) []
 	if options.Builder != "" {
 		args = append(args, "--builder", options.Builder)
 	}
+	if bake.jobs > 0 {
+		args = append(args, "--jobs", strconv.Itoa(bake.jobs))
+	}
 	if options.Quiet {
 		args = append(args, "--progress=quiet")
 	}
 	return args
+}
+
+// bakeJobs returns how many targets bake can build concurrently
+func bakeJobs(cfg bakeConfig, maxConcurrency int, buildxVersion string) int {
+	// no limit
+	if maxConcurrency <= 0 {
+		return 0
+	}
+	// limit doesn't hold target back
+	targets, linked := bakeTargets(cfg)
+	if maxConcurrency >= targets {
+		return 0
+	}
+	if versions.LessThan(buildxVersion[1:], buildxJobsMinVersion) {
+		logrus.Warnf("limiting build concurrency requires buildx %s or later, ignoring parallel limit", buildxJobsMinVersion)
+		return 0
+	}
+	// bake rejects a limit lower than its target count once any are linked by `target:` contexts
+	if linked {
+		logrus.Warnf("bake does not support a parallel limit lower than its %d linked build targets, ignoring parallel limit", targets)
+		return 0
+	}
+	return maxConcurrency
+}
+
+// bakeTargets counts the targets bake builds for the default group, those
+// linked in by `target:` contexts included, and reports whether any link exists.
+func bakeTargets(cfg bakeConfig) (int, bool) {
+	targets := slices.Clone(cfg.Groups["default"].Targets)
+	linked := false
+	for i := 0; i < len(targets); i++ {
+		for _, source := range cfg.Targets[targets[i]].Contexts {
+			if target, ok := strings.CutPrefix(source, "target:"); ok {
+				linked = true
+				if !slices.Contains(targets, target) {
+					targets = append(targets, target)
+				}
+			}
+		}
+	}
+	return len(targets), linked
 }
 
 // waitBake forwards the solve statuses of a started bake command's rawjson
