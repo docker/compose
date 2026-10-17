@@ -112,6 +112,24 @@ func TestComposeRunNoRecreate(t *testing.T) {
 			ServiceState("dep", "running"))
 }
 
+func TestComposeRunInheritsAnonymousVolumes(t *testing.T) {
+	// A dependency whose config-hash diverged is recreated by run like by up,
+	// but run used to drop its anonymous volumes on the way: the new container
+	// got a fresh, empty volume, so a database dependency looked wiped. The
+	// marker is written from the test, not by the container itself, so a fresh
+	// volume cannot pass the check by writing it again.
+	NewScenario(t, "run must keep the anonymous volumes of a dependency it recreates, as up does").
+		Step("run creates and starts the dependency",
+			ComposeCmd("run", "task").WithEnv("TAG=one"),
+			ServiceState("dep", "running")).
+		Step("data lands in the dependency's anonymous volume",
+			ComposeCmd("exec", "dep", "sh", "-c", "echo kept > /data/marker")).
+		Step("a diverged dependency recreated by run still sees that data",
+			ComposeCmd("run", "task").WithEnv("TAG=two", "COMPOSE_IGNORE_ORPHANS=True"),
+			Recreated("dep"),
+			ExecOutputContains("dep", "cat /data/marker", "kept"))
+}
+
 func TestComposeRunNotRequiredDeps(t *testing.T) {
 	NewScenario(t, "run must skip a dependency marked required: false when its profile is inactive").
 		Step("run executes the service without materializing the optional dependency",
