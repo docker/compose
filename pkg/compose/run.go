@@ -304,6 +304,9 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 		// passes "never" so an existing dependency is reused as-is
 		Recreate:             options.Recreate,
 		RecreateDependencies: options.RecreateDependencies,
+		// a recreated dependency keeps its anonymous volumes, as with `up`:
+		// run has no --renew-anon-volumes to opt out
+		Inherit: true,
 	})
 	if err != nil {
 		return err
