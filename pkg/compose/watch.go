@@ -314,7 +314,7 @@ func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]
 	// add a hardcoded set of ignores on top of what came from .dockerignore
 	// some of this should likely be configurable (e.g. there could be cases
 	// where you want `.git` to be synced) but this is suitable for now
-	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{"**/.git"})
 	if err != nil {
 		return nil, err
 	}
