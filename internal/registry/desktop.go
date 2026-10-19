@@ -18,8 +18,6 @@ package registry
 
 import (
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -38,7 +36,7 @@ const (
 	// unexpected request delay by the secrets engine.
 	desktopLookupTimeout = 5 * time.Second
 	sessionExpirySkew    = 30 * time.Second
-	// sessionTTL is how long a token without a readable expiry is reused.
+	// sessionTTL is how long a session without an expiry claim is reused.
 	sessionTTL = time.Minute
 	// retryInterval is how long Desktop is not asked again after a failed lookup.
 	retryInterval = time.Minute
@@ -200,8 +198,8 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 
 	now := s.now()
 	validUntil := now.Add(sessionTTL)
-	if expiresAt, ok := sessionExpiry(session); ok {
-		validUntil = expiresAt.Add(-sessionExpirySkew)
+	if exp := session.Claims.ExpiresAt; exp != nil {
+		validUntil = exp.Add(-sessionExpirySkew)
 		if !now.Before(validUntil) {
 			return clitypes.AuthConfig{}, time.Time{}, errSessionExpired
 		}
@@ -212,31 +210,6 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 		Password:      session.AccessToken,
 		ServerAddress: s.serverAddress,
 	}, validUntil, nil
-}
-
-func sessionExpiry(session dockerhub.UserSession) (time.Time, bool) {
-	if exp := session.Claims.ExpiresAt; exp != nil {
-		return exp.Time, true
-	}
-	return jwtExpiry(session.AccessToken)
-}
-
-func jwtExpiry(token string) (time.Time, bool) {
-	parts := strings.Split(token, ".")
-	if len(parts) != 3 {
-		return time.Time{}, false
-	}
-	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
-	if err != nil {
-		return time.Time{}, false
-	}
-	var claims struct {
-		ExpiresAt *dockerhub.NumericDate `json:"exp"`
-	}
-	if err := json.Unmarshal(payload, &claims); err != nil || claims.ExpiresAt == nil {
-		return time.Time{}, false
-	}
-	return claims.ExpiresAt.Time, true
 }
 
 func logDesktopFallback(name string, err error) {
