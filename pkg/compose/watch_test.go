@@ -177,6 +177,34 @@ func TestWatch_Sync(t *testing.T) {
 	})
 }
 
+// #14362: the .git ignore rule only matched /.git, not .git inside the watched path.
+func TestWatchRules_IgnoreGitDirectoryAtAnyDepth(t *testing.T) {
+	root := t.TempDir()
+	rules, err := getWatchRules(&types.DevelopConfig{
+		Watch: []types.Trigger{{Path: root, Action: "rebuild"}},
+	}, types.ServiceConfig{Name: "test"})
+	assert.NilError(t, err)
+	assert.Equal(t, len(rules), 1)
+
+	for _, tt := range []struct {
+		path    string
+		ignored bool
+	}{
+		{path: ".git", ignored: true},
+		{path: ".git/index", ignored: true},
+		{path: ".git/objects/ab/cdef", ignored: true},
+		{path: "vendor/lib/.git/HEAD", ignored: true},
+		{path: "main.go", ignored: false},
+		{path: ".gitignore", ignored: false},
+		{path: ".github/workflows/ci.yml", ignored: false},
+	} {
+		t.Run(tt.path, func(t *testing.T) {
+			mapping := rules[0].Matches(watch.NewFileEvent(filepath.Join(root, filepath.FromSlash(tt.path))))
+			assert.Equal(t, mapping == nil, tt.ignored)
+		})
+	}
+}
+
 // A rebuild running in the background from an earlier batch must not be
 // raced by a plain restart of the same service triggered by a later batch:
 // the restart is folded into the scheduler instead — the stale run is
