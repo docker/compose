@@ -1,6 +1,6 @@
 module github.com/docker/compose/v5
 
-go 1.26.8
+go 1.27.2
 
 require (
 	github.com/DefangLabs/secret-detector v0.0.0-20260916192156-3e28d7ed64df
@@ -17,8 +17,8 @@ require (
 	github.com/docker/cli v29.9.1+incompatible
 	github.com/docker/cli-docs-tool v0.11.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/secrets-engine/client v0.2.0
-	github.com/docker/secrets-engine/x v0.8.3
+	github.com/docker/secrets-engine/client v0.2.1
+	github.com/docker/secrets-engine/x v0.8.4
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/fsnotify/fsevents v0.2.0
 	github.com/google/go-cmp v0.7.0
