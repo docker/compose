@@ -168,7 +168,7 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 				return err
 			}
 			defer releaseSlot(limiter)
-			return s.removeVolume(ctx, volumeName)
+			return s.removeVolume(ctx, volumeName, project.Name)
 		})
 	}
 
@@ -380,12 +380,23 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 	return nil
 }
 
-func (s *composeService) removeVolume(ctx context.Context, id string) error {
+func (s *composeService) removeVolume(ctx context.Context, id string, projectName string) error {
 	resource := "Volume " + id
 
-	_, err := s.apiClient().VolumeInspect(ctx, id, client.VolumeInspectOptions{})
+	res, err := s.apiClient().VolumeInspect(ctx, id, client.VolumeInspectOptions{})
 	if errdefs.IsNotFound(err) {
 		// Already gone
+		return nil
+	}
+	// A volume declared with an explicit name can belong to another project
+	// sharing that name, or have been created outside Compose: up only reuses
+	// such a volume (see ownedConfigHash), so down must not remove it either.
+	if owner := res.Volume.Labels[api.ProjectLabel]; err == nil && owner != projectName {
+		reason := fmt.Sprintf("Volume belongs to project %q", owner)
+		if owner == "" {
+			reason = "Volume was not created by Docker Compose"
+		}
+		s.events.On(newEvent(resource, api.Warning, "Skipped", reason))
 		return nil
 	}
 
