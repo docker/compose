@@ -31,6 +31,7 @@ import (
 	seclient "github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/dockerhub"
 	"github.com/moby/moby/api/pkg/authconfig"
+	"go.opentelemetry.io/otel/trace/noop"
 	"gotest.tools/v3/assert"
 )
 
@@ -42,10 +43,17 @@ type fakeHub struct {
 	profile      dockerhub.Profile
 	profileErr   error
 	sessionCalls atomic.Int32
+	// duringSession runs inside GetDefaultSession; an error fails the call.
+	duringSession func(ctx context.Context) error
 }
 
-func (f *fakeHub) GetDefaultSession(context.Context) (dockerhub.UserSession, error) {
+func (f *fakeHub) GetDefaultSession(ctx context.Context) (dockerhub.UserSession, error) {
 	f.sessionCalls.Add(1)
+	if f.duringSession != nil {
+		if err := f.duringSession(ctx); err != nil {
+			return dockerhub.UserSession{}, err
+		}
+	}
 	return f.session, f.sessionErr
 }
 
@@ -107,13 +115,15 @@ type testProvider struct {
 	staging  *fakeHub
 }
 
-func newTestProvider(hub hubSessions, connectErr error) *testProvider {
+func newTestProvider(t *testing.T, hub hubSessions, connectErr error) *testProvider {
+	t.Helper()
 	tp := &testProvider{
 		fallback: &recordingFallback{},
 		clock:    &fakeClock{t: testNow},
 		staging:  &fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile},
 	}
 	tp.desktopAuthProvider = &desktopAuthProvider{
+		ctx:      t.Context(),
 		fallback: tp.fallback,
 		hub: &desktopSession{
 			name:          "Docker Hub",
@@ -127,6 +137,7 @@ func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 			},
 			timeout: time.Second,
 			now:     tp.clock.now,
+			tracer:  noop.NewTracerProvider().Tracer(""),
 		},
 		stagingHub: &desktopSession{
 			name:          "Docker Hub staging",
@@ -136,6 +147,7 @@ func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 			},
 			timeout: time.Second,
 			now:     tp.clock.now,
+			tracer:  noop.NewTracerProvider().Tracer(""),
 		},
 	}
 	return tp
@@ -152,9 +164,9 @@ func stagingCredentials() clitypes.AuthConfig {
 }
 
 func TestNewDesktopAuthProvider_SharesOneSessionPerEnvironment(t *testing.T) {
-	a, ok := NewDesktopAuthProvider(&recordingFallback{}).(*desktopAuthProvider)
+	a, ok := NewDesktopAuthProvider(t.Context(), &recordingFallback{}).(*desktopAuthProvider)
 	assert.Assert(t, ok)
-	b, ok := NewDesktopAuthProvider(&recordingFallback{}).(*desktopAuthProvider)
+	b, ok := NewDesktopAuthProvider(t.Context(), &recordingFallback{}).(*desktopAuthProvider)
 	assert.Assert(t, ok)
 	assert.Assert(t, a.hub == b.hub, "providers must share the process-wide Docker Hub session")
 	assert.Assert(t, a.stagingHub == b.stagingHub, "providers must share the process-wide Docker Hub staging session")
@@ -165,8 +177,8 @@ func TestNewDesktopAuthProvider_SharesOneSessionPerEnvironment(t *testing.T) {
 
 func TestDesktopAuthProvider_ProvidersOnOneSessionFetchOnce(t *testing.T) {
 	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-	p := newTestProvider(hub, nil)
-	other := &desktopAuthProvider{fallback: &recordingFallback{}, hub: p.hub, stagingHub: p.stagingHub}
+	p := newTestProvider(t, hub, nil)
+	other := &desktopAuthProvider{ctx: t.Context(), fallback: &recordingFallback{}, hub: p.hub, stagingHub: p.stagingHub}
 
 	for _, provider := range []AuthProvider{p, other} {
 		got, err := provider.GetAuthConfig("docker.io")
@@ -180,7 +192,7 @@ func TestDesktopAuthProvider_DockerHubUsesDesktopSession(t *testing.T) {
 	for _, host := range []string{"docker.io", "index.docker.io", "registry-1.docker.io", IndexServer} {
 		t.Run(host, func(t *testing.T) {
 			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-			p := newTestProvider(hub, nil)
+			p := newTestProvider(t, hub, nil)
 
 			got, err := p.GetAuthConfig(host)
 			assert.NilError(t, err)
@@ -201,7 +213,7 @@ func TestDesktopAuthProvider_OtherRegistriesUseFallback(t *testing.T) {
 	for _, host := range hosts {
 		t.Run(host, func(t *testing.T) {
 			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-			p := newTestProvider(hub, nil)
+			p := newTestProvider(t, hub, nil)
 			p.signInToStaging()
 
 			got, err := p.GetAuthConfig(host)
@@ -217,7 +229,7 @@ func TestDesktopAuthProvider_DHIUsesDockerHubSession(t *testing.T) {
 	for _, host := range []string{DHIRegistryHost, DHIIndexServer, DHIIndexServer + "/"} {
 		t.Run(host, func(t *testing.T) {
 			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-			p := newTestProvider(hub, nil)
+			p := newTestProvider(t, hub, nil)
 			p.signInToStaging()
 
 			want := desktopCredentials()
@@ -241,7 +253,7 @@ func TestDesktopAuthProvider_StagingRegistryUsesStagingSession(t *testing.T) {
 	for _, host := range []string{StagingRegistryHost, StagingIndexServer, "https://" + StagingRegistryHost} {
 		t.Run(host, func(t *testing.T) {
 			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-			p := newTestProvider(hub, nil)
+			p := newTestProvider(t, hub, nil)
 			p.signInToStaging()
 
 			got, err := p.GetAuthConfig(host)
@@ -255,7 +267,7 @@ func TestDesktopAuthProvider_StagingRegistryUsesStagingSession(t *testing.T) {
 func TestDesktopAuthProvider_EnvironmentsDoNotMix(t *testing.T) {
 	t.Run("staging session is not used for docker.io", func(t *testing.T) {
 		// Desktop in stage mode: signed in to staging only.
-		p := newTestProvider(&fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile}, nil)
+		p := newTestProvider(t, &fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile}, nil)
 		p.signInToStaging()
 
 		got, err := p.GetAuthConfig("docker.io")
@@ -269,7 +281,7 @@ func TestDesktopAuthProvider_EnvironmentsDoNotMix(t *testing.T) {
 
 	t.Run("production session is not used for the staging registry", func(t *testing.T) {
 		hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-		p := newTestProvider(hub, nil)
+		p := newTestProvider(t, hub, nil)
 
 		got, err := p.GetAuthConfig(StagingRegistryHost)
 		assert.NilError(t, err)
@@ -286,7 +298,7 @@ func TestDesktopAuthProvider_UsernameFromProfile(t *testing.T) {
 		session: hubSession("", testNow.Add(time.Hour)),
 		profile: dockerhub.Profile{Username: "hubuser"},
 	}
-	p := newTestProvider(hub, nil)
+	p := newTestProvider(t, hub, nil)
 
 	got, err := p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
@@ -334,7 +346,7 @@ func TestDesktopAuthProvider_FallsBackWithoutUsableSession(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			p := newTestProvider(tc.hub, nil)
+			p := newTestProvider(t, tc.hub, nil)
 
 			for range 2 {
 				got, err := p.GetAuthConfig("docker.io")
@@ -347,7 +359,7 @@ func TestDesktopAuthProvider_FallsBackWithoutUsableSession(t *testing.T) {
 }
 
 func TestDesktopAuthProvider_FallsBackWhenClientCannotBeCreated(t *testing.T) {
-	p := newTestProvider(nil, errors.New("no socket path"))
+	p := newTestProvider(t, nil, errors.New("no socket path"))
 
 	for range 2 {
 		got, err := p.GetAuthConfig("docker.io")
@@ -359,7 +371,7 @@ func TestDesktopAuthProvider_FallsBackWhenClientCannotBeCreated(t *testing.T) {
 
 func TestDesktopAuthProvider_RetriesAfterInterval(t *testing.T) {
 	hub := &fakeHub{sessionErr: dockerhub.ErrNoDefaultProfile}
-	p := newTestProvider(hub, nil)
+	p := newTestProvider(t, hub, nil)
 
 	got, err := p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
@@ -414,7 +426,7 @@ func connectError(reason seclient.ConnectReason) error {
 func TestDesktopAuthProvider_ReusesSessionUntilExpiry(t *testing.T) {
 	expiresAt := testNow.Add(10 * time.Minute)
 	hub := &fakeHub{session: hubSession("hubuser", expiresAt)}
-	p := newTestProvider(hub, nil)
+	p := newTestProvider(t, hub, nil)
 
 	_, err := p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
@@ -437,7 +449,7 @@ func TestDesktopAuthProvider_ReusesSessionUntilExpiry(t *testing.T) {
 
 func TestDesktopAuthProvider_RefetchesSessionWithoutExpiry(t *testing.T) {
 	hub := &fakeHub{session: hubSession("hubuser", time.Time{})}
-	p := newTestProvider(hub, nil)
+	p := newTestProvider(t, hub, nil)
 
 	_, err := p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
@@ -461,7 +473,7 @@ func TestDesktopAuthProvider_ExpiryFromTokenWhenClaimsLackIt(t *testing.T) {
 	t.Run("expired token falls back", func(t *testing.T) {
 		session := hubSession("hubuser", time.Time{})
 		session.AccessToken = fakeJWT(testNow.Add(-time.Minute))
-		p := newTestProvider(&fakeHub{session: session}, nil)
+		p := newTestProvider(t, &fakeHub{session: session}, nil)
 
 		got, err := p.GetAuthConfig("docker.io")
 		assert.NilError(t, err)
@@ -472,7 +484,7 @@ func TestDesktopAuthProvider_ExpiryFromTokenWhenClaimsLackIt(t *testing.T) {
 		session := hubSession("hubuser", time.Time{})
 		session.AccessToken = fakeJWT(testNow.Add(10 * time.Minute))
 		hub := &fakeHub{session: session}
-		p := newTestProvider(hub, nil)
+		p := newTestProvider(t, hub, nil)
 
 		got, err := p.GetAuthConfig("docker.io")
 		assert.NilError(t, err)
@@ -497,9 +509,19 @@ func TestJWTExpiry(t *testing.T) {
 	}
 }
 
+func TestIsJWT(t *testing.T) {
+	enc := base64.RawURLEncoding.EncodeToString
+	for _, token := range []string{fakeJWT(testNow), "a." + enc([]byte(`{}`)) + ".c"} {
+		assert.Assert(t, isJWT(token), token)
+	}
+	for _, token := range []string{"", "opaque-token", "a.b", "a.%%%.c", "a." + enc([]byte(`not json`)) + ".c", "a." + enc([]byte(`[1]`)) + ".c"} {
+		assert.Assert(t, !isJWT(token), token)
+	}
+}
+
 func TestDesktopAuthProvider_ConcurrentLookupsShareOneFetch(t *testing.T) {
 	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-	p := newTestProvider(hub, nil)
+	p := newTestProvider(t, hub, nil)
 
 	const lookups = 20
 	results := make([]clitypes.AuthConfig, lookups)
@@ -522,7 +544,7 @@ func TestDesktopAuthProvider_ConcurrentLookupsShareOneFetch(t *testing.T) {
 
 func TestEncodedAuth_DesktopSession(t *testing.T) {
 	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
-	p := newTestProvider(hub, nil)
+	p := newTestProvider(t, hub, nil)
 	ref, err := reference.ParseNormalizedNamed("alpine")
 	assert.NilError(t, err)
 

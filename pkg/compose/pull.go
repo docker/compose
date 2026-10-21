@@ -304,7 +304,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	encodedAuth, err := registry.EncodedAuth(ref, s.authProvider())
+	encodedAuth, err := registry.EncodedAuth(ref, s.authProvider(ctx))
 	if err != nil {
 		return err
 	}
@@ -388,7 +388,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 //
 // Docker Hub credentials come from the Docker Desktop session first.
 func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {
-	return imageDigestResolver(ctx, registry.NewDesktopAuthProvider(file), apiClient)
+	return imageDigestResolver(ctx, registry.NewDesktopAuthProvider(ctx, file), apiClient)
 }
 
 func imageDigestResolver(ctx context.Context, credentials registry.AuthProvider, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {

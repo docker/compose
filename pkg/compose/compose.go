@@ -29,7 +29,6 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/config/configfile"
-	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/container"
@@ -74,10 +73,7 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 
 		logStreamDrainTimeout: defaultLogStreamDrainTimeout,
 	}
-	// Look the config file up lazily: WithDryRun replaces s.dockerCli.
-	s.auth = registry.NewDesktopAuthProvider(registry.AuthProviderFunc(func(registryHostname string) (clitypes.AuthConfig, error) {
-		return s.configFile().GetAuthConfig(registryHostname)
-	}))
+	s.desktopAuth = true
 	for _, option := range options {
 		if err := option(s); err != nil {
 			return nil, err
@@ -299,7 +295,8 @@ type composeService struct {
 	maxConcurrency int
 	dryRun         bool
 
-	auth registry.AuthProvider
+	// desktopAuth enables Docker Desktop credentials, see authProvider.
+	desktopAuth bool
 
 	runtimeAPIVersion runtimeVersionCache
 
@@ -337,11 +334,11 @@ func (s *composeService) configFile() *configfile.ConfigFile {
 
 // authProvider uses the config file only for services not built by
 // NewComposeService, so unit tests never reach Docker Desktop.
-func (s *composeService) authProvider() registry.AuthProvider {
-	if s.auth != nil {
-		return s.auth
+func (s *composeService) authProvider(ctx context.Context) registry.AuthProvider {
+	if !s.desktopAuth {
+		return s.configFile()
 	}
-	return s.configFile()
+	return registry.NewDesktopAuthProvider(ctx, s.configFile())
 }
 
 // getContextInfo returns the context info - either custom override or dockerCli adapter
