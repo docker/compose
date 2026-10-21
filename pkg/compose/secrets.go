@@ -97,12 +97,19 @@ func warnIgnoredFileReferences(project *types.Project, services []string) {
 		if !ok || service.GetScale() == 0 {
 			continue
 		}
-		for _, ref := range service.Configs {
-			warnIgnoredFileReference(name, "configs", types.FileReferenceConfig(ref), types.FileObjectConfig(project.Configs[ref.Source]))
-		}
-		for _, ref := range service.Secrets {
-			warnIgnoredFileReference(name, "secrets", types.FileReferenceConfig(ref), types.FileObjectConfig(project.Secrets[ref.Source]))
-		}
+		warnServiceFileReferences(project, service)
+	}
+}
+
+// warnServiceFileReferences is warnIgnoredFileReferences for a service that is
+// known to get a container, whatever its scale in the project: `run` creates
+// its target from a copy forced to a scale of one.
+func warnServiceFileReferences(project *types.Project, service types.ServiceConfig) {
+	for _, ref := range service.Configs {
+		warnIgnoredFileReference(service.Name, "configs", types.FileReferenceConfig(ref), types.FileObjectConfig(project.Configs[ref.Source]))
+	}
+	for _, ref := range service.Secrets {
+		warnIgnoredFileReference(service.Name, "secrets", types.FileReferenceConfig(ref), types.FileObjectConfig(project.Secrets[ref.Source]))
 	}
 }
 
