@@ -145,6 +145,10 @@ var serviceHashKeyOrder = []string{
 	// merge order made the fallback place it here already: listing it is a
 	// no-op for every hash, it only freezes the position)
 	"pull_refresh_after",
+	// added with compose-go v2.16.2 (the umask service attribute): the
+	// sorted fallback would place it here already, listing it only freezes
+	// the position
+	"umask",
 }
 
 // trimServiceHashFields removes the attributes deliberately excluded from the
