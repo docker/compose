@@ -96,6 +96,16 @@ func TestWarnIgnoredFileReferences(t *testing.T) {
 		`service "web": secrets.file-secret.uid: uid` + ignored,
 	})
 
+	// a run target scaled to zero in the project still gets a container, built
+	// from a copy with a scale of one: it is reported when handed over as such.
+	runTarget := project.Services["scaled-down"]
+	one := 1
+	runTarget.Scale = &one
+	hook := logrustest.NewGlobal()
+	defer hook.Reset()
+	warnServiceFileReferences(project, runTarget)
+	assert.Equal(t, len(hook.AllEntries()), 3)
+
 	// services outside the requested set are not reported.
 	assert.Equal(t, len(collect([]string{"other"})), 3)
 	assert.Equal(t, len(collect([]string{"unknown"})), 0)

@@ -25,6 +25,15 @@ services:
         uid: "1000"
         mode: 0o440
 
+  # run-only: scaled to zero, so create/up skip it, yet `run` creates a container.
+  run-only:
+    image: alpine
+    scale: 0
+    configs:
+      - source: fileconfig
+        uid: "1000"
+        mode: 0o440
+
 configs:
   fileconfig:
     file: ./myconfig.txt

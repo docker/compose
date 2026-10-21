@@ -75,8 +75,12 @@ func TestFileReferenceOverridesWarning(t *testing.T) {
 			OutputContains(`service \"file-refs\": secrets.filesecret.uid`),
 			OutputContains(`service \"file-refs\": secrets.filesecret.mode`),
 			OutputNotContains(`secrets.filesecret.gid`),
-			OutputNotContains(`service \"inline-refs\"`)).
+			OutputNotContains(`service \"inline-refs\"`),
+			OutputNotContains(`service \"run-only\"`)).
 		Step("running the service reports them too, since its container is not created by create",
 			ComposeCmd("run", "--rm", "file-refs", "true"),
-			OutputContains(`service \"file-refs\": configs.fileconfig.uid`))
+			OutputContains(`service \"file-refs\": configs.fileconfig.uid`)).
+		Step("running a service scaled to zero reports them too, since run creates its container anyway",
+			ComposeCmd("run", "--rm", "run-only", "true"),
+			OutputContains(`service \"run-only\": configs.fileconfig.uid`))
 }
