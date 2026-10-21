@@ -45,6 +45,8 @@ var (
 	ErrParsingFailed = errors.New("parsing failed")
 	// ErrNoResources is returned when operation didn't selected any resource
 	ErrNoResources = errors.New("no resources")
+	// ErrJobsNotSupported is returned when a job operation requires an engine exposing the jobs API
+	ErrJobsNotSupported = errors.New("jobs are not supported by the engine")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound
