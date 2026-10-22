@@ -1,0 +1,20 @@
+services:
+  # never becomes healthy: api, which waits for it, cannot start before web fails
+  db:
+    image: alpine
+    command: sleep infinity
+    healthcheck:
+      test: ["CMD", "false"]
+      interval: 1s
+
+  api:
+    image: alpine
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # fails to start: the executable does not exist
+  web:
+    image: alpine
+    command: ["/does-not-exist"]
