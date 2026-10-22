@@ -33,6 +33,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/streams"
 	"github.com/moby/buildkit/client"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -147,6 +148,49 @@ func TestBakeReadGrants(t *testing.T) {
 		"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", "metadata.json",
 		"--allow", "fs.read=/outside/Dockerfile", "--allow", "fs.read=/project", "--allow", "fs.read=/secrets/token",
 	})
+}
+
+func TestBakeJobs(t *testing.T) {
+	group := func(targets ...string) bakeConfig {
+		return bakeConfig{
+			Groups: map[string]bakeGroup{"default": {Targets: targets}},
+			Targets: map[string]bakeTarget{
+				"app":  {Contexts: map[string]string{"base": "target:base"}},
+				"base": {},
+				"db":   {},
+				"web":  {},
+			},
+		}
+	}
+	for _, tc := range []struct {
+		name           string
+		cfg            bakeConfig
+		maxConcurrency int
+		buildx         string
+		want           int
+		warn           bool
+	}{
+		{name: "unlimited", cfg: group("base", "db", "web"), maxConcurrency: -1, buildx: "v0.38.0"},
+		{name: "limited, link not built", cfg: group("base", "db", "web"), maxConcurrency: 2, buildx: "v0.38.0", want: 2},
+		{name: "limit holds no target back", cfg: group("base", "db"), maxConcurrency: 2, buildx: "v0.38.0"},
+		{name: "buildx too old", cfg: group("base", "db", "web"), maxConcurrency: 2, buildx: "v0.37.2", warn: true},
+		{name: "linked targets", cfg: group("app", "base", "db"), maxConcurrency: 2, buildx: "v0.38.0", warn: true},
+		{name: "linked targets, limit holds no target back", cfg: group("app", "base", "db"), maxConcurrency: 3, buildx: "v0.38.0"},
+		{name: "link outside group, limit too low", cfg: group("app", "db"), maxConcurrency: 2, buildx: "v0.38.0", warn: true},
+		{name: "link outside group, limit holds no target back", cfg: group("app", "db"), maxConcurrency: 3, buildx: "v0.38.0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			hook := logrustest.NewGlobal()
+			assert.Equal(t, bakeJobs(tc.cfg, tc.maxConcurrency, tc.buildx), tc.want)
+			assert.Equal(t, len(hook.AllEntries()) > 0, tc.warn)
+		})
+	}
+}
+
+func TestBakeArgsJobs(t *testing.T) {
+	want := []string{"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", "metadata.json"}
+	assert.DeepEqual(t, bakeArgs(&bakeBuild{}, "metadata.json", api.BuildOptions{}), want)
+	assert.DeepEqual(t, bakeArgs(&bakeBuild{jobs: 2}, "metadata.json", api.BuildOptions{}), append(want, "--jobs", "2"))
 }
 
 func TestPrepareBakeBuildGrants(t *testing.T) {
