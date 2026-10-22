@@ -25,6 +25,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/image"
@@ -40,18 +41,19 @@ import (
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
-// scheduledHookImages runs addPreStartHookPulls and returns the hook image
-// references it scheduled for pull, sorted for deterministic assertions.
-func scheduledHookImages(t *testing.T, project *types.Project, present map[string]api.ImageSummary) []string {
+// scheduledDependentImages runs addDependentImagePulls and returns the
+// dependent image references it scheduled for pull, sorted for deterministic
+// assertions.
+func scheduledDependentImages(t *testing.T, project *types.Project, present map[string]api.ImageSummary) []string {
 	t.Helper()
 	needPull := map[string]types.ServiceConfig{}
 	scheduled := map[string]bool{}
 	// Seed scheduled with the service images, as pullRequiredImages does before
-	// calling addPreStartHookPulls.
+	// calling addDependentImagePulls.
 	for _, service := range project.Services {
 		scheduled[service.Image] = true
 	}
-	if err := addPreStartHookPulls(project, present, needPull, scheduled); err != nil {
+	if err := addDependentImagePulls(project, present, needPull, scheduled); err != nil {
 		t.Fatal(err)
 	}
 	var images []string
@@ -64,60 +66,163 @@ func scheduledHookImages(t *testing.T, project *types.Project, present map[strin
 
 func serviceWithHook(name, img, policy string) types.ServiceConfig {
 	return types.ServiceConfig{
-		Name: name,
-
-		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "init:latest"}}}, ContainerSpec: types.ContainerSpec{
+		Name:     name,
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Image: "init:latest"}}},
+		ContainerSpec: types.ContainerSpec{
 			Image:      img,
 			PullPolicy: policy,
 		},
 	}
 }
 
-// TestAddPreStartHookPulls_AlwaysForcesPresentHook covers the docker-agent
+func serviceWithVolume(name, img, policy, volSource string) types.ServiceConfig {
+	return types.ServiceConfig{
+		Name: name,
+		ContainerSpec: types.ContainerSpec{
+			Image:      img,
+			PullPolicy: policy,
+			Volumes: []types.ServiceVolumeConfig{
+				{Type: types.VolumeTypeImage, Source: volSource, Target: "/data"},
+			},
+		},
+	}
+}
+
+// TestAddDependentImagePulls_AlwaysForcesPresentHook covers the docker-agent
 // finding: `pull_policy: always` must re-pull a hook image even when it is
 // already present locally, mirroring how the service image is force-pulled.
-func TestAddPreStartHookPulls_AlwaysForcesPresentHook(t *testing.T) {
+func TestAddDependentImagePulls_AlwaysForcesPresentHook(t *testing.T) {
 	project := &types.Project{
 		Name:     "demo",
 		Services: types.Services{"web": serviceWithHook("web", "web:latest", types.PullPolicyAlways)},
 	}
 	present := map[string]api.ImageSummary{"init:latest": {ID: "sha256:present"}}
 
-	assert.DeepEqual(t, scheduledHookImages(t, project, present), []string{"init:latest"})
+	assert.DeepEqual(t, scheduledDependentImages(t, project, present), []string{"init:latest"})
 }
 
-// TestAddPreStartHookPulls_MissingPolicySkipsPresentHook verifies a present hook
-// image is not re-pulled under the default (pull-if-missing) behavior.
-func TestAddPreStartHookPulls_MissingPolicySkipsPresentHook(t *testing.T) {
+// TestAddDependentImagePulls_MissingPolicySkipsPresentHook verifies a present
+// hook image is not re-pulled under the default (pull-if-missing) behavior.
+func TestAddDependentImagePulls_MissingPolicySkipsPresentHook(t *testing.T) {
 	project := &types.Project{
 		Name:     "demo",
 		Services: types.Services{"web": serviceWithHook("web", "web:latest", types.PullPolicyMissing)},
 	}
 	present := map[string]api.ImageSummary{"init:latest": {ID: "sha256:present"}}
 
-	assert.Equal(t, len(scheduledHookImages(t, project, present)), 0)
+	assert.Equal(t, len(scheduledDependentImages(t, project, present)), 0)
 }
 
-// TestAddPreStartHookPulls_MissingPolicyPullsAbsentHook verifies an absent hook
-// image is pulled under the default policy.
-func TestAddPreStartHookPulls_MissingPolicyPullsAbsentHook(t *testing.T) {
+// TestAddDependentImagePulls_MissingPolicyPullsAbsentHook verifies an absent
+// hook image is pulled under the default policy.
+func TestAddDependentImagePulls_MissingPolicyPullsAbsentHook(t *testing.T) {
 	project := &types.Project{
 		Name:     "demo",
 		Services: types.Services{"web": serviceWithHook("web", "web:latest", types.PullPolicyMissing)},
 	}
 
-	assert.DeepEqual(t, scheduledHookImages(t, project, map[string]api.ImageSummary{}), []string{"init:latest"})
+	assert.DeepEqual(t, scheduledDependentImages(t, project, map[string]api.ImageSummary{}), []string{"init:latest"})
 }
 
-// TestAddPreStartHookPulls_NeverSkips verifies `pull_policy: never` never
+// TestAddDependentImagePulls_NeverSkips verifies `pull_policy: never` never
 // schedules a hook pull, even for an absent image.
-func TestAddPreStartHookPulls_NeverSkips(t *testing.T) {
+func TestAddDependentImagePulls_NeverSkips(t *testing.T) {
 	project := &types.Project{
 		Name:     "demo",
 		Services: types.Services{"web": serviceWithHook("web", "web:latest", types.PullPolicyNever)},
 	}
 
-	assert.Equal(t, len(scheduledHookImages(t, project, map[string]api.ImageSummary{})), 0)
+	assert.Equal(t, len(scheduledDependentImages(t, project, map[string]api.ImageSummary{})), 0)
+}
+
+// TestAddDependentImagePulls_VolumeOnlyImage verifies that a type=image volume
+// source that is not present locally gets scheduled for pull.
+func TestAddDependentImagePulls_VolumeOnlyImage(t *testing.T) {
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"web": serviceWithVolume("web", "nginx:alpine", types.PullPolicyMissing, "myorg/assets:latest"),
+		},
+	}
+
+	assert.DeepEqual(t, scheduledDependentImages(t, project, map[string]api.ImageSummary{}), []string{"myorg/assets:latest"})
+}
+
+// TestAddDependentImagePulls_ServiceAndVolumeDedup verifies that when the same
+// image is used by a service and as a volume source, the service entry wins
+// (via the scheduled map) and the image is not pulled twice.
+func TestAddDependentImagePulls_ServiceAndVolumeDedup(t *testing.T) {
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"assets": {
+				Name: "assets",
+				ContainerSpec: types.ContainerSpec{
+					Image:      "myorg/assets:latest",
+					PullPolicy: types.PullPolicyAlways,
+				},
+			},
+			"web": serviceWithVolume("web", "nginx:alpine", types.PullPolicyMissing, "myorg/assets:latest"),
+		},
+	}
+	// The service image "myorg/assets:latest" is already in scheduled (seeded
+	// by scheduledDependentImages), so the volume reference is deduplicated.
+	assert.Equal(t, len(scheduledDependentImages(t, project, map[string]api.ImageSummary{})), 0)
+}
+
+// TestAddDependentImagePulls_BuildableVolumeSkipped verifies that a volume
+// image produced by a buildable service in the project is not scheduled for
+// pull, avoiding the --ignore-buildable regression in the up path.
+func TestAddDependentImagePulls_BuildableVolumeSkipped(t *testing.T) {
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"assets": {
+				Name: "assets",
+				ContainerSpec: types.ContainerSpec{
+					Image:      "demo/assets:dev",
+					PullPolicy: types.PullPolicyMissing,
+				},
+				WorkloadSpec: types.WorkloadSpec{
+					Build: &types.BuildConfig{Context: "."},
+				},
+			},
+			"web": serviceWithVolume("web", "nginx:alpine", types.PullPolicyMissing, "demo/assets:dev"),
+		},
+	}
+	// Even though demo/assets:dev is not present locally, it should be skipped
+	// because the "assets" service can build it.
+	needPull := map[string]types.ServiceConfig{}
+	scheduled := map[string]bool{}
+	scheduled["nginx:alpine"] = true
+	err := addDependentImagePulls(project, map[string]api.ImageSummary{}, needPull, scheduled)
+	assert.NilError(t, err)
+	assert.Equal(t, len(needPull), 0)
+}
+
+// TestAddDependentImagePulls_ServicePolicyNeverWins verifies that when an image
+// is defined by a service with pull_policy: never, a volume referencing the
+// same image is not scheduled for pull in the up path.
+func TestAddDependentImagePulls_ServicePolicyNeverWins(t *testing.T) {
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"assets": {
+				Name: "assets",
+				ContainerSpec: types.ContainerSpec{
+					Image:      "myorg/assets:latest",
+					PullPolicy: types.PullPolicyNever,
+				},
+			},
+			"web": serviceWithVolume("web", "nginx:alpine", types.PullPolicyMissing, "myorg/assets:latest"),
+		},
+	}
+	needPull := map[string]types.ServiceConfig{}
+	scheduled := map[string]bool{}
+	scheduled["nginx:alpine"] = true
+	err := addDependentImagePulls(project, map[string]api.ImageSummary{}, needPull, scheduled)
+	assert.NilError(t, err)
+	assert.Equal(t, len(needPull), 0)
 }
 
 // fakePullResponse is an empty, already-complete pull stream.
@@ -178,9 +283,9 @@ func TestPullRequiredImagesUsesContentDigest(t *testing.T) {
 	assert.Equal(t, images[ref].ID, "sha256:image")
 }
 
-// TestAddPreStartHookPulls_DedupsSharedHookImage verifies a hook image shared by
+// TestAddDependentImagePulls_DedupsSharedHookImage verifies a hook image shared by
 // several services is scheduled at most once.
-func TestAddPreStartHookPulls_DedupsSharedHookImage(t *testing.T) {
+func TestAddDependentImagePulls_DedupsSharedHookImage(t *testing.T) {
 	project := &types.Project{
 		Name: "demo",
 		Services: types.Services{
@@ -189,7 +294,7 @@ func TestAddPreStartHookPulls_DedupsSharedHookImage(t *testing.T) {
 		},
 	}
 
-	assert.DeepEqual(t, scheduledHookImages(t, project, map[string]api.ImageSummary{}), []string{"init:latest"})
+	assert.DeepEqual(t, scheduledDependentImages(t, project, map[string]api.ImageSummary{}), []string{"init:latest"})
 }
 
 func TestShouldPullImage(t *testing.T) {
@@ -261,10 +366,10 @@ func TestShouldPullImage(t *testing.T) {
 	})
 }
 
-// TestAddPreStartHookPulls_RefreshWindow: hook images inherit the parent
+// TestAddDependentImagePulls_RefreshWindow: hook images inherit the parent
 // service's daily/weekly/every_N policy through the same mustPull interpreter
 // as the service image, so `up` honors the refresh window for them too.
-func TestAddPreStartHookPulls_RefreshWindow(t *testing.T) {
+func TestAddDependentImagePulls_RefreshWindow(t *testing.T) {
 	project := &types.Project{
 		Name:     "demo",
 		Services: types.Services{"web": serviceWithHook("web", "web:latest", "daily")},
@@ -273,12 +378,12 @@ func TestAddPreStartHookPulls_RefreshWindow(t *testing.T) {
 	fresh := map[string]api.ImageSummary{
 		"init:latest": {ID: "sha256:present", LastTagTime: time.Now()},
 	}
-	assert.DeepEqual(t, scheduledHookImages(t, project, fresh), []string(nil))
+	assert.DeepEqual(t, scheduledDependentImages(t, project, fresh), []string(nil))
 
 	stale := map[string]api.ImageSummary{
 		"init:latest": {ID: "sha256:present", LastTagTime: time.Now().Add(-48 * time.Hour)},
 	}
-	assert.DeepEqual(t, scheduledHookImages(t, project, stale), []string{"init:latest"})
+	assert.DeepEqual(t, scheduledDependentImages(t, project, stale), []string{"init:latest"})
 }
 
 // TestShouldPullImageProvider: a service declaring both provider: and image:
@@ -330,4 +435,178 @@ func TestImageDigestResolverUsesDistributionDigest(t *testing.T) {
 	resolved, err := imageDigestResolver(t.Context(), &configfile.ConfigFile{}, mockAPI)(named)
 	assert.NilError(t, err)
 	assert.Equal(t, resolved.String(), indexDigest)
+}
+
+// TestPull_IgnoreBuildable_SkipsBuildableVolumeImage verifies that running
+// `compose pull --ignore-buildable` skips dependent volume images produced by
+// buildable services in the project, avoiding registry pull attempts and failures.
+func TestPull_IgnoreBuildable_SkipsBuildableVolumeImage(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), gomock.Any(), gomock.Any()).
+		Return(client.ImageInspectResult{}, errdefs.ErrNotFound).
+		AnyTimes()
+
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"assets": {
+				Name:          "assets",
+				ContainerSpec: types.ContainerSpec{Image: "demo/assets:dev"},
+				WorkloadSpec:  types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+			},
+			"web": {
+				Name: "web",
+				ContainerSpec: types.ContainerSpec{
+					Image: "nginx:alpine",
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "demo/assets:dev", Target: "/srv/static"},
+					},
+				},
+			},
+		},
+	}
+
+	// nginx:alpine must be pulled, but demo/assets:dev must NOT be pulled
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), "nginx:alpine", gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+
+	err := tested.Pull(t.Context(), project, api.PullOptions{IgnoreBuildable: true})
+	assert.NilError(t, err)
+}
+
+// TestPull_VolumeOnlyImage verifies that running compose pull pulls an image
+// used only as a type: image volume.
+func TestPull_VolumeOnlyImage(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), gomock.Any(), gomock.Any()).
+		Return(client.ImageInspectResult{}, errdefs.ErrNotFound).
+		AnyTimes()
+
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"web": {
+				Name: "web",
+				ContainerSpec: types.ContainerSpec{
+					Image: "nginx:alpine",
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "myorg/assets:latest", Target: "/srv/static"},
+					},
+				},
+			},
+		},
+	}
+
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), "nginx:alpine", gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), "myorg/assets:latest", gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+
+	err := tested.Pull(t.Context(), project, api.PullOptions{})
+	assert.NilError(t, err)
+}
+
+// TestPull_SameImageUsedByServiceAndVolume verifies that when the same image is
+// used by a service and as a volume source, it is pulled only once (deduplicated).
+func TestPull_SameImageUsedByServiceAndVolume(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), gomock.Any(), gomock.Any()).
+		Return(client.ImageInspectResult{}, errdefs.ErrNotFound).
+		AnyTimes()
+
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"assets": {
+				Name: "assets",
+				ContainerSpec: types.ContainerSpec{
+					Image: "myorg/assets:latest",
+				},
+			},
+			"web": {
+				Name: "web",
+				ContainerSpec: types.ContainerSpec{
+					Image: "nginx:alpine",
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "myorg/assets:latest", Target: "/srv/static"},
+					},
+				},
+			},
+		},
+	}
+
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), "myorg/assets:latest", gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), "nginx:alpine", gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+
+	err := tested.Pull(t.Context(), project, api.PullOptions{})
+	assert.NilError(t, err)
+}
+
+// TestPull_SameImageUsedByServiceAndVolume_ServicePolicyWins verifies that when
+// the service defines pull_policy: never, the service policy wins and the volume
+// image is not pulled.
+func TestPull_SameImageUsedByServiceAndVolume_ServicePolicyWins(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), gomock.Any(), gomock.Any()).
+		Return(client.ImageInspectResult{}, errdefs.ErrNotFound).
+		AnyTimes()
+
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"assets": {
+				Name: "assets",
+				ContainerSpec: types.ContainerSpec{
+					Image:      "myorg/assets:latest",
+					PullPolicy: types.PullPolicyNever,
+				},
+			},
+			"web": {
+				Name: "web",
+				ContainerSpec: types.ContainerSpec{
+					Image: "nginx:alpine",
+					Volumes: []types.ServiceVolumeConfig{
+						{Type: types.VolumeTypeImage, Source: "myorg/assets:latest", Target: "/srv/static"},
+					},
+				},
+			},
+		},
+	}
+
+	// Only nginx:alpine should be pulled; myorg/assets:latest must NOT be pulled
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), "nginx:alpine", gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+
+	err := tested.Pull(t.Context(), project, api.PullOptions{})
+	assert.NilError(t, err)
 }
