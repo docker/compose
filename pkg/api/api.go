@@ -901,6 +901,15 @@ func GetImageNameOrDefault(service types.ServiceConfig, projectName string) stri
 	return imageName
 }
 
+// IsPureResourceProvider reports whether a service is a "pure resource"
+// provider: it declares a provider, but neither an image nor a build section.
+// Such a service has no image reference of its own — the name
+// GetImageNameOrDefault fabricates for it is never built nor pulled — and the
+// provider owns the resource instead.
+func IsPureResourceProvider(service types.ServiceConfig) bool {
+	return service.Provider != nil && service.Image == "" && service.Build == nil
+}
+
 // GetDependentImages returns the additional images a service depends on beyond
 // its main image. Currently this is the set of pre_start hook images, which run
 // as ephemeral init containers with their own image. A hook without an explicit
