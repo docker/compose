@@ -30,6 +30,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/loader"
+	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
 	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
@@ -140,7 +141,9 @@ func (g gitRemoteLoader) Dir(path string) string {
 func validateGitSubDir(base, subDir string) error {
 	cleanSubDir := filepath.Clean(subDir)
 
-	if filepath.IsAbs(cleanSubDir) {
+	// filepath.IsAbs is host-dependent and filepath.Clean rewrites "/" to "\\" on Windows, so check
+	// the raw value and cover the Windows absolute forms too.
+	if filepath.IsAbs(subDir) || strings.HasPrefix(subDir, "/") || strings.HasPrefix(subDir, `\`) || paths.IsWindowsAbs(subDir) {
 		return fmt.Errorf("git subdirectory must be relative, got: %s", subDir)
 	}
 
