@@ -302,7 +302,7 @@ options:
     - option: wait
       value_type: bool
       default_value: "false"
-      description: Wait for services to be running|healthy. Implies detached mode.
+      description: Wait until services are running, or healthy if they have a healthcheck. Implies detached mode.
       deprecated: false
       hidden: false
       experimental: false
@@ -313,7 +313,7 @@ options:
       value_type: int
       default_value: "0"
       description: |
-        Maximum duration in seconds to wait for the project to be running|healthy
+        Maximum duration in seconds to wait for services to be running or healthy
       deprecated: false
       hidden: false
       experimental: false
