@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -141,10 +142,21 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	// (see TestExecutePlanFailedPreStartGatesStart).
 	var failuresMu sync.Mutex
 	failures := make(map[int]error, len(plan.Nodes))
+	successes := make(map[int]bool, len(plan.Nodes))
 	recordFailure := func(id int, err error) {
 		failuresMu.Lock()
 		failures[id] = err
 		failuresMu.Unlock()
+	}
+	recordSuccess := func(id int) {
+		failuresMu.Lock()
+		successes[id] = true
+		failuresMu.Unlock()
+	}
+	succeeded := func(id int) bool {
+		failuresMu.Lock()
+		defer failuresMu.Unlock()
+		return successes[id]
 	}
 	failedDependency := func(deps []*PlanNode) error {
 		failuresMu.Lock()
@@ -164,6 +176,8 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 	rs := &runState{
 		done:             done,
 		recordFailure:    recordFailure,
+		recordSuccess:    recordSuccess,
+		succeeded:        succeeded,
 		failedDependency: failedDependency,
 		groups:           groups,
 		events:           events,
@@ -260,6 +274,11 @@ type phaseCancel struct {
 	cancel context.CancelFunc
 	once   sync.Once
 	err    error
+	// failed is the node whose failure canceled the phase, nil while the phase
+	// is not canceled by one of its own nodes (the caller's context may be done
+	// as well, e.g. on Ctrl-C). Set strictly before cancel(), so a node that
+	// sees ctx done because of that failure always finds it here.
+	failed atomic.Pointer[PlanNode]
 }
 
 func newPhaseCancel(parent context.Context) *phaseCancel {
@@ -277,6 +296,7 @@ func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *gr
 	p.once.Do(func() {
 		p.err = err
 		groups.onNodeError(node, events, err)
+		p.failed.Store(node)
 		p.cancel()
 	})
 }
@@ -310,6 +330,8 @@ func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *Pla
 type runState struct {
 	done             map[int]chan struct{}
 	recordFailure    func(id int, err error)
+	recordSuccess    func(id int)
+	succeeded        func(id int) bool
 	failedDependency func(deps []*PlanNode) error
 	groups           *groupTracker
 	events           api.EventProcessor
@@ -345,6 +367,7 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 			// context.
 			err := nodeCtx.Err()
 			rs.recordFailure(node.ID, err)
+			exec.reportAborted(node, rs, phase)
 			return err
 		}
 	}
@@ -359,12 +382,14 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 		// every hop would compound "dependency failed: " prefixes down a
 		// multi-node chain (create -> pre_start -> start -> post_start).
 		rs.recordFailure(node.ID, err)
+		exec.reportAborted(node, rs, phase)
 		return fmt.Errorf("dependency failed: %w", err)
 	}
 
 	release, slotErr := acquireNodeSlot(nodeCtx, rs.limiter, node)
 	if slotErr != nil {
 		rs.recordFailure(node.ID, slotErr)
+		exec.reportAborted(node, rs, phase)
 		return slotErr
 	}
 	defer release()
@@ -373,8 +398,17 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 	rs.groups.onNodeStart(node, rs.events)
 
 	err := exec.executeNode(nodeCtx, node)
+	if errors.Is(err, errWaitInterrupted) {
+		// waitDependency ends a wait silently when its context is canceled,
+		// which suits a caller that is going away itself (Ctrl-C): the node
+		// ends as it always did. Canceled by the failure of another node of
+		// its phase, the wait is a failure instead: the condition was not
+		// reached, and the nodes depending on it must not run.
+		err = exec.interruptedWait(node, rs, phase)
+	}
 
 	if err == nil {
+		rs.recordSuccess(node.ID)
 		// Emit group done event if this is the last node of a group
 		rs.groups.onNodeDone(node, rs.events)
 		return nil
@@ -390,6 +424,8 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 		// cancellation-casualty caller the cost of building the error-event
 		// payload it would be dropped anyway.
 		phase.fail(node, rs.events, rs.groups, err)
+	} else {
+		exec.reportAborted(node, rs, phase)
 	}
 	return err
 }
@@ -402,6 +438,10 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 // on DeadlineExceeded, which is not specific to waits. The wrapped error still
 // satisfies errors.Is(err, context.DeadlineExceeded).
 var errWaitTimeout = errors.New("timeout waiting for dependencies")
+
+// errWaitInterrupted marks an OpWaitCondition node whose wait ended because its
+// context was canceled, before the condition was reached.
+var errWaitInterrupted = errors.New("wait interrupted")
 
 // translateWaitTimeout turns a plan failure caused by a wait node's own
 // --wait-timeout window (see errWaitTimeout) into the "timeout waiting for
