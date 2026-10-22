@@ -51,6 +51,7 @@ import (
 type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)
 
 type Watcher struct {
+	mx      gsync.Mutex
 	project *types.Project
 	options api.WatchOptions
 	watchFn WatchFunc
@@ -85,14 +86,12 @@ func (w *Watcher) Start(ctx context.Context) error {
 	w.mx.Lock()
 	defer w.mx.Unlock()
 	ctx, cancelFunc := context.WithCancel(ctx)
-	w.stopFn = cancelFunc
 	wait, err := w.watchFn(ctx, w.project, w.options)
 	if err != nil {
-		go func() {
-			w.errCh <- err
-		}()
+		cancelFunc()
 		return err
 	}
+	w.stopFn = cancelFunc
 	go func() {
 		w.errCh <- wait()
 	}()
