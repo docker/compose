@@ -472,6 +472,36 @@ func ImageAbsent(ref string) Check {
 	}
 }
 
+// VolumeExists expects a volume with the given name to be present on the
+// engine, e.g. one a command must have left untouched.
+func VolumeExists(name string) Check {
+	return Check{
+		name: fmt.Sprintf("volume %q exists", name),
+		fn: func(ctx *CheckContext) error {
+			res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "volume", "inspect", "--format", "{{.Name}}", name))
+			if res.ExitCode != 0 {
+				return fmt.Errorf("not found: %s", strings.TrimSpace(res.Combined()))
+			}
+			return nil
+		},
+	}
+}
+
+// VolumeAbsent expects no volume with the given name on the engine, e.g. one
+// a command must have removed.
+func VolumeAbsent(name string) Check {
+	return Check{
+		name: fmt.Sprintf("volume %q is absent", name),
+		fn: func(ctx *CheckContext) error {
+			res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "volume", "inspect", "--format", "{{.Name}}", name))
+			if res.ExitCode == 0 {
+				return fmt.Errorf("volume %s exists", name)
+			}
+			return nil
+		},
+	}
+}
+
 // FileExists expects a non-empty file at the given host path, e.g. the output
 // of an export command.
 func FileExists(path string) Check {
