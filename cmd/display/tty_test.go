@@ -373,3 +373,22 @@ func TestTerm_VisualSnapshot(t *testing.T) {
 		assert.Equal(t, expected[i], strings.TrimRight(lines[i], " "), "line %d", i)
 	}
 }
+
+// TestTerm_DryRunPrefixesRows covers the wiring from the --dry-run flag down
+// to the rendered rows: WithDryRun must reach the layout, which is what puts
+// the marker on every task row.
+func TestTerm_DryRunPrefixesRows(t *testing.T) {
+	var buf bytes.Buffer
+	ep := Full(&buf, &buf, false, WithDryRun())
+	w, ok := ep.(*termWriter)
+	assert.Assert(t, ok)
+
+	w.size = func() (int, int) { return 120, 40 }
+	w.now = testClock().Now
+	w.operation = "pull"
+	feed(w, api.Resource{ID: "svc", Text: "Pulling", Status: api.Working})
+	w.repaint()
+
+	assert.Assert(t, strings.Contains(stripAnsi(buf.String()), DRYRUN_PREFIX),
+		"rendered frame does not carry the dry-run marker: %q", stripAnsi(buf.String()))
+}
