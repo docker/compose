@@ -219,3 +219,31 @@ func TestImageVolumeRecreateOnRebuild(t *testing.T) {
 			ComposeCmd("logs", "consumer"),
 			OutputContains("bar"))
 }
+
+func TestDownVolumesKeepsVolumesNotOwned(t *testing.T) {
+	// Regression test for https://github.com/docker/compose/issues/14373:
+	// `down -v` removed a volume declared with an explicit name by name only,
+	// deleting the data of another project sharing that name, or of a volume
+	// created outside Compose, both of which `up` only reuses.
+	s := NewScenario(t, "down -v must only remove the volumes the project owns")
+	shared, unmanaged := s.Project()+"-shared", s.Project()+"-unmanaged"
+	s.Env("SHARED_VOLUME="+shared, "UNMANAGED_VOLUME="+unmanaged).
+		Defer(
+			DockerCmd("volume", "rm", "-f", shared).MayFail(),
+			DockerCmd("volume", "rm", "-f", unmanaged).MayFail()).
+		Step("another project owns a volume with the shared name",
+			DockerCmd("volume", "create", "--label", "com.docker.compose.project="+s.Project()+"-other", shared),
+			VolumeExists(shared)).
+		Step("a volume created outside Compose carries no project label",
+			DockerCmd("volume", "create", unmanaged),
+			VolumeExists(unmanaged)).
+		Step("up reuses both volumes and creates the project's own one",
+			ComposeCmd("up", "-d"),
+			ServiceState("app", "running"),
+			VolumeExists(s.Project()+"_own")).
+		Step("down -v removes the project's own volume and keeps the others",
+			ComposeCmd("down", "-v", "-t", "0"),
+			VolumeAbsent(s.Project()+"_own"),
+			VolumeExists(shared),
+			VolumeExists(unmanaged))
+}

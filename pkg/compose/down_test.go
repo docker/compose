@@ -464,7 +464,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 			Items: []volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
 	api.EXPECT().VolumeInspect(gomock.Any(), "myProject_volume", gomock.Any()).
-		Return(client.VolumeInspectResult{}, nil)
+		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "myProject_volume", Labels: map[string]string{compose.ProjectLabel: strings.ToLower(testProject)}}}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{}, nil)
 
@@ -482,6 +482,82 @@ func TestDownRemoveVolumes(t *testing.T) {
 
 	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{Volumes: true})
 	assert.NilError(t, err)
+}
+
+// TestEnsureVolumesDown_SkipsVolumeNotOwnedByProject guards #14373:
+// down -v must not remove a volume labeled for another project or unlabeled.
+func TestEnsureVolumesDown_SkipsVolumeNotOwnedByProject(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	rec := &capturingEvents{}
+	svcIface, err := NewComposeService(cli, WithEventProcessor(rec))
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{Name: "prj", Volumes: types.Volumes{
+		"own":       {Name: "own-data"},
+		"other":     {Name: "shared-data"},
+		"unlabeled": {Name: "unlabeled-data"},
+	}}
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "own-data", gomock.Any()).
+		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "own-data", Labels: map[string]string{compose.ProjectLabel: "prj"}}}, nil)
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "shared-data", gomock.Any()).
+		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "shared-data", Labels: map[string]string{compose.ProjectLabel: "other"}}}, nil)
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "unlabeled-data", gomock.Any()).
+		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "unlabeled-data"}}, nil)
+	apiClient.EXPECT().VolumeRemove(gomock.Any(), "own-data", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
+	// no VolumeRemove expectation for shared-data and unlabeled-data — a call for either fails the test
+
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, nil) {
+		assert.NilError(t, op())
+	}
+
+	var skipped []compose.Resource
+	for _, r := range rec.resources {
+		if r.Text == "Skipped" {
+			skipped = append(skipped, r)
+		}
+	}
+	sort.Slice(skipped, func(i, j int) bool { return skipped[i].ID < skipped[j].ID })
+	assert.DeepEqual(t, skipped, []compose.Resource{
+		{
+			ID:      "Volume shared-data",
+			Status:  compose.Warning,
+			Text:    "Skipped",
+			Details: `Volume belongs to project "other"`,
+		},
+		{
+			ID:      "Volume unlabeled-data",
+			Status:  compose.Warning,
+			Text:    "Skipped",
+			Details: "Volume was not created by Docker Compose",
+		},
+	})
+}
+
+// TestEnsureVolumesDown_KeepsVolumeWhenInspectFails guards #14373: a volume
+// whose owner can't be checked must not be removed.
+func TestEnsureVolumesDown_KeepsVolumeWhenInspectFails(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	svcIface, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{Name: "prj", Volumes: types.Volumes{
+		"data": {Name: "prj-data"},
+	}}
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "prj-data", gomock.Any()).
+		Return(client.VolumeInspectResult{}, errors.New("engine unavailable"))
+	// no VolumeRemove expectation — a call for prj-data fails the test
+
+	ops := svc.ensureVolumesDown(t.Context(), project, nil)
+	assert.Equal(t, len(ops), 1)
+	assert.Error(t, ops[0](), "failed to inspect volume prj-data: engine unavailable")
 }
 
 func TestDownRemoveImages(t *testing.T) {
