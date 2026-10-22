@@ -537,6 +537,29 @@ func TestEnsureVolumesDown_SkipsVolumeNotOwnedByProject(t *testing.T) {
 	})
 }
 
+// TestEnsureVolumesDown_KeepsVolumeWhenInspectFails guards #14373: a volume
+// whose owner can't be checked must not be removed.
+func TestEnsureVolumesDown_KeepsVolumeWhenInspectFails(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	svcIface, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{Name: "prj", Volumes: types.Volumes{
+		"data": {Name: "prj-data"},
+	}}
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "prj-data", gomock.Any()).
+		Return(client.VolumeInspectResult{}, errors.New("engine unavailable"))
+	// no VolumeRemove expectation — a call for prj-data fails the test
+
+	ops := svc.ensureVolumesDown(t.Context(), project, nil)
+	assert.Equal(t, len(ops), 1)
+	assert.Error(t, ops[0](), "failed to inspect volume prj-data: engine unavailable")
+}
+
 func TestDownRemoveImages(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

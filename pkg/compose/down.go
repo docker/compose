@@ -388,10 +388,14 @@ func (s *composeService) removeVolume(ctx context.Context, id string, projectNam
 		// Already gone
 		return nil
 	}
+	if err != nil {
+		// without the inspect result its owner can't be checked: keep it
+		return fmt.Errorf("failed to inspect volume %s: %w", id, err)
+	}
 	// A volume declared with an explicit name can belong to another project
 	// sharing that name, or have been created outside Compose: up only reuses
 	// such a volume (see ownedConfigHash), so down must not remove it either.
-	if owner := res.Volume.Labels[api.ProjectLabel]; err == nil && owner != projectName {
+	if owner := res.Volume.Labels[api.ProjectLabel]; owner != projectName {
 		reason := fmt.Sprintf("Volume belongs to project %q", owner)
 		if owner == "" {
 			reason = "Volume was not created by Docker Compose"
