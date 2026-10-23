@@ -399,7 +399,16 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 	defer release()
 
 	// Emit group start event if this is the first node of a group
-	rs.groups.onNodeStart(node, rs.events)
+	if !rs.groups.onNodeStart(node, rs.events) {
+		// its group was given up meanwhile: the node is skipped like one
+		// found canceled above, its row already ended
+		err := nodeCtx.Err()
+		if err == nil {
+			err = context.Canceled
+		}
+		rs.recordFailure(node.ID, err)
+		return err
+	}
 
 	err := exec.executeNode(nodeCtx, node)
 	var wi *waitInterrupted

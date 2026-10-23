@@ -1816,7 +1816,8 @@ func TestAbortReasonOfAFailedWait(t *testing.T) {
 	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return false }}
 	assert.Equal(t, exec.abortReason(held, rs, wait), `condition "service_healthy" of service "db" not met`)
 	assert.Equal(t, exec.abortReason(other, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
-	assert.Equal(t, exec.abortReason(postStart, rs, wait), `started, post_start hooks interrupted by the unmet condition "service_healthy" of service "db"`)
+	// its start did not succeed: nothing is started for the hooks to be cut short
+	assert.Equal(t, exec.abortReason(postStart, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
 }
 
 // TestExecutePlanCanceledCallerMidInspectionKeepsItsError keeps what a caller
@@ -1853,4 +1854,44 @@ func TestExecutePlanCanceledCallerMidInspectionKeepsItsError(t *testing.T) {
 	defer recorder.mu.Unlock()
 	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting})
 	assert.Equal(t, len(recorder.byID["Container test-api-1"]), 0, "api: %v", recorder.byID["Container test-api-1"])
+}
+
+// TestAbortReasonFollowsTheChainOfPrerequisites pins that the reason a node
+// reads does not depend on which node of a chain reports first: wait -> start
+// -> post_start is held by the wait for each of the three, and a post_start is
+// only "started" once its start has succeeded.
+func TestAbortReasonFollowsTheChainOfPrerequisites(t *testing.T) {
+	apiCtr, webCtr := startTestSummary("api"), startTestSummary("web")
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
+	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
+	failed := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
+
+	exec := &planExecutor{}
+	succeeded := map[int]bool{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(id int) bool { return succeeded[id] }}
+	const reason = `condition "service_healthy" of service "db" not reached: interrupted by the failure of Container test-web-1`
+	assert.Equal(t, exec.abortReason(start, rs, failed), reason)
+	assert.Equal(t, exec.abortReason(postStart, rs, failed), reason)
+
+	// the wait is over and the start succeeded: only the hooks were cut short
+	succeeded[wait.ID], succeeded[start.ID] = true, true
+	assert.Equal(t, exec.abortReason(postStart, rs, failed), "started, post_start hooks interrupted by the failure of Container test-web-1")
+}
+
+// TestGroupTrackerNothingStartsAfterTheFinalEvent pins the order of a group's
+// events when another node of the group gives it up while a node is still on
+// its way to start: the final event stays the last one.
+func TestGroupTrackerNothingStartsAfterTheFinalEvent(t *testing.T) {
+	summary := container.Summary{ID: "api-id", Names: []string{"/test-api-1"}}
+	plan := &Plan{}
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
+	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &summary}, "start:api:1", start)
+	gt := (&planExecutor{}).buildGroupTracker(plan)
+	rec := &capturingEvents{}
+
+	gt.onNodeAborted(postStart, rec, "interrupted")
+	assert.Assert(t, !gt.onNodeStart(start, rec), "a node of a given up group must not go on")
+	assert.DeepEqual(t, rec.resources, []api.Resource{{ID: "Container test-api-1", Status: api.Error, Text: "not started: interrupted"}})
 }
