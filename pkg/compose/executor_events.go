@@ -17,7 +17,7 @@
 package compose
 
 import (
-	"errors"
+	"context"
 	"fmt"
 	"sync"
 
@@ -234,26 +234,56 @@ func (gt *groupTracker) resourceName(node *PlanNode) string {
 	return node.Operation.ResourceID
 }
 
+// unmetCondition names the depends_on condition a wait node is bound to.
+func unmetCondition(op Operation) string {
+	return fmt.Sprintf("condition %q of service %q", op.Condition, op.Name)
+}
+
+// interruption says what ended the phase: the resource whose failure
+// interrupted it or, for the failure of a wait node, which has no resource of
+// its own to name, the depends_on condition that was not met.
+func (exec *planExecutor) interruption(rs *runState, failed *PlanNode) string {
+	if failed.Operation.Type == OpWaitCondition {
+		return "interrupted by the unmet " + unmetCondition(failed.Operation)
+	}
+	return "interrupted by the failure of " + rs.groups.resourceName(failed)
+}
+
 // abortReason tells why node was given up after the failure of another node
 // of its phase: the depends_on condition it was still waiting for, if that is
-// what it was held by, and the resource whose failure interrupted the phase.
+// what it was held by, and what ended the phase. A node held by the very wait
+// that failed was not interrupted: its dependency did not meet the condition.
 func (exec *planExecutor) abortReason(node *PlanNode, rs *runState, failed *PlanNode) string {
-	reason := "interrupted by the failure of " + rs.groups.resourceName(failed)
+	reason := exec.interruption(rs, failed)
+	for _, dep := range node.DependsOn {
+		if dep == failed {
+			return unmetCondition(dep.Operation) + " not met"
+		}
+	}
 	for _, dep := range node.DependsOn {
 		if dep.Operation.Type == OpWaitCondition && !rs.succeeded(dep.ID) {
-			return fmt.Sprintf("condition %q of service %q not reached: %s", dep.Operation.Condition, dep.Operation.Name, reason)
+			return fmt.Sprintf("%s not reached: %s", unmetCondition(dep.Operation), reason)
 		}
+	}
+	if node.Operation.Type == OpRunPostStart {
+		// the container is started by then: only its hooks were cut short
+		return "started, post_start hooks " + reason
 	}
 	return reason
 }
 
 // reportAborted reports a node that did not run (or did not complete) because
-// the phase was canceled by the failure of another node, so that the row of
-// the resource it was about to change ends on something other than its last
-// status. A phase canceled by its caller (Ctrl-C) reports nothing, as before.
+// the start phase was canceled by the failure of another node, so that the row
+// of the resource it was about to change ends on something other than its last
+// status. A phase canceled by its caller (Ctrl-C) reports nothing, as before,
+// and so does the create phase, whose failure never was reported on the nodes
+// it gives up.
 func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *phaseCancel) {
+	if node.Phase != PhaseStart || node.Operation.Type == OpWaitCondition {
+		return
+	}
 	failed := phase.failed.Load()
-	if failed == nil || failed == node || node.Operation.Type == OpWaitCondition {
+	if failed == nil || failed == node {
 		return
 	}
 	rs.groups.onNodeAborted(node, rs.events, exec.abortReason(node, rs, failed))
@@ -263,20 +293,19 @@ func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *pha
 // another node of its phase: the depends_on condition was not reached. The
 // rows of the containers it was waiting on, left on "Waiting", are closed with
 // the same reason. A phase not canceled by one of its own nodes is not an
-// interruption to report: the wait ends silently, as before.
-func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *phaseCancel) error {
+// interruption to report: the wait ends as it always did, with cause.
+func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *phaseCancel, cause error) error {
 	failed := phase.failed.Load()
 	if failed == nil {
-		return nil
+		return cause
 	}
 	op := node.Operation
 	exec.containersMu.Lock()
 	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
 	exec.containersMu.Unlock()
-	reason := fmt.Sprintf("condition %q of service %q not reached: interrupted by the failure of %s",
-		op.Condition, op.Name, rs.groups.resourceName(failed))
+	reason := fmt.Sprintf("%s not reached: %s", unmetCondition(op), exec.interruption(rs, failed))
 	rs.events.On(containerReasonEvents(waitingFor, skippedEvent, reason)...)
-	return errors.New(reason)
+	return fmt.Errorf("%s: %w", reason, context.Canceled)
 }
 
 // emitStartEvent emits the appropriate Working event for an ungrouped node.

@@ -224,9 +224,14 @@ func (s *composeService) waitDependencyReached(ctx, origCtx context.Context, dep
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
+		// a tick and the end of ctx can be ready together, and select would
+		// then pick either: ctx wins, so that a canceled wait is never run
+		// through one more check
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
+		}
+		if ctx.Err() != nil {
 			// An expired deadline is precisely the failure this wait is meant
 			// to detect for a required dependency; only a plain cancellation
 			// (Ctrl-C) stays silent either way. An optional dependency
@@ -320,9 +325,13 @@ func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string,
 			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
 			return true, nil
 		}
-		s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
-			return errorEventf(s, "dependency %s failed to start", dep)
-		})...)
+		if !errors.Is(ctx.Err(), context.Canceled) {
+			// a failure caused by a canceled ctx says nothing about the
+			// dependency: its rows are not marked failed for it
+			s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
+				return errorEventf(s, "dependency %s failed to start", dep)
+			})...)
+		}
 		return false, fmt.Errorf("dependency failed to start: %w", err)
 	}
 	if isHealthy {
