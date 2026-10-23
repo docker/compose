@@ -19,6 +19,7 @@ package compose
 import (
 	"context"
 	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -116,15 +117,22 @@ func (exec *planExecutor) groupEventName(op Operation) string {
 	return op.ResourceID
 }
 
-func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) {
+// onNodeStart tells whether node may go on: not when its group was given up by
+// another node of the group while this one was getting a slot. A Working event
+// now would follow the group's final one and leave the row on it, and so would
+// whatever the node then fails with.
+func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) bool {
 	if node.Group == "" {
 		// Ungrouped: emit individual event
 		emitStartEvent(node, events)
-		return
+		return true
 	}
 	gt.mu.Lock()
 	defer gt.mu.Unlock()
 	gs := gt.groups[node.Group]
+	if gs.finished {
+		return false
+	}
 	if gs.eventName == "" {
 		gs.eventName = gt.exec.groupEventName(node.Operation)
 	}
@@ -133,6 +141,7 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) {
 		gs.working = true
 		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
 	}
+	return true
 }
 
 // triggersWorking reports whether this node starting should fire the group's
@@ -249,23 +258,48 @@ func (exec *planExecutor) interruption(rs *runState, failed *PlanNode) string {
 	return "interrupted by the failure of " + rs.groups.resourceName(failed)
 }
 
+// unmetPrerequisite returns the wait node, among the prerequisites of node
+// (transitively: a start is held through its pre_start, a post_start through
+// its start), that has not succeeded, failed itself being preferred: which of
+// the nodes of a chain reports first must not change what is said.
+func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNode {
+	var first *PlanNode
+	seen := map[int]bool{}
+	var walk func(n *PlanNode)
+	walk = func(n *PlanNode) {
+		for _, dep := range n.DependsOn {
+			if seen[dep.ID] || succeeded(dep.ID) {
+				continue
+			}
+			seen[dep.ID] = true
+			if dep.Operation.Type == OpWaitCondition && first == nil {
+				first = dep
+			}
+			walk(dep)
+		}
+	}
+	walk(node)
+	if failed != nil && seen[failed.ID] && failed.Operation.Type == OpWaitCondition {
+		return failed
+	}
+	return first
+}
+
 // abortReason tells why node was given up after the failure of another node
 // of its phase: the depends_on condition it was still waiting for, if that is
 // what it was held by, and what ended the phase. A node held by the very wait
 // that failed was not interrupted: its dependency did not meet the condition.
 func (exec *planExecutor) abortReason(node *PlanNode, rs *runState, failed *PlanNode) string {
 	reason := exec.interruption(rs, failed)
-	for _, dep := range node.DependsOn {
-		if dep == failed {
-			return unmetCondition(dep.Operation) + " not met"
+	if held := unmetPrerequisite(node, failed, rs.succeeded); held != nil {
+		if held == failed {
+			return unmetCondition(held.Operation) + " not met"
 		}
+		return fmt.Sprintf("%s not reached: %s", unmetCondition(held.Operation), reason)
 	}
-	for _, dep := range node.DependsOn {
-		if dep.Operation.Type == OpWaitCondition && !rs.succeeded(dep.ID) {
-			return fmt.Sprintf("%s not reached: %s", unmetCondition(dep.Operation), reason)
-		}
-	}
-	if node.Operation.Type == OpRunPostStart {
+	if node.Operation.Type == OpRunPostStart && slices.ContainsFunc(node.DependsOn, func(dep *PlanNode) bool {
+		return dep.Operation.Type == OpStartContainer && rs.succeeded(dep.ID)
+	}) {
 		// the container is started by then: only its hooks were cut short
 		return "started, post_start hooks " + reason
 	}
