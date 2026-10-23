@@ -213,12 +213,25 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // external deadline, a test harness timeout) fired, and must keep
 // propagating regardless of Required.
 func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
+	_, err := s.waitDependencyReached(ctx, origCtx, dependant, dep, config, waitingFor)
+	return err
+}
+
+// waitDependencyReached is waitDependency, which also tells whether the wait is
+// over because the dependency is ready (or an optional one was given up on),
+// as opposed to a plain cancellation of ctx, which ends it silently.
+func (s *composeService) waitDependencyReached(ctx, origCtx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 	for {
+		// a tick and the end of ctx can be ready together, and select would
+		// then pick either: ctx wins, so that a canceled wait is never run
+		// through one more check
 		select {
 		case <-ticker.C:
 		case <-ctx.Done():
+		}
+		if ctx.Err() != nil {
 			// An expired deadline is precisely the failure this wait is meant
 			// to detect for a required dependency; only a plain cancellation
 			// (Ctrl-C) stays silent either way. An optional dependency
@@ -232,11 +245,11 @@ func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant,
 					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
 						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
 					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
-					return nil
+					return true, nil
 				}
-				return ctx.Err()
+				return false, ctx.Err()
 			}
-			return nil
+			return false, nil
 		}
 		var (
 			done bool
@@ -264,10 +277,10 @@ func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant,
 			// one written by an older/newer Compose version using a
 			// condition value this build doesn't recognize.
 			logrus.Warnf("service %q: unsupported depends_on condition %q, skipping wait for %q", dependant, config.Condition, dep)
-			return nil
+			return true, nil
 		}
 		if done || err != nil {
-			return err
+			return done, err
 		}
 	}
 }
@@ -312,9 +325,15 @@ func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string,
 			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
 			return true, nil
 		}
-		s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
-			return errorEventf(s, "dependency %s failed to start", dep)
-		})...)
+		if !errors.Is(err, context.Canceled) {
+			// a failure caused by a canceled ctx says nothing about the
+			// dependency: its rows are not marked failed for it. The error is
+			// tested, not the ctx: a genuine failure (unhealthy, exited)
+			// found just as another node cancels the phase is still reported
+			s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
+				return errorEventf(s, "dependency %s failed to start", dep)
+			})...)
+		}
 		return false, fmt.Errorf("dependency failed to start: %w", err)
 	}
 	if isHealthy {

@@ -1047,6 +1047,51 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 // context that is already done, so no poll timing is involved: an optional
 // dependency is "not done yet" (the wait's loop then sees ctx.Done()), never
 // skipped; a required one keeps reporting the failure.
+// A genuine failure of a required dependency is reported even when the context
+// happens to be canceled by the time it is evaluated: only an error caused by
+// the cancellation is silent.
+func TestCheckDependencyHealthyReportsGenuineFailureOnCanceledContext(t *testing.T) {
+	containers := Containers{{
+		ID:     "db-ctr",
+		Names:  []string{"/db-ctr"},
+		Labels: map[string]string{api.ServiceLabel: "db"},
+	}}
+	mockCtrl := gomock.NewController(t)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	events := &capturingEvents{}
+	svc, err := NewComposeService(cli, WithEventProcessor(events))
+	assert.NilError(t, err)
+
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+			// the phase is canceled right after the inspection answered
+			cancel()
+			return client.ContainerInspectResult{
+				Container: container.InspectResponse{
+					ID:   "db-ctr",
+					Name: "/db-ctr",
+					State: &container.State{
+						Status: container.StateRunning,
+						Health: &container.Health{Status: container.Unhealthy},
+					},
+					Config: &container.Config{
+						Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}},
+					},
+				},
+			}, nil
+		})
+
+	done, err := svc.(*composeService).checkDependencyHealthy(ctx, "db", types.ServiceDependency{Required: true}, containers)
+	assert.ErrorContains(t, err, "is unhealthy")
+	assert.Assert(t, !done)
+	assert.Equal(t, len(events.resources), 1, "got %v", events.resources)
+	assert.Equal(t, events.resources[0].Status, api.Error)
+}
+
 func TestCheckDependencyDoneContext(t *testing.T) {
 	containers := Containers{{
 		ID:     "db-ctr",

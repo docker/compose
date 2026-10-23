@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -253,7 +254,17 @@ func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op Ope
 	// practically unreachable log line (an unsupported depends_on condition,
 	// filtered out before a plan is ever built).
 	//
-	return s.waitDependency(ctx, origCtx, op.ResourceID, op.Name, config, waitingFor)
+	reached, err := s.waitDependencyReached(ctx, origCtx, op.ResourceID, op.Name, config, waitingFor)
+	if err == nil && !reached {
+		return &waitInterrupted{}
+	}
+	if err != nil && errors.Is(ctx.Err(), context.Canceled) && errors.Is(err, context.Canceled) {
+		// a required dependency's check that failed because ctx was canceled
+		// meanwhile (an inspection cut short) is no failure of the dependency:
+		// the wait is interrupted all the same
+		return &waitInterrupted{cause: err}
+	}
+	return err
 }
 
 // execRunPreStart runs the service's pre_start hooks against the runner

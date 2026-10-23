@@ -25,6 +25,7 @@ import (
 	"net"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -1384,4 +1385,513 @@ func TestTranslateWaitTimeout(t *testing.T) {
 	assert.Equal(t, translateWaitTimeout(other), other)
 	assert.Equal(t, translateWaitTimeout(context.DeadlineExceeded), context.DeadlineExceeded)
 	assert.NilError(t, translateWaitTimeout(nil))
+}
+
+// startFailureOptions varies startFailureFixture.
+type startFailureOptions struct {
+	// phase is the phase every node of the plan belongs to
+	phase PlanPhase
+	// inspectBlocks makes the inspection of db wait for the end of its context
+	// and fail with it, as one cut short by the cancellation does
+	inspectBlocks bool
+}
+
+// startFailureFixture builds a project where web fails to start while api,
+// which depends on db being healthy, is still held by that wait. db's health
+// never changes, so only web's failure can end the phase.
+func startFailureFixture(t *testing.T, opts startFailureOptions) (*recordingEvents, *planExecutor, *Plan) {
+	t.Helper()
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	project := &types.Project{
+		Name: "test",
+		Services: types.Services{
+			"db":  {Name: "db"},
+			"api": {Name: "api"},
+			"web": {Name: "web"},
+		},
+	}
+	summary := func(service string) container.Summary {
+		return container.Summary{
+			ID:     service + "-id",
+			Names:  []string{"/test-" + service + "-1"},
+			Labels: map[string]string{api.ServiceLabel: service, api.OneoffLabel: "False"},
+		}
+	}
+	dbSummary, apiSummary, webSummary := summary("db"), summary("api"), summary("web")
+
+	// web fails once the wait on db is polling, so that the failure finds the
+	// wait in flight rather than not dispatched yet
+	polling := make(chan struct{})
+	var pollingOnce sync.Once
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
+		DoAndReturn(func(ctx context.Context, _ string, _ client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+			pollingOnce.Do(func() { close(polling) })
+			if opts.inspectBlocks {
+				<-ctx.Done()
+				return client.ContainerInspectResult{}, fmt.Errorf("inspect db-id: %w", ctx.Err())
+			}
+			return client.ContainerInspectResult{Container: container.InspectResponse{
+				ID:   "db-id",
+				Name: "/test-db-1",
+				State: &container.State{
+					Status: container.StateRunning,
+					Health: &container.Health{Status: container.Starting},
+				},
+				Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+			}}, nil
+		}).AnyTimes()
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "web-id", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+			select {
+			case <-polling:
+			case <-time.After(5 * time.Second):
+				t.Error("the wait on db never started polling")
+			}
+			return client.ContainerStartResult{}, errors.New("port is already allocated")
+		})
+	// no ContainerStart for api: it must never be reached
+
+	apiSvc, webSvc := project.Services["api"], project.Services["web"]
+	plan := &Plan{}
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:web:1",
+		Cause:      "start",
+		Service:    &webSvc,
+		Container:  &webSummary,
+	}, "start:web:1")
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Cause:      "api depends on db (service_healthy)",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:api:1",
+		Cause:      "start",
+		Service:    &apiSvc,
+		Container:  &apiSummary,
+	}, "start:api:1", wait)
+	for _, n := range plan.Nodes {
+		n.Phase = opts.phase
+	}
+
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	return recorder, exec, plan
+}
+
+// TestExecutePlanStartFailureReportsTheServicesItInterrupts pins what the rows
+// of the other services say when a start fails: a service held by a depends_on
+// wait is reported as not started, with the condition that was not reached,
+// and the row of the dependency it was waiting on no longer reads "Waiting".
+// A service recreated by the same command would otherwise be left on
+// "Recreated" while it is never started.
+func TestExecutePlanStartFailureReportsTheServicesItInterrupts(t *testing.T) {
+	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: PhaseStart})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	err := exec.run(ctx, plan)
+	assert.ErrorContains(t, err, "port is already allocated")
+
+	const reason = `condition "service_healthy" of service "db" not reached: interrupted by the failure of Container test-web-1`
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	web := recorder.byID["Container test-web-1"]
+	assert.Equal(t, len(web), 2, "web: %v", web)
+	assert.Equal(t, web[0], api.StatusStarting)
+	assert.ErrorContains(t, errors.New(web[1]), "port is already allocated")
+	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting, "Skipped: " + reason})
+	assert.DeepEqual(t, recorder.byID["Container test-api-1"], []string{"not started: " + reason})
+}
+
+// TestGroupTrackerOnNodeAborted pins the final event of a group given up
+// because another node failed: "not started" while the group never reported
+// Working, the bare interruption once it did, and never a second final event,
+// before or after.
+func TestGroupTrackerOnNodeAborted(t *testing.T) {
+	summary := container.Summary{ID: "api-id", Names: []string{"/test-api-1"}}
+	newTracker := func() (*groupTracker, *PlanNode, *capturingEvents) {
+		plan := &Plan{}
+		node := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
+		return (&planExecutor{}).buildGroupTracker(plan), node, &capturingEvents{}
+	}
+	const row = "Container test-api-1"
+
+	t.Run("never started", func(t *testing.T) {
+		gt, node, rec := newTracker()
+		gt.onNodeAborted(node, rec, "interrupted")
+		gt.onNodeAborted(node, rec, "interrupted")
+		assert.DeepEqual(t, rec.resources, []api.Resource{{ID: row, Status: api.Error, Text: "not started: interrupted"}})
+	})
+	t.Run("started", func(t *testing.T) {
+		gt, node, rec := newTracker()
+		gt.onNodeStart(node, rec)
+		gt.onNodeAborted(node, rec, "interrupted")
+		gt.onNodeDone(node, rec)
+		assert.DeepEqual(t, rec.resources, []api.Resource{
+			{ID: row, Status: api.Working, Text: api.StatusStarting},
+			{ID: row, Status: api.Error, Text: "interrupted"},
+		})
+	})
+	t.Run("already failed", func(t *testing.T) {
+		gt, node, rec := newTracker()
+		gt.onNodeError(node, rec, errors.New("boom"))
+		gt.onNodeAborted(node, rec, "interrupted")
+		assert.DeepEqual(t, rec.resources, []api.Resource{
+			{ID: row, Status: api.Working, Text: api.StatusStarting},
+			{ID: row, Status: api.Error, Text: "boom"},
+		})
+	})
+}
+
+// TestExecutePlanCanceledCallerReportsNothingMore keeps what a canceled caller
+// (Ctrl-C) gets as it was: the plan ends, and no row is rewritten as the
+// victim of a failure there was none of.
+func TestExecutePlanCanceledCallerReportsNothingMore(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	project := &types.Project{Name: "test", Services: types.Services{"db": {Name: "db"}, "api": {Name: "api"}}}
+	dbSummary := container.Summary{
+		ID:     "db-id",
+		Names:  []string{"/test-db-1"},
+		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+	}
+	apiSummary := container.Summary{
+		ID:     "api-id",
+		Names:  []string{"/test-api-1"},
+		Labels: map[string]string{api.ServiceLabel: "api", api.OneoffLabel: "False"},
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+			cancel()
+			return client.ContainerInspectResult{Container: container.InspectResponse{
+				ID:   "db-id",
+				Name: "/test-db-1",
+				State: &container.State{
+					Status: container.StateRunning,
+					Health: &container.Health{Status: container.Starting},
+				},
+				Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+			}}, nil
+		}).AnyTimes()
+
+	apiSvc := project.Services["api"]
+	plan := &Plan{}
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:api:1",
+		Service:    &apiSvc,
+		Container:  &apiSummary,
+	}, "start:api:1", wait)
+	for _, n := range plan.Nodes {
+		n.Phase = PhaseStart
+	}
+
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	_ = exec.run(ctx, plan)
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting})
+	assert.Equal(t, len(recorder.byID["Container test-api-1"]), 0, "api: %v", recorder.byID["Container test-api-1"])
+}
+
+// TestExecutePlanStartFailureClosesAnInterruptedInspection is the same start
+// failure, found by a wait whose inspection of the dependency is in flight: it
+// ends with the cancellation, which is the interruption, not a failure of the
+// healthy dependency.
+func TestExecutePlanStartFailureClosesAnInterruptedInspection(t *testing.T) {
+	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: PhaseStart, inspectBlocks: true})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	err := exec.run(ctx, plan)
+	assert.ErrorContains(t, err, "port is already allocated")
+
+	const reason = `condition "service_healthy" of service "db" not reached: interrupted by the failure of Container test-web-1`
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting, "Skipped: " + reason})
+	assert.DeepEqual(t, recorder.byID["Container test-api-1"], []string{"not started: " + reason})
+}
+
+// TestExecutePlanCreatePhaseFailureReportsNothingOnItsSiblings keeps the create
+// phase as it was: the nodes it gives up are not reported, only the failing
+// one is.
+func TestExecutePlanCreatePhaseFailureReportsNothingOnItsSiblings(t *testing.T) {
+	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: PhaseCreate})
+
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	err := exec.run(ctx, plan)
+	assert.ErrorContains(t, err, "port is already allocated")
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	assert.Equal(t, len(recorder.byID["Container test-api-1"]), 0, "api: %v", recorder.byID["Container test-api-1"])
+}
+
+// TestExecutePlanFailedWaitNamesTheConditionNotMet pins what the service held
+// by a wait reads when that wait is what fails: the dependency did not reach
+// the condition, nothing was interrupted, and the wait node is not a resource
+// of the output.
+func TestExecutePlanFailedWaitNamesTheConditionNotMet(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	project := &types.Project{Name: "test", Services: types.Services{"db": {Name: "db"}, "api": {Name: "api"}}}
+	dbSummary := startTestSummary("db")
+	apiSummary := startTestSummary("api")
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
+		Return(client.ContainerInspectResult{Container: container.InspectResponse{
+			ID:   "db-id",
+			Name: "/test-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Unhealthy},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		}}, nil).AnyTimes()
+
+	apiSvc := project.Services["api"]
+	plan := &Plan{}
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:api:1",
+		Service:    &apiSvc,
+		Container:  &apiSummary,
+	}, "start:api:1", wait)
+	for _, n := range plan.Nodes {
+		n.Phase = PhaseStart
+	}
+
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{dbSummary}
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	err := exec.run(ctx, plan)
+	assert.ErrorContains(t, err, "dependency failed to start")
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	assert.DeepEqual(t, recorder.byID["Container test-api-1"],
+		[]string{`not started: condition "service_healthy" of service "db" not met`})
+	for id, texts := range recorder.byID {
+		assert.Assert(t, !strings.HasPrefix(id, "wait:"), "event on %q: %v", id, texts)
+		for _, text := range texts {
+			assert.Assert(t, !strings.Contains(text, "wait:"), "%s: %q", id, text)
+		}
+	}
+}
+
+// startTestSummary is the container of a service's first replica.
+func startTestSummary(service string) container.Summary {
+	return container.Summary{
+		ID:     service + "-id",
+		Names:  []string{"/test-" + service + "-1"},
+		Labels: map[string]string{api.ServiceLabel: service, api.OneoffLabel: "False"},
+	}
+}
+
+// concurrentFailure runs the creation of two networks, which do not depend on
+// each other, to the point where both are in flight; fail then tells how each
+// one ends. (Container starts cannot stand for them: they are serialized, see
+// startMx.)
+func concurrentFailure(t *testing.T, fail func(ctx context.Context, network string) error) (*recordingEvents, error) {
+	t.Helper()
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	inFlight := map[string]chan struct{}{"a": make(chan struct{}), "b": make(chan struct{})}
+	plan := &Plan{}
+	for _, name := range []string{"a", "b"} {
+		nw := types.NetworkConfig{Name: "test_" + name}
+		apiClient.EXPECT().NetworkCreate(gomock.Any(), nw.Name, gomock.Any()).
+			DoAndReturn(func(ctx context.Context, _ string, _ client.NetworkCreateOptions) (client.NetworkCreateResult, error) {
+				close(inFlight[name])
+				// the other creation is in flight before either ends
+				other := map[string]string{"a": "b", "b": "a"}[name]
+				select {
+				case <-inFlight[other]:
+				case <-time.After(5 * time.Second):
+					t.Error("the other creation never began")
+				}
+				return client.NetworkCreateResult{}, fail(ctx, name)
+			})
+		plan.addNode(Operation{
+			Type:       OpCreateNetwork,
+			ResourceID: "network:" + name,
+			Name:       nw.Name,
+			Network:    &nw,
+		}, "")
+	}
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	return recorder, exec.run(ctx, plan)
+}
+
+// TestExecutePlanConcurrentFailuresEachEndTheirRow pins that two nodes failing
+// together both say why: the failure that cancels the phase is the one
+// returned, but the other row must not be left on its Working status.
+func TestExecutePlanConcurrentFailuresEachEndTheirRow(t *testing.T) {
+	recorder, err := concurrentFailure(t, func(_ context.Context, network string) error {
+		return errors.New("failed " + network)
+	})
+	assert.Assert(t, err != nil)
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	for _, network := range []string{"a", "b"} {
+		assert.DeepEqual(t, recorder.byID["network:"+network], []string{"failed to create network test_" + network + ": failed " + network})
+	}
+}
+
+// TestExecutePlanFailingOnItsOwnWhileCanceledSaysSo pins that a node which
+// fails for a reason of its own after another one canceled the phase reports
+// that reason, whichever of the two failures comes first.
+func TestExecutePlanFailingOnItsOwnWhileCanceledSaysSo(t *testing.T) {
+	recorder, err := concurrentFailure(t, func(ctx context.Context, network string) error {
+		if network == "a" {
+			return errors.New("failed a")
+		}
+		<-ctx.Done()
+		return errors.New("failed b")
+	})
+	assert.ErrorContains(t, err, "failed a")
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	assert.DeepEqual(t, recorder.byID["network:a"], []string{"failed to create network test_a: failed a"})
+	assert.DeepEqual(t, recorder.byID["network:b"], []string{"failed to create network test_b: failed b"})
+}
+
+// TestAbortReasonOfPostStart pins that a replica whose start is behind it is
+// not reported as one that never started: only its post_start hooks were cut
+// short.
+func TestAbortReasonOfPostStart(t *testing.T) {
+	web, apiCtr := startTestSummary("web"), startTestSummary("api")
+	plan := &Plan{}
+	failed := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &web}, "start:web:1")
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1")
+	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
+
+	exec := &planExecutor{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return true }}
+	assert.Equal(t, exec.abortReason(start, rs, failed), "interrupted by the failure of Container test-web-1")
+	assert.Equal(t, exec.abortReason(postStart, rs, failed), "started, post_start hooks interrupted by the failure of Container test-web-1")
+}
+
+// TestAbortReasonOfAFailedWait pins what a node reads when the node that ended
+// the phase is a wait: held by that wait, it was not interrupted, its
+// dependency did not meet the condition; any other node was interrupted by it.
+func TestAbortReasonOfAFailedWait(t *testing.T) {
+	apiCtr, webCtr := startTestSummary("api"), startTestSummary("web")
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	held := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
+	other := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
+	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:web:1", Container: &webCtr}, "start:web:1", other)
+
+	exec := &planExecutor{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return false }}
+	assert.Equal(t, exec.abortReason(held, rs, wait), `condition "service_healthy" of service "db" not met`)
+	assert.Equal(t, exec.abortReason(other, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
+	// its start did not succeed: nothing is started for the hooks to be cut short
+	assert.Equal(t, exec.abortReason(postStart, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
+}
+
+// TestExecutePlanCanceledCallerMidInspectionKeepsItsError keeps what a caller
+// canceled (Ctrl-C) while a required wait inspects its dependency as it was: the
+// wait fails, so the nodes it holds are skipped, and the healthy dependency is
+// not reported as failed.
+func TestExecutePlanCanceledCallerMidInspectionKeepsItsError(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	project := &types.Project{Name: "test", Services: types.Services{"db": {Name: "db"}, "api": {Name: "api"}}}
+	apiCtr := startTestSummary("api")
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+			cancel()
+			return client.ContainerInspectResult{}, fmt.Errorf("inspect db-id: %w", context.Canceled)
+		}).AnyTimes()
+
+	apiSvc := project.Services["api"]
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Service: &apiSvc, Container: &apiCtr}, "start:api:1", wait)
+	for _, n := range plan.Nodes {
+		n.Phase = PhaseStart
+	}
+
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec.containersByService["db"] = Containers{startTestSummary("db")}
+	err := exec.run(ctx, plan)
+	assert.ErrorIs(t, err, context.Canceled)
+
+	recorder.mu.Lock()
+	defer recorder.mu.Unlock()
+	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting})
+	assert.Equal(t, len(recorder.byID["Container test-api-1"]), 0, "api: %v", recorder.byID["Container test-api-1"])
+}
+
+// TestAbortReasonFollowsTheChainOfPrerequisites pins that the reason a node
+// reads does not depend on which node of a chain reports first: wait -> start
+// -> post_start is held by the wait for each of the three, and a post_start is
+// only "started" once its start has succeeded.
+func TestAbortReasonFollowsTheChainOfPrerequisites(t *testing.T) {
+	apiCtr, webCtr := startTestSummary("api"), startTestSummary("web")
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
+	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
+	failed := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
+
+	exec := &planExecutor{}
+	succeeded := map[int]bool{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(id int) bool { return succeeded[id] }}
+	const reason = `condition "service_healthy" of service "db" not reached: interrupted by the failure of Container test-web-1`
+	assert.Equal(t, exec.abortReason(start, rs, failed), reason)
+	assert.Equal(t, exec.abortReason(postStart, rs, failed), reason)
+
+	// the wait is over and the start succeeded: only the hooks were cut short
+	succeeded[wait.ID], succeeded[start.ID] = true, true
+	assert.Equal(t, exec.abortReason(postStart, rs, failed), "started, post_start hooks interrupted by the failure of Container test-web-1")
+}
+
+// TestGroupTrackerNothingStartsAfterTheFinalEvent pins the order of a group's
+// events when another node of the group gives it up while a node is still on
+// its way to start: the final event stays the last one.
+func TestGroupTrackerNothingStartsAfterTheFinalEvent(t *testing.T) {
+	summary := container.Summary{ID: "api-id", Names: []string{"/test-api-1"}}
+	plan := &Plan{}
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
+	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &summary}, "start:api:1", start)
+	gt := (&planExecutor{}).buildGroupTracker(plan)
+	rec := &capturingEvents{}
+
+	gt.onNodeAborted(postStart, rec, "interrupted")
+	assert.Assert(t, !gt.onNodeStart(start, rec), "a node of a given up group must not go on")
+	assert.DeepEqual(t, rec.resources, []api.Resource{{ID: "Container test-api-1", Status: api.Error, Text: "not started: interrupted"}})
 }

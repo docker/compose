@@ -17,6 +17,9 @@
 package compose
 
 import (
+	"context"
+	"fmt"
+	"slices"
 	"sync"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -73,6 +76,7 @@ type groupState struct {
 	started   int    // nodes that have started
 	done      int    // nodes that have completed
 	working   bool   // the group's Working event has been emitted
+	finished  bool   // the group's final event (Done or Error) has been emitted
 }
 
 func (exec *planExecutor) buildGroupTracker(plan *Plan) *groupTracker {
@@ -113,15 +117,22 @@ func (exec *planExecutor) groupEventName(op Operation) string {
 	return op.ResourceID
 }
 
-func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) {
+// onNodeStart tells whether node may go on: not when its group was given up by
+// another node of the group while this one was getting a slot. A Working event
+// now would follow the group's final one and leave the row on it, and so would
+// whatever the node then fails with.
+func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) bool {
 	if node.Group == "" {
 		// Ungrouped: emit individual event
 		emitStartEvent(node, events)
-		return
+		return true
 	}
 	gt.mu.Lock()
 	defer gt.mu.Unlock()
 	gs := gt.groups[node.Group]
+	if gs.finished {
+		return false
+	}
 	if gs.eventName == "" {
 		gs.eventName = gt.exec.groupEventName(node.Operation)
 	}
@@ -130,6 +141,7 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) {
 		gs.working = true
 		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
 	}
+	return true
 }
 
 // triggersWorking reports whether this node starting should fire the group's
@@ -154,7 +166,8 @@ func (gt *groupTracker) onNodeDone(node *PlanNode, events api.EventProcessor) {
 	defer gt.mu.Unlock()
 	gs := gt.groups[node.Group]
 	gs.done++
-	if gs.done == gs.total {
+	if gs.done == gs.total && !gs.finished {
+		gs.finished = true
 		events.On(newEvent(gs.eventName, api.Done, gs.kind.doneText()))
 	}
 }
@@ -176,11 +189,157 @@ func (gt *groupTracker) onNodeError(node *PlanNode, events api.EventProcessor, e
 		gs.working = true
 		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
 	}
+	gs.finished = true
 	events.On(api.Resource{
 		ID:     gs.eventName,
 		Status: api.Error,
 		Text:   err.Error(),
 	})
+}
+
+// onNodeAborted gives a group a final event when one of its nodes was given up
+// because another node of the phase failed. Without it the row stays at its
+// last status for good: a replica recreated, then never started, still reads
+// "Recreated", as if nothing was left to do. It is a no-op once the group has
+// its final event, so the failing node's own Error (which also ends the
+// nodes depending on it) is never followed by a second one.
+func (gt *groupTracker) onNodeAborted(node *PlanNode, events api.EventProcessor, reason string) {
+	if node.Group == "" {
+		return
+	}
+	gt.mu.Lock()
+	defer gt.mu.Unlock()
+	gs := gt.groups[node.Group]
+	if gs.finished {
+		return
+	}
+	gs.finished = true
+	if gs.eventName == "" {
+		gs.eventName = gt.exec.groupEventName(node.Operation)
+	}
+	if !gs.working {
+		reason = "not started: " + reason
+	}
+	events.On(api.Resource{
+		ID:     gs.eventName,
+		Status: api.Error,
+		Text:   reason,
+	})
+}
+
+// resourceName is the name a node's resource goes by in the progress output.
+func (gt *groupTracker) resourceName(node *PlanNode) string {
+	if node.Group != "" {
+		gt.mu.Lock()
+		name := gt.groups[node.Group].eventName
+		gt.mu.Unlock()
+		if name != "" {
+			return name
+		}
+	}
+	if node.Operation.Container != nil {
+		return getContainerProgressName(*node.Operation.Container)
+	}
+	return node.Operation.ResourceID
+}
+
+// unmetCondition names the depends_on condition a wait node is bound to.
+func unmetCondition(op Operation) string {
+	return fmt.Sprintf("condition %q of service %q", op.Condition, op.Name)
+}
+
+// interruption says what ended the phase: the resource whose failure
+// interrupted it or, for the failure of a wait node, which has no resource of
+// its own to name, the depends_on condition that was not met.
+func (exec *planExecutor) interruption(rs *runState, failed *PlanNode) string {
+	if failed.Operation.Type == OpWaitCondition {
+		return "interrupted by the unmet " + unmetCondition(failed.Operation)
+	}
+	return "interrupted by the failure of " + rs.groups.resourceName(failed)
+}
+
+// unmetPrerequisite returns the wait node, among the prerequisites of node
+// (transitively: a start is held through its pre_start, a post_start through
+// its start), that has not succeeded, failed itself being preferred: which of
+// the nodes of a chain reports first must not change what is said.
+func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNode {
+	var first *PlanNode
+	seen := map[int]bool{}
+	var walk func(n *PlanNode)
+	walk = func(n *PlanNode) {
+		for _, dep := range n.DependsOn {
+			if seen[dep.ID] || succeeded(dep.ID) {
+				continue
+			}
+			seen[dep.ID] = true
+			if dep.Operation.Type == OpWaitCondition && first == nil {
+				first = dep
+			}
+			walk(dep)
+		}
+	}
+	walk(node)
+	if failed != nil && seen[failed.ID] && failed.Operation.Type == OpWaitCondition {
+		return failed
+	}
+	return first
+}
+
+// abortReason tells why node was given up after the failure of another node
+// of its phase: the depends_on condition it was still waiting for, if that is
+// what it was held by, and what ended the phase. A node held by the very wait
+// that failed was not interrupted: its dependency did not meet the condition.
+func (exec *planExecutor) abortReason(node *PlanNode, rs *runState, failed *PlanNode) string {
+	reason := exec.interruption(rs, failed)
+	if held := unmetPrerequisite(node, failed, rs.succeeded); held != nil {
+		if held == failed {
+			return unmetCondition(held.Operation) + " not met"
+		}
+		return fmt.Sprintf("%s not reached: %s", unmetCondition(held.Operation), reason)
+	}
+	if node.Operation.Type == OpRunPostStart && slices.ContainsFunc(node.DependsOn, func(dep *PlanNode) bool {
+		return dep.Operation.Type == OpStartContainer && rs.succeeded(dep.ID)
+	}) {
+		// the container is started by then: only its hooks were cut short
+		return "started, post_start hooks " + reason
+	}
+	return reason
+}
+
+// reportAborted reports a node that did not run (or did not complete) because
+// the start phase was canceled by the failure of another node, so that the row
+// of the resource it was about to change ends on something other than its last
+// status. A phase canceled by its caller (Ctrl-C) reports nothing, as before,
+// and so does the create phase, whose failure never was reported on the nodes
+// it gives up.
+func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *phaseCancel) {
+	if node.Phase != PhaseStart || node.Operation.Type == OpWaitCondition {
+		return
+	}
+	failed := phase.failed.Load()
+	if failed == nil || failed == node {
+		return
+	}
+	rs.groups.onNodeAborted(node, rs.events, exec.abortReason(node, rs, failed))
+}
+
+// interruptedWait is the failure of a wait node left by the failure of
+// another node of its phase: the depends_on condition was not reached. The
+// rows of the containers it was waiting on, left on "Waiting", are closed with
+// the same reason. A phase not canceled by one of its own nodes is not an
+// interruption to report: the wait ends as it always did, with cause.
+func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *phaseCancel, cause error) error {
+	failed := phase.failed.Load()
+	if failed == nil {
+		return cause
+	}
+	op := node.Operation
+	exec.containersMu.Lock()
+	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
+	exec.containersMu.Unlock()
+	reason := fmt.Sprintf("%s not reached: %s", unmetCondition(op), exec.interruption(rs, failed))
+	rs.events.On(containerReasonEvents(waitingFor, skippedEvent, reason)...)
+	return fmt.Errorf("%s: %w", reason, context.Canceled)
 }
 
 // emitStartEvent emits the appropriate Working event for an ungrouped node.
