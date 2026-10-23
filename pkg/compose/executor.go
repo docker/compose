@@ -289,16 +289,20 @@ func newPhaseCancel(parent context.Context) *phaseCancel {
 
 // fail registers node's failure as this phase's cause, for the first caller
 // only: it emits the group error event and cancels the phase's context. Any
-// later caller's err is silently dropped -- by the time it could run, this
-// phase is already canceled, so it is never anything but a cancellation
-// casualty of the first failure, not a new one of its own.
-func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *groupTracker, err error) {
+// later caller's err is not registered, and fail tells so (false): such a
+// caller either is a cancellation casualty of the first failure, with nothing
+// of its own to say, or failed for a genuine reason of its own at the same
+// moment, whose row is then for it to close.
+func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *groupTracker, err error) bool {
+	first := false
 	p.once.Do(func() {
+		first = true
 		p.err = err
 		groups.onNodeError(node, events, err)
 		p.failed.Store(node)
 		p.cancel()
 	})
+	return first
 }
 
 // acquireNodeSlot takes node's --parallel slot and returns the function that
@@ -398,36 +402,56 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 	rs.groups.onNodeStart(node, rs.events)
 
 	err := exec.executeNode(nodeCtx, node)
-	if errors.Is(err, errWaitInterrupted) {
+	var wi *waitInterrupted
+	interrupted := errors.As(err, &wi)
+	if interrupted {
 		// waitDependency ends a wait silently when its context is canceled,
 		// which suits a caller that is going away itself (Ctrl-C): the node
 		// ends as it always did. Canceled by the failure of another node of
 		// its phase, the wait is a failure instead: the condition was not
 		// reached, and the nodes depending on it must not run.
-		err = exec.interruptedWait(node, rs, phase)
+		err = exec.interruptedWait(node, rs, phase, wi.cause)
 	}
 
 	if err == nil {
-		rs.recordSuccess(node.ID)
+		// a wait that ended unreached is not a success its dependents' reports
+		// could rely on (see abortReason)
+		if !interrupted {
+			rs.recordSuccess(node.ID)
+		}
 		// Emit group done event if this is the last node of a group
 		rs.groups.onNodeDone(node, rs.events)
 		return nil
 	}
 
 	rs.recordFailure(node.ID, err)
-	if nodeCtx.Err() == nil {
+	switch {
+	case nodeCtx.Err() == nil:
 		// This node's own failure, not an inherited cancellation: a node
 		// whose nodeCtx is already canceled failed because of that
 		// cancellation, not a new failure of its own to propagate. phase.fail
 		// itself gates on being the first such failure in this phase (see its
 		// doc comment) -- this outer check only spares every later,
 		// cancellation-casualty caller the cost of building the error-event
-		// payload it would be dropped anyway.
-		phase.fail(node, rs.events, rs.groups, err)
-	} else {
+		// payload it would be dropped anyway. One that lost the race to a
+		// failure of its own, at the same moment, still ends its own row.
+		if !phase.fail(node, rs.events, rs.groups, err) {
+			rs.groups.onNodeError(node, rs.events, err)
+		}
+	case phase.failed.Load() != nil && !isCancellation(err):
+		// canceled by the failure of another node while failing, for a reason
+		// of its own, before it noticed: "interrupted" would hide that reason
+		rs.groups.onNodeError(node, rs.events, err)
+	default:
 		exec.reportAborted(node, rs, phase)
 	}
 	return err
+}
+
+// isCancellation tells whether err is the end of a context, as opposed to a
+// failure of the operation itself.
+func isCancellation(err error) bool {
+	return errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded)
 }
 
 // errWaitTimeout marks the failure of an OpWaitCondition node whose own
@@ -439,9 +463,14 @@ func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCanc
 // satisfies errors.Is(err, context.DeadlineExceeded).
 var errWaitTimeout = errors.New("timeout waiting for dependencies")
 
-// errWaitInterrupted marks an OpWaitCondition node whose wait ended because its
-// context was canceled, before the condition was reached.
-var errWaitInterrupted = errors.New("wait interrupted")
+// waitInterrupted marks an OpWaitCondition node whose wait ended because its
+// context was canceled, before the condition was reached. cause is what the
+// wait would have ended with had nothing but a caller going away (Ctrl-C) been
+// at stake: nil for a wait that ends silently, the error of a check cut short
+// otherwise.
+type waitInterrupted struct{ cause error }
+
+func (e *waitInterrupted) Error() string { return "wait interrupted" }
 
 // translateWaitTimeout turns a plan failure caused by a wait node's own
 // --wait-timeout window (see errWaitTimeout) into the "timeout waiting for

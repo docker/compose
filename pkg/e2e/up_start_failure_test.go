@@ -32,3 +32,16 @@ func TestUpStartFailureReportsInterruptedServices(t *testing.T) {
 			ServiceState("api", "created"),
 			OutputContains(`not started: condition "service_healthy" of service "db" not reached: interrupted by the failure of`))
 }
+
+// TestUpUnhealthyDependencyNamesTheConditionNotMet locks what a service held by
+// a wait reads when the dependency it waits for fails: the condition that was
+// not met, not an interruption nor the internal name of the wait.
+func TestUpUnhealthyDependencyNamesTheConditionNotMet(t *testing.T) {
+	NewScenario(t, "up must name the depends_on condition a dependency did not meet").
+		Step("db turns unhealthy, and api, held by the wait for it, is reported as not started",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			ServiceState("api", "created"),
+			OutputContains(`not started: condition "service_healthy" of service "db" not met`),
+			OutputNotContains("wait:"))
+}
