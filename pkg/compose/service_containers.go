@@ -325,9 +325,11 @@ func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string,
 			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
 			return true, nil
 		}
-		if !errors.Is(ctx.Err(), context.Canceled) {
+		if !errors.Is(err, context.Canceled) {
 			// a failure caused by a canceled ctx says nothing about the
-			// dependency: its rows are not marked failed for it
+			// dependency: its rows are not marked failed for it. The error is
+			// tested, not the ctx: a genuine failure (unhealthy, exited)
+			// found just as another node cancels the phase is still reported
 			s.events.On(containerEvents(waitingFor, func(s string) api.Resource {
 				return errorEventf(s, "dependency %s failed to start", dep)
 			})...)
