@@ -106,6 +106,17 @@ services:
 		assertFindings(t, got, []findingKey{{Service: "web", Path: "deploy.mode"}})
 	})
 
+	t.Run("service name containing a dot is reported verbatim", func(t *testing.T) {
+		got := loadCompose(t, `
+services:
+  my.service:
+    image: alpine
+    deploy:
+      mode: replicated
+`)
+		assertFindings(t, got, []findingKey{{Service: "my.service", Path: "deploy.mode"}})
+	})
+
 	t.Run("deploy labels is unsupported", func(t *testing.T) {
 		got := loadCompose(t, `
 services:

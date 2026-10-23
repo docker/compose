@@ -230,7 +230,7 @@ func fileReferenceReport(kind string) func(loader.UnsupportedAttribute) []api.Un
 func splitServicePath(path tree.Path) (service, outputPath string) {
 	parts := path.Parts()
 	if len(parts) >= 2 && parts[0] == "services" {
-		return parts[1], strings.Join(parts[2:], ".")
+		return tree.Path(parts[1]).String(), strings.Join(parts[2:], ".")
 	}
 	return "", path.String()
 }
