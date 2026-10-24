@@ -23,6 +23,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -808,6 +809,18 @@ func TestRuntimeAPIVersionRetriesOnTransientError(t *testing.T) {
 	assert.Equal(t, version, "1.44")
 }
 
+// startingDBInspect is the "db-ctr" container running with its healthcheck
+// still starting: every health-based dependency check reports it "not done
+// yet".
+var startingDBInspect = client.ContainerInspectResult{
+	Container: container.InspectResponse{
+		ID:     "db-ctr",
+		Name:   "/db-ctr",
+		Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		State:  &container.State{Status: container.StateRunning, Health: &container.Health{Status: container.Starting}},
+	},
+}
+
 // TestWaitDependencyDeadline locks the timeout semantics of the dependency
 // wait: an expired deadline surfaces as "timeout waiting for dependencies",
 // while a plain user cancellation is not a wait failure.
@@ -832,10 +845,16 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		Names:  []string{"/db-ctr"},
 		Labels: map[string]string{api.ServiceLabel: "db"},
 	}}
+	// stillStarting makes the check on entry report "not done yet", so that a
+	// timeout shorter than the 500ms poll interval fires between two checks.
+	stillStarting := func() {
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).Return(startingDBInspect, nil)
+	}
 
 	t.Run("expired deadline is an error", func(t *testing.T) {
-		// Timeout shorter than the first 500ms poll tick: the deadline fires
-		// before any condition check, and must not be swallowed.
+		// The dependency is still starting at the check on entry, and the
+		// deadline fires before the next poll tick: it must not be swallowed.
+		stillStarting()
 		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 50*time.Millisecond)
 		assert.Error(t, err, "timeout waiting for dependencies")
 	})
@@ -849,6 +868,7 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		optionalDeps := types.DependsOnConfig{
 			"db": {Condition: types.ServiceConditionHealthy, Required: false},
 		}
+		stillStarting()
 		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", optionalDeps, containers, 50*time.Millisecond)
 		assert.NilError(t, err)
 	})
@@ -893,6 +913,75 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		joined := strings.Join(messages, "\n")
 		assert.Assert(t, strings.Contains(joined, `service "app": unsupported depends_on condition "some_future_condition"`), joined)
 	})
+}
+
+// TestWaitDependencyFirstCheck locks when the dependency wait first checks a
+// dependency that already satisfies its condition. service_healthy and
+// service_completed_successfully are checked on entry, so they cost no poll
+// interval. running_or_healthy accepts a running container without a
+// healthcheck, so it is first checked on the first tick: checked on entry, a
+// container that exits right after starting would be reported as running.
+func TestWaitDependencyFirstCheck(t *testing.T) {
+	project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
+		"db": {Name: "db", Scale: intPtr(1)},
+	}}
+	containers := Containers{{
+		ID:     "db-ctr",
+		Names:  []string{"/db-ctr"},
+		Labels: map[string]string{api.ServiceLabel: "db"},
+	}}
+	satisfied := map[string]struct {
+		inspect container.InspectResponse
+		wait    time.Duration
+	}{
+		types.ServiceConditionHealthy: {
+			inspect: container.InspectResponse{
+				ID:     "db-ctr",
+				Name:   "/db-ctr",
+				Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+				State:  &container.State{Status: container.StateRunning, Health: &container.Health{Status: container.Healthy}},
+			},
+			wait: 0,
+		},
+		types.ServiceConditionCompletedSuccessfully: {
+			inspect: container.InspectResponse{
+				ID:    "db-ctr",
+				Name:  "/db-ctr",
+				State: &container.State{Status: container.StateExited, ExitCode: 0},
+			},
+			wait: 0,
+		},
+		ServiceConditionRunningOrHealthy: {
+			inspect: container.InspectResponse{
+				ID:     "db-ctr",
+				Name:   "/db-ctr",
+				Config: &container.Config{},
+				State:  &container.State{Status: container.StateRunning},
+			},
+			wait: 500 * time.Millisecond,
+		},
+	}
+
+	for condition, tc := range satisfied {
+		t.Run(condition, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				mockCtrl := gomock.NewController(t)
+				apiClient := mocks.NewMockAPIClient(mockCtrl)
+				cli := mocks.NewMockCli(mockCtrl)
+				cli.EXPECT().Client().Return(apiClient).AnyTimes()
+				tested, err := NewComposeService(cli)
+				assert.NilError(t, err)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
+					Return(client.ContainerInspectResult{Container: tc.inspect}, nil)
+
+				dependencies := types.DependsOnConfig{"db": {Condition: condition, Required: true}}
+				start := time.Now()
+				err = tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0)
+				assert.NilError(t, err)
+				assert.Equal(t, time.Since(start), tc.wait)
+			})
+		})
+	}
 }
 
 // TestOptionalDependencyInspectFailure locks what an optional (required:
@@ -1009,8 +1098,8 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 					t.Parallel()
 					tested, apiClient, events := newTested(t)
 					inspectFailsWithContext(apiClient)
-					// the first poll (500ms) starts the inspection, which only
-					// ends with the deadline
+					// the first check starts the inspection, which only ends
+					// with the deadline
 					ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 					defer cancel()
 					err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, required), dbContainers, 0)
@@ -1030,8 +1119,13 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 					inspectFailsWithContext(apiClient)
 					duringInspect := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, time.Second)
 
-					// shorter than the first poll: expires before any check
-					betweenPolls := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, 50*time.Millisecond)
+					// the timeout, shorter than the poll interval, expires with no
+					// check in flight: service_healthy has found the dependency
+					// still starting on entry, running_or_healthy has not checked
+					// it yet
+					polled, polledClient, _ := newTested(t)
+					polledClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).Return(startingDBInspect, nil).MaxTimes(1)
+					betweenPolls := polled.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, 50*time.Millisecond)
 
 					assert.Equal(t, fmt.Sprint(duringInspect), fmt.Sprint(betweenPolls))
 					if required {
