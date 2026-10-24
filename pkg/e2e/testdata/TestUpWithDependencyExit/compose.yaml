@@ -9,3 +9,5 @@ services:
   db:
     image: alpine
     command: sh -c "exit 1"
+    healthcheck:
+      test: ["CMD", "true"]
