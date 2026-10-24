@@ -399,11 +399,8 @@ func TestExecutePlanOptionalWaitTimeoutIsToleratedWithoutInheritedDeadline(t *te
 // network create (Phase: PhaseCreate, the default, no DependsOn edge to
 // anything in the Start phase) with an OpStartContainer node (Phase:
 // PhaseStart) and asserts ContainerStart is never called before the network
-// create has fully returned. Uses OpStartContainer rather than
-// OpWaitCondition deliberately: execWaitCondition's underlying poll loop
-// only checks on a 500ms ticker (never on entry), which would make a
-// same-order-of-magnitude Create delay pass this assertion even with no
-// barrier at all, and so couldn't actually catch a regression here.
+// create has fully returned. Uses OpStartContainer: its single
+// ContainerStart call shows exactly when the Start phase began.
 func TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase(t *testing.T) {
 	svc, apiClient := newTestService(t)
 

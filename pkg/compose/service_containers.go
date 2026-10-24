@@ -223,13 +223,18 @@ func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant,
 func (s *composeService) waitDependencyReached(ctx, origCtx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) (bool, error) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	for {
+	// running_or_healthy accepts a running container without a healthcheck:
+	// checked right after it starts, one that exits at once would pass.
+	checkOnEntry := config.Condition == types.ServiceConditionHealthy || config.Condition == types.ServiceConditionCompletedSuccessfully
+	for first := true; ; first = false {
 		// a tick and the end of ctx can be ready together, and select would
 		// then pick either: ctx wins, so that a canceled wait is never run
 		// through one more check
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
+		if !first || !checkOnEntry {
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+			}
 		}
 		if ctx.Err() != nil {
 			// An expired deadline is precisely the failure this wait is meant
