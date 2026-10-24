@@ -212,31 +212,42 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // dependency; an inherited deadline means something else entirely (an
 // external deadline, a test harness timeout) fired, and must keep
 // propagating regardless of Required.
+//
+// service_healthy and service_completed_successfully are checked on entry,
+// without waiting for a tick, so a dependency that already satisfies one
+// costs no poll interval. running_or_healthy is first checked on the first
+// tick: it accepts a running container that has no healthcheck, and checked
+// right after that container started it would report one that exits within
+// the interval as running. A ctx already done on entry is still decided by
+// ctx.Done(), without checking the dependency.
 func (s *composeService) waitDependency(ctx, origCtx context.Context, dependant, dep string, config types.ServiceDependency, waitingFor Containers) error {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
-	for {
-		select {
-		case <-ticker.C:
-		case <-ctx.Done():
-			// An expired deadline is precisely the failure this wait is meant
-			// to detect for a required dependency; only a plain cancellation
-			// (Ctrl-C) stays silent either way. An optional dependency
-			// tolerates a timeout exactly like it tolerates any other
-			// definitive failure the check* functions below report —
-			// skipped, not aborted — but only this call's OWN timeout: an
-			// inherited deadline is a different, real failure the caller
-			// must still see.
-			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-				if !config.Required && origCtx.Err() == nil {
-					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
-						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
-					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
-					return nil
+	checkOnEntry := config.Condition == types.ServiceConditionHealthy || config.Condition == types.ServiceConditionCompletedSuccessfully
+	for first := true; ; first = false {
+		if !first || !checkOnEntry || ctx.Err() != nil {
+			select {
+			case <-ticker.C:
+			case <-ctx.Done():
+				// An expired deadline is precisely the failure this wait is meant
+				// to detect for a required dependency; only a plain cancellation
+				// (Ctrl-C) stays silent either way. An optional dependency
+				// tolerates a timeout exactly like it tolerates any other
+				// definitive failure the check* functions below report —
+				// skipped, not aborted — but only this call's OWN timeout: an
+				// inherited deadline is a different, real failure the caller
+				// must still see.
+				if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+					if !config.Required && origCtx.Err() == nil {
+						s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+							fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
+						logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
+						return nil
+					}
+					return ctx.Err()
 				}
-				return ctx.Err()
+				return nil
 			}
-			return nil
 		}
 		var (
 			done bool
