@@ -113,8 +113,16 @@ services:
     image: alpine
     deploy:
       mode: replicated
+    ports:
+      - target: 80
+        published: "8080"
+        protocol: tcp
+        mode: host
 `)
-		assertFindings(t, got, []findingKey{{Service: "my.service", Path: "deploy.mode"}})
+		assertFindings(t, got, []findingKey{
+			{Service: "my.service", Path: "deploy.mode"},
+			{Service: "my.service", Path: "ports[80/tcp].mode"},
+		})
 	})
 
 	t.Run("deploy labels is unsupported", func(t *testing.T) {
