@@ -60,6 +60,17 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	// and the dependency waits read them
 	project = project.WithoutUnresolvedOptionalDependencies()
 
+	// use_api_socket is applied by rewriting the project (see useAPISocket),
+	// and the config file it adds is injected when a container starts, from the
+	// project given to the start: a container created beforehand and only
+	// started here would otherwise get DOCKER_CONFIG without the file it points
+	// to. The project is the copy made above, so the caller's is left alone, and
+	// one already transformed (a dependency started by `run`) is not done twice.
+	project, err := s.useAPISocket(project)
+	if err != nil {
+		return err
+	}
+
 	observed, err := s.collectObservedState(ctx, project, ScopeStart)
 	if err != nil {
 		return err
