@@ -820,8 +820,7 @@ func TestExecRunPreStart_BailsOutWhenContextCanceled(t *testing.T) {
 // TestExecRunPostStart_RunsHookAndStreamsToListener verifies that
 // execRunPostStart resolves the replica the start chain just brought up and
 // runs its post_start hooks, forwarding their output to the listener the
-// executor was constructed with — the plumbing an attached `up` will use
-// once the interactive-up convergence wires a real one in.
+// executor was constructed with.
 func TestExecRunPostStart_RunsHookAndStreamsToListener(t *testing.T) {
 	svc, apiClient, _ := newStartPhaseTestService(t)
 

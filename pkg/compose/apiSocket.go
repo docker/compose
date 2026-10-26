@@ -42,7 +42,8 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 	}
 	// The project already went through here, as the plan's own project does
 	// when it is handed to a later plan (a watch rebuild): transforming it a
-	// second time would mount the socket and the config file twice.
+	// second time would append the socket volume and the config entry again,
+	// duplicate entries in the model that also change the service's config hash.
 	if _, applied := project.Configs["#apisocket"]; applied {
 		return project, nil
 	}
