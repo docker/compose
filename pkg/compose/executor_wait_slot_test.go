@@ -89,7 +89,7 @@ func TestExecutePlanWaitNodesHoldNoConcurrencySlot(t *testing.T) {
 			}}, nil
 		}).AnyTimes()
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService[dep] = Containers{{
 		ID:     depID,
 		Names:  []string{"/test-" + dep + "-1"},
