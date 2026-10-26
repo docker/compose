@@ -308,7 +308,7 @@ type BuildOptions struct {
 func (o BuildOptions) Apply(project *types.Project) error {
 	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
 	for name, service := range project.Services {
-		if service.Provider == nil && service.Image == "" && service.Build == nil {
+		if !IsPureResourceProvider(service) && service.Provider == nil && service.Image == "" && service.Build == nil {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
 		}
 
