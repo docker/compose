@@ -82,17 +82,10 @@ type createdUp struct {
 // runInteractiveUp has set up the session streaming logs to the terminal, and
 // the progress display's refresh would repaint over them.
 func (s *composeService) upCreatePhase(ctx context.Context, project *types.Project, options api.UpOptions) (*createdUp, error) {
-	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
+	project, exec, plan, err := s.prepareUp(ctx, project, options)
 	if err != nil {
 		return nil, err
 	}
-
-	// Must run against the pre-execution snapshot, see upDetached.
-	emitRunningEvents(project, observed, plan, s.events)
-
-	// Same per-wait --wait-timeout window as upDetached, see there.
-	exec := s.newPlanExecutor(project, observed, nil)
-	exec.waitTimeout = options.Start.WaitTimeout
 
 	run, err := exec.begin(plan)
 	if err != nil {
@@ -104,16 +97,13 @@ func (s *composeService) upCreatePhase(ctx context.Context, project *types.Proje
 	return &createdUp{project: project, run: run}, nil
 }
 
-// upDetached runs detached `up`'s Create and Start phases as a single plan:
-// the semantic switchover from create() + start() -- two separate daemon
-// snapshots, the second blind to what the first just did -- to one
-// preparePlan/executePlan pass covering both phases (epic #14081, lot 2).
-// Interactive up prepares the same plan but drives its two phases itself,
-// with the attach/printer/monitor setup in between (see upCreatePhase).
-func (s *composeService) upDetached(ctx context.Context, project *types.Project, options api.UpOptions) error {
+// prepareUp prepares the single Create+Start plan of an up, detached or
+// interactive, and the executor that runs it. It returns the plan's own
+// project, the one carrying what preparation resolved (see useAPISocket).
+func (s *composeService) prepareUp(ctx context.Context, project *types.Project, options api.UpOptions) (*types.Project, *planExecutor, *Plan, error) {
 	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	// Must run against the pre-execution snapshot: observed only labels a
@@ -137,6 +127,20 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// per-wait-independent behavior never had that failure mode.
 	exec := s.newPlanExecutor(project, observed, nil)
 	exec.waitTimeout = options.Start.WaitTimeout
+	return project, exec, plan, nil
+}
+
+// upDetached runs detached `up`'s Create and Start phases as a single plan:
+// the semantic switchover from create() + start() -- two separate daemon
+// snapshots, the second blind to what the first just did -- to one
+// preparePlan/executePlan pass covering both phases (epic #14081, lot 2).
+// Interactive up prepares the same plan but drives its two phases itself,
+// with the attach/printer/monitor setup in between (see upCreatePhase).
+func (s *composeService) upDetached(ctx context.Context, project *types.Project, options api.UpOptions) error {
+	project, exec, plan, err := s.prepareUp(ctx, project, options)
+	if err != nil {
+		return err
+	}
 
 	if err := exec.run(ctx, plan); err != nil {
 		return translateWaitTimeout(err)
@@ -222,11 +226,12 @@ type upSession struct {
 
 // runInteractiveUp sets up the attach/printer/monitor session around the
 // Start phase of created's plan, runs it, then follows the application until
-// it terminates. The Create phase already ran, and signal.Notify only comes
-// after it: Ctrl+C during Create keeps its default behavior.
+// it terminates. The Create phase already ran: the session's own signal
+// handling only starts after it, so an interruption of the Create phase is the
+// caller's, through ctx.
 func (s *composeService) runInteractiveUp(ctx context.Context, created *createdUp, options api.UpOptions) error {
-	// the plan's own project, not the caller's: the one carrying what
-	// preparePlan resolved (see useAPISocket)
+	// the plan's own project, not the caller's: the one the Start phase runs
+	// on, so the session, the watcher and the teardown follow the same model
 	project := created.project
 
 	// if we get a second signal during shutdown, we kill the services

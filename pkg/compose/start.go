@@ -39,9 +39,9 @@ func (s *composeService) Start(ctx context.Context, projectName string, options 
 // other lifecycle command already uses. ScopeStart's planStartPhase works
 // straight off the observed containers (see TestPlanStart_StartOnlyScope) --
 // it never converges anything, matching start()'s own historical contract of
-// starting what exists, never creating. Interactive up does not go through
-// here: it drives its own plan's Start phase (see runInteractiveUp), so there
-// is no attached session for the hook logs to stream into.
+// starting what exists, never creating. The Start phase of an interactive up
+// does not go through here: it runs from the up's own plan, and hands its
+// session's listener to runStart (see runInteractiveUp).
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions) error {
 	project := options.Project
 	if project == nil {
