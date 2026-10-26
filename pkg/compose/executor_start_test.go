@@ -85,7 +85,7 @@ func newStartPhaseTestService(t *testing.T) (*composeService, *mocks.MockAPIClie
 // all is a hard plan failure, exactly like waitDependencies today.
 func TestExecWaitCondition_RequiredMissingDependencyFails(t *testing.T) {
 	svc, _, _ := newStartPhaseTestService(t)
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
 		Name:      "db",
@@ -100,7 +100,7 @@ func TestExecWaitCondition_RequiredMissingDependencyFails(t *testing.T) {
 // resolves as satisfied.
 func TestExecWaitCondition_OptionalMissingDependencyIsTolerated(t *testing.T) {
 	svc, _, recorder := newStartPhaseTestService(t)
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
 		Name:       "db",
@@ -141,7 +141,7 @@ func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 		},
 	}, nil)
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed, nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
 	exec.containersByService["db"] = Containers{dbSummary}
 
 	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
@@ -193,7 +193,7 @@ func TestExecutePlanWaitConditionRespectsContextDeadline(t *testing.T) {
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 
 	ctx, cancel := context.WithTimeout(t.Context(), 200*time.Millisecond)
@@ -264,7 +264,7 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	exec.waitTimeout = 200 * time.Millisecond
 
@@ -321,7 +321,7 @@ func TestExecutePlanOptionalWaitDoesNotSwallowInheritedDeadline(t *testing.T) {
 		BestEffort: true,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	exec.waitTimeout = 10 * time.Second
 
@@ -372,7 +372,7 @@ func TestExecutePlanOptionalWaitTimeoutIsToleratedWithoutInheritedDeadline(t *te
 		BestEffort: true,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	exec.waitTimeout = 200 * time.Millisecond
 
@@ -436,7 +436,7 @@ func TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase(t *testing.T) {
 	}, "")
 	start.Phase = PhaseStart
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	assert.NilError(t, exec.run(t.Context(), plan))
 	assert.Assert(t, createDone.Load())
@@ -481,7 +481,7 @@ func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 		Volume:     &vol,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	// run waits for every node, and VolumeCreate blocks until its ctx ends: if
 	// the sibling failure ever stopped canceling it, run would hang until the
@@ -531,7 +531,7 @@ func TestExecutePlanCanceledDependencyIsRecordedAsFailure(t *testing.T) {
 		a := plan.addNode(Operation{Type: OpCreateVolume, ResourceID: "volume:a", Name: volA.Name, Volume: &volA}, "", x)
 		plan.addNode(Operation{Type: OpCreateVolume, ResourceID: "volume:b", Name: volB.Name, Volume: &volB}, "", a)
 
-		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 		assert.ErrorContains(t, exec.run(t.Context(), plan), "boom")
 	}
 }
@@ -566,7 +566,7 @@ func TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase(t *testing.T) {
 	}, "")
 	start.Phase = PhaseStart
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	err := exec.run(t.Context(), plan)
 	assert.ErrorContains(t, err, "boom")
@@ -618,7 +618,7 @@ func TestExecutePlanConcurrentPhaseFailureKeepsOriginatingError(t *testing.T) {
 		blocked.Phase = PhaseStart
 	}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	err := exec.run(t.Context(), plan)
 	assert.ErrorContains(t, err, "missing dependency missing")
@@ -758,7 +758,7 @@ func TestExecRenameContainer_RefreshesLiveViewName(t *testing.T) {
 	apiClient.EXPECT().ContainerRename(gomock.Any(), "new-id", client.ContainerRenameOptions{NewName: finalName}).
 		Return(client.ContainerRenameResult{}, nil)
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	exec.pctx.set(1, operationResult{ContainerID: "new-id", ContainerName: tmpName})
 	exec.containersByService["web"] = Containers{{ID: "new-id", Names: []string{"/" + tmpName}}}
 
@@ -792,7 +792,7 @@ func TestExecRunPreStart_SkipsWhenReplicaAlreadyRunning(t *testing.T) {
 	// No further daemon call: the hook runner scan (and any wait/start/remove)
 	// never happens once the drift guard skips the node.
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	err := exec.execRunPreStart(t.Context(), Operation{Service: &service})
 	assert.NilError(t, err)
 }
@@ -812,15 +812,16 @@ func TestExecRunPreStart_BailsOutWhenContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	err := exec.execRunPreStart(ctx, Operation{Service: &service})
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
 // TestExecRunPostStart_RunsHookAndStreamsToListener verifies that
 // execRunPostStart resolves the replica the start chain just brought up and
-// runs its post_start hooks, forwarding their output to the listener the
-// executor was constructed with.
+// runs its post_start hooks, forwarding their output to the executor's
+// listener (set directly here: runStart is what sets it in production, see
+// TestPlanRunStartTakesTheListenerAtPhaseEntry).
 func TestExecRunPostStart_RunsHookAndStreamsToListener(t *testing.T) {
 	svc, apiClient, _ := newStartPhaseTestService(t)
 
@@ -851,7 +852,8 @@ func TestExecRunPostStart_RunsHookAndStreamsToListener(t *testing.T) {
 	}
 	ctr := container.Summary{ID: "c1", Names: []string{"/test-web-1"}}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), listener)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	exec.listener = listener
 	err := exec.execRunPostStart(t.Context(), Operation{Service: &service, Container: &ctr})
 	assert.NilError(t, err)
 	assert.DeepEqual(t, lines, []string{"post-start ok"})
@@ -894,7 +896,7 @@ func TestExecutePlanStartInjectsSecretsAndConfigsBeforeContainerStart(t *testing
 		Container:  &ctr,
 	}, "start:web:1")
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	assert.NilError(t, exec.run(t.Context(), plan))
 }
 
@@ -937,7 +939,7 @@ func TestExecutePlanFailedPostStartFailsTheStart(t *testing.T) {
 		Container:  &ctr,
 	}, "start:web:1", start)
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test", Services: types.Services{"web": service}}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test", Services: types.Services{"web": service}}, emptyObservedState("test"))
 	err := exec.run(t.Context(), plan)
 	assert.ErrorContains(t, err, "hook exited with status 3")
 	assert.Assert(t, !slices.Contains(recorder.byID["Container test-web-1"], api.StatusStarted),
@@ -1003,7 +1005,7 @@ func TestExecutePlanStartPhaseEventContract(t *testing.T) {
 		Container:  &appSummary,
 	}, "start:app:1", wait)
 
-	exec := svc.newPlanExecutor(project, observed, nil)
+	exec := svc.newPlanExecutor(project, observed)
 	exec.containersByService["db"] = Containers{dbSummary}
 
 	assert.NilError(t, exec.run(t.Context(), plan))
@@ -1097,7 +1099,7 @@ func TestExecutePlanStartPhaseFullChainThroughCreateNode(t *testing.T) {
 		CreateNodeID: create.ID,
 	}, "start:web:1", start)
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	assert.NilError(t, exec.run(t.Context(), plan))
 
 	// The create node is ungrouped (Creating/Created), then the start group
@@ -1246,7 +1248,7 @@ func TestExecutePlanWaitTimeoutIsMarked(t *testing.T) {
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	exec.waitTimeout = 200 * time.Millisecond
 
@@ -1274,7 +1276,7 @@ func TestExecutePlanOtherDeadlinesAreNotWaitTimeouts(t *testing.T) {
 			Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
 		}, "").Phase = PhaseStart
 
-		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 		exec.waitTimeout = time.Minute
 
 		err := exec.run(t.Context(), plan)
@@ -1309,7 +1311,7 @@ func TestExecutePlanOtherDeadlinesAreNotWaitTimeouts(t *testing.T) {
 			Condition:  types.ServiceConditionHealthy,
 		}, "")
 
-		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 		exec.containersByService["db"] = Containers{dbSummary}
 		exec.waitTimeout = time.Minute // far longer than the caller's own deadline
 
@@ -1362,7 +1364,7 @@ func TestExecutePlanWaitTimeoutSurvivesDependentSkip(t *testing.T) {
 		Container:  &container.Summary{ID: "app-id", Names: []string{"/test-app-1"}},
 	}, "", wait).Phase = PhaseStart
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	exec.waitTimeout = 200 * time.Millisecond
 
@@ -1478,7 +1480,7 @@ func startFailureFixture(t *testing.T, opts startFailureOptions) (*recordingEven
 		n.Phase = opts.phase
 	}
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	return recorder, exec, plan
 }
@@ -1599,7 +1601,7 @@ func TestExecutePlanCanceledCallerReportsNothingMore(t *testing.T) {
 		n.Phase = PhaseStart
 	}
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	_ = exec.run(ctx, plan)
 
@@ -1683,7 +1685,7 @@ func TestExecutePlanFailedWaitNamesTheConditionNotMet(t *testing.T) {
 		n.Phase = PhaseStart
 	}
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -1743,7 +1745,7 @@ func concurrentFailure(t *testing.T, fail func(ctx context.Context, network stri
 		}, "")
 	}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
 	return recorder, exec.run(ctx, plan)
@@ -1844,7 +1846,7 @@ func TestExecutePlanCanceledCallerMidInspectionKeepsItsError(t *testing.T) {
 		n.Phase = PhaseStart
 	}
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{startTestSummary("db")}
 	err := exec.run(ctx, plan)
 	assert.ErrorIs(t, err, context.Canceled)
@@ -1925,7 +1927,7 @@ func TestPlanRunDrivesPhasesSeparately(t *testing.T) {
 		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
 	}, "", network).Phase = PhaseStart
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	pr, err := exec.begin(plan)
 	assert.NilError(t, err)
 	assert.Assert(t, !networkCreated.Load() && !started.Load(), "begin must not dispatch anything")
@@ -1989,14 +1991,14 @@ func postStartHookPlan(t *testing.T) (*composeService, *Plan) {
 }
 
 // TestPlanRunStartTakesTheListenerAtPhaseEntry verifies that a listener
-// handed to runStart -- not the one the executor was built with, nil here --
-// receives the hook logs of the Start phase: an attached caller only has its
-// printer once its session is set up, after the Create phase.
+// handed to runStart -- the only way to give an executor one -- receives the
+// hook logs of the Start phase: an attached caller only has its printer once
+// its session is set up, after the Create phase.
 func TestPlanRunStartTakesTheListenerAtPhaseEntry(t *testing.T) {
 	svc, plan := postStartHookPlan(t)
 	var logs hookLogs
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	pr, err := exec.begin(plan)
 	assert.NilError(t, err)
 	assert.NilError(t, pr.runCreate(t.Context()))
@@ -2004,33 +2006,28 @@ func TestPlanRunStartTakesTheListenerAtPhaseEntry(t *testing.T) {
 	assert.DeepEqual(t, logs.got(), []string{"post-start ok"})
 }
 
-// TestPlanRunStartListenerReplacesTheConstructionTimeOne verifies that a
-// listener handed to runStart takes over from the one the executor was built
-// with: the hook logs go to the former only.
-func TestPlanRunStartListenerReplacesTheConstructionTimeOne(t *testing.T) {
-	svc, plan := postStartHookPlan(t)
-	var constructed, given hookLogs
+// TestPlanRunStartWithoutListenerStillRunsHooks verifies that a nil listener
+// handed to runStart -- and run(), which hands it none -- leaves the executor
+// without one, and that the post_start hook still runs: the mocked exec round
+// trip is expected exactly once.
+func TestPlanRunStartWithoutListenerStillRunsHooks(t *testing.T) {
+	t.Run("runStart", func(t *testing.T) {
+		svc, plan := postStartHookPlan(t)
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), constructed.listener)
-	pr, err := exec.begin(plan)
-	assert.NilError(t, err)
-	assert.NilError(t, pr.runCreate(t.Context()))
-	assert.NilError(t, pr.runStart(t.Context(), given.listener))
-	assert.DeepEqual(t, given.got(), []string{"post-start ok"})
-	assert.Equal(t, len(constructed.got()), 0)
-}
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+		pr, err := exec.begin(plan)
+		assert.NilError(t, err)
+		assert.NilError(t, pr.runCreate(t.Context()))
+		assert.NilError(t, pr.runStart(t.Context(), nil))
+		assert.Assert(t, exec.listener == nil)
+	})
+	t.Run("run", func(t *testing.T) {
+		svc, plan := postStartHookPlan(t)
 
-// TestExecutePlanKeepsTheConstructionTimeListener verifies that run() -- which
-// hands no listener to runStart -- still streams the Start phase's hook logs
-// to the one the executor was built with, and that a nil runStart listener
-// never drops it.
-func TestExecutePlanKeepsTheConstructionTimeListener(t *testing.T) {
-	svc, plan := postStartHookPlan(t)
-	var logs hookLogs
-
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), logs.listener)
-	assert.NilError(t, exec.run(t.Context(), plan))
-	assert.DeepEqual(t, logs.got(), []string{"post-start ok"})
+		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+		assert.NilError(t, exec.run(t.Context(), plan))
+		assert.Assert(t, exec.listener == nil)
+	})
 }
 
 // TestPlanRunRefusesAnIllegalPhaseSequence verifies the guards that keep the
@@ -2065,7 +2062,7 @@ func TestPlanRunRefusesAnIllegalPhaseSequence(t *testing.T) {
 			ResourceID: "service:db:1",
 			Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
 		}, "", network).Phase = PhaseStart
-		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil).begin(plan)
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(plan)
 		assert.NilError(t, err)
 		return pr
 	}
@@ -2103,7 +2100,7 @@ func TestPlanRunRefusesAnIllegalPhaseSequence(t *testing.T) {
 func TestPlanRunOfAnEmptyOrSinglePhasePlan(t *testing.T) {
 	t.Run("empty plan", func(t *testing.T) {
 		svc, _ := newTestService(t) // any API call fails the test
-		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil).begin(&Plan{})
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(&Plan{})
 		assert.NilError(t, err)
 		assert.NilError(t, pr.runCreate(t.Context()))
 		assert.NilError(t, pr.runStart(t.Context(), nil))
@@ -2115,7 +2112,7 @@ func TestPlanRunOfAnEmptyOrSinglePhasePlan(t *testing.T) {
 		nw := types.NetworkConfig{Name: "test_default"}
 		plan := &Plan{}
 		plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
-		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil).begin(plan)
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(plan)
 		assert.NilError(t, err)
 		assert.NilError(t, pr.runCreate(t.Context()))
 		assert.NilError(t, pr.runStart(t.Context(), nil))

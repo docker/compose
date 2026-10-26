@@ -40,9 +40,9 @@ type planExecutor struct {
 	pctx    *reconciliationContext
 
 	// listener streams pre_start/post_start hook logs, exactly like the
-	// imperative start path. nil until an attached caller wires one in, either
-	// at construction or, for a caller driving the phases itself, when it
-	// enters the Start phase (planRun.runStart) — nil leaves hook execution
+	// imperative start path. It is set once, when the Start phase is entered
+	// (planRun.runStart): an attached caller only has one by then, its printer
+	// not existing before the Create phase is done. nil leaves hook execution
 	// silent, matching detached behavior.
 	listener api.ContainerEventListener
 
@@ -93,22 +93,21 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // while respecting dependency edges. It emits progress events and handles
 // group-based event aggregation for composite operations like recreate.
 //
-// It threads no hook-log listener: its callers stream no pre_start/post_start
-// logs. A caller that does, into an attached session (interactive up), builds
-// the executor itself, drives a planRun, and hands its listener to runStart
-// once its session exists.
+// It streams no pre_start/post_start hook logs: it hands runStart no listener.
+// A caller that does, into an attached session (interactive up), builds the
+// executor itself, drives a planRun, and hands its listener to runStart once
+// its session exists.
 func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
-	return s.newPlanExecutor(project, observed, nil).run(ctx, plan)
+	return s.newPlanExecutor(project, observed).run(ctx, plan)
 }
 
 // newPlanExecutor constructs a planExecutor seeded from the observed state.
 // Split out from executePlan so tests can inspect the executor's live state
 // (e.g. the containersByService cache) after running a plan.
-func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState, listener api.ContainerEventListener) *planExecutor {
+func (s *composeService) newPlanExecutor(project *types.Project, observed *ObservedState) *planExecutor {
 	return &planExecutor{
 		compose:             s,
 		project:             project,
-		listener:            listener,
 		pctx:                &reconciliationContext{results: map[int]operationResult{}},
 		containersByService: observed.containersByService(),
 	}
@@ -281,14 +280,13 @@ func (r *planRun) runCreate(ctx context.Context) error {
 }
 
 // runStart dispatches the Start phase and waits for it. It refuses to run
-// before a successful Create phase, and to run twice. A non-nil listener
-// replaces the one the executor was built with and receives the
-// pre_start/post_start hook logs; nil keeps the construction-time one. It
-// can be given here because an attached caller only has one once it has set
-// up its session, which happens after the Create phase. It is set before any
-// Start-phase node is dispatched, and the planner only emits the operations
-// that read it (pre_start, post_start) in the Start phase, so no goroutine can
-// observe the previous value.
+// before a successful Create phase, and to run twice. This is the only way to
+// give the executor a listener: it receives the pre_start/post_start hook
+// logs, and nil leaves them unstreamed. It is given here because an attached
+// caller only has one once it has set up its session, which happens after the
+// Create phase. It is set before any Start-phase node is dispatched, and the
+// planner only emits the operations that read it (pre_start, post_start) in
+// the Start phase, so no goroutine can observe the previous value.
 func (r *planRun) runStart(ctx context.Context, listener api.ContainerEventListener) error {
 	if !r.createRan || r.createErr != nil {
 		return errors.New("plan run: the start phase cannot run before the create phase succeeded")
@@ -297,9 +295,7 @@ func (r *planRun) runStart(ctx context.Context, listener api.ContainerEventListe
 		return errors.New("plan run: the start phase already ran")
 	}
 	r.startRan = true
-	if listener != nil {
-		r.exec.listener = listener
-	}
+	r.exec.listener = listener
 	return r.exec.runPhase(r.startNodes, r.rs, newPhaseCancel(ctx))
 }
 

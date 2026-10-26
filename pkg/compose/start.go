@@ -97,7 +97,7 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 	// combination nothing rejects). exec.waitTimeout reproduces that for the
 	// plan's own OpWaitCondition nodes, each with its own fresh window
 	// starting when that wait begins -- see upDetached's identical reasoning.
-	exec := s.newPlanExecutor(project, observed, nil)
+	exec := s.newPlanExecutor(project, observed)
 	exec.waitTimeout = options.WaitTimeout
 
 	if err := exec.run(ctx, plan); err != nil {

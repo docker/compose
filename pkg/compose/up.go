@@ -125,7 +125,7 @@ func (s *composeService) prepareUp(ctx context.Context, project *types.Project, 
 	// alone exhaust it, failing an otherwise healthy deployment as "not
 	// healthy" with no wait ever actually timing out -- start()'s real,
 	// per-wait-independent behavior never had that failure mode.
-	exec := s.newPlanExecutor(project, observed, nil)
+	exec := s.newPlanExecutor(project, observed)
 	exec.waitTimeout = options.Start.WaitTimeout
 	return project, exec, plan, nil
 }
