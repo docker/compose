@@ -46,6 +46,16 @@ func TestCascadeFail(t *testing.T) {
 			ServiceState("running", "exited"))
 }
 
+// TestCascadeStopHonorsTimeout is a regression test for #14394: the stop
+// triggered by the first exit ignored -t and waited for stop_grace_period.
+func TestCascadeStopHonorsTimeout(t *testing.T) {
+	NewScenario(t, "up --abort-on-container-exit must stop the project within the -t timeout").
+		Step("up aborts on the first exit and kills a service ignoring SIGTERM once -t elapses",
+			ComposeCmd("up", "-t", "1", "--abort-on-container-exit", "--exit-code-from", "tests").MayFail().Within(60*time.Second),
+			ExitCode(3),
+			ServiceState("app", "exited"))
+}
+
 func TestCascadeIgnoresOneOffContainer(t *testing.T) {
 	const projectName = "compose-e2e-cascade-oneoff"
 	c := NewCLI(t, WithEnv("COMPOSE_PROJECT_NAME="+projectName))

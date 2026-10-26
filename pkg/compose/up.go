@@ -492,6 +492,7 @@ func (u *upSession) stopApplication() {
 		err := u.stop(context.WithoutCancel(u.globalCtx), u.project.Name, api.StopOptions{
 			Services: u.options.Create.Services,
 			Project:  u.project,
+			Timeout:  u.options.Create.Timeout,
 		}, u.printer.HandleEvent)
 		u.appendErr(err)
 		return nil
@@ -575,6 +576,7 @@ func (u *upSession) stopLateStarter(service string) {
 		err := u.stop(context.WithoutCancel(u.globalCtx), u.project.Name, api.StopOptions{
 			Services: []string{service},
 			Project:  u.project,
+			Timeout:  u.options.Create.Timeout,
 		}, u.printer.HandleEvent)
 		u.appendErr(err)
 		return nil

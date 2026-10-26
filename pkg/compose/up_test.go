@@ -34,6 +34,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func TestShouldFollowStartEvent(t *testing.T) {
@@ -187,6 +188,42 @@ func TestAppendErrKeepsCancellationBeforeShutdown(t *testing.T) {
 
 	u.appendErr(context.Canceled)
 	assert.Equal(t, len(u.errs), 1)
+}
+
+// TestUpSessionStopsWithUpTimeout locks that the stops an attached up issues
+// itself carry -t (#14394).
+func TestUpSessionStopsWithUpTimeout(t *testing.T) {
+	timeout := 2 * time.Second
+	stops := map[string]func(*upSession){
+		"stopApplication": (*upSession).stopApplication,
+		"stopLateStarter": func(u *upSession) { u.stopLateStarter("svc0") },
+	}
+	for name, stop := range stops {
+		t.Run(name, func(t *testing.T) {
+			svc, apiClient := newTestService(t)
+			project, containers := nIndependentServiceContainers(1)
+			apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+				Return(client.ContainerListResult{Items: containers}, nil)
+			var got client.ContainerStopOptions
+			apiClient.EXPECT().ContainerStop(gomock.Any(), "c0", gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, opts client.ContainerStopOptions) (client.ContainerStopResult, error) {
+					got = opts
+					return client.ContainerStopResult{}, nil
+				})
+
+			u := &upSession{
+				composeService: svc,
+				project:        project,
+				globalCtx:      t.Context(),
+				printer:        newLogPrinter(&testLogConsumer{}),
+				options:        api.UpOptions{Create: api.CreateOptions{Timeout: &timeout}},
+			}
+			stop(u)
+			assert.NilError(t, u.eg.Wait())
+			assert.Equal(t, len(u.errs), 0, "%v", u.errs)
+			assert.DeepEqual(t, got, client.ContainerStopOptions{Timeout: utils.DurationSecondToInt(&timeout)})
+		})
+	}
 }
 
 // TestStreamContainerLogs_ConcurrencyIsBounded guards a regression flagged
