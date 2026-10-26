@@ -25,6 +25,7 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -56,10 +57,18 @@ type interactiveUpDaemon struct {
 	eventLog *fakeEventLog
 	// createErr, when set, fails ContainerCreate
 	createErr error
-	// onAttach and onInfo, when set, run once the session attached to the
-	// container, and once it read the daemon's time
+	// onCreate, onAttach and onInfo, when set, run when the container is
+	// created, once the session attached to it, and once it read the daemon's
+	// time
+	onCreate func()
 	onAttach func()
 	onInfo   func()
+	// startWaitsForEvents holds a container start until the events
+	// subscription is opened, giving up (and flagging it) after a while
+	startWaitsForEvents   bool
+	eventsSeen            chan struct{}
+	eventsOnce            sync.Once
+	startedWithoutMonitor atomic.Bool
 	// slowSubscription delays the completion of the events subscription well
 	// past the moment the container has started and exited
 	slowSubscription bool
@@ -90,7 +99,7 @@ func (d *interactiveUpDaemon) indexOf(call string) int {
 
 func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *interactiveUpDaemon {
 	t.Helper()
-	d := &interactiveUpDaemon{eventLog: &fakeEventLog{}, started: make(chan struct{})}
+	d := &interactiveUpDaemon{eventLog: &fakeEventLog{}, started: make(chan struct{}), eventsSeen: make(chan struct{})}
 	labels := map[string]string{
 		api.ProjectLabel:         "test",
 		api.ServiceLabel:         "web",
@@ -116,8 +125,14 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			}}}, nil
 		})
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).AnyTimes().
-		DoAndReturn(func(context.Context, client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+		DoAndReturn(func(ctx context.Context, _ client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
 			d.record("create")
+			if d.onCreate != nil {
+				d.onCreate()
+			}
+			if err := ctx.Err(); err != nil {
+				return client.ContainerCreateResult{}, err
+			}
 			if d.createErr != nil {
 				return client.ContainerCreateResult{}, d.createErr
 			}
@@ -163,6 +178,7 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 	apiClient.EXPECT().Events(gomock.Any(), gomock.Any()).AnyTimes().
 		DoAndReturn(func(_ context.Context, opts client.EventsListOptions) client.EventsResult {
 			d.record("events")
+			d.eventsOnce.Do(func() { close(d.eventsSeen) })
 			if d.slowSubscription {
 				select {
 				case <-d.started:
@@ -180,12 +196,18 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 	// the container exits right after it starts
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "c1", gomock.Any()).AnyTimes().
 		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+			if d.startWaitsForEvents {
+				select {
+				case <-d.eventsSeen:
+				case <-time.After(5 * time.Second):
+					d.startedWithoutMonitor.Store(true)
+				}
+			}
 			d.record("start")
 			defer d.startedOnce.Do(func() { close(d.started) })
 			d.eventLog.emit(containerMessage(events.ActionStart, "c1", "test-web-1", "web", labels))
 			// The engine reports the exit some time after the start call, not
-			// within it: long enough here for the session to have read the
-			// daemon's time, which it does just before the Start phase.
+			// within it.
 			timer := time.AfterFunc(containerExitDelay, func() {
 				d.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": "0"}))
 			})
@@ -417,4 +439,35 @@ func TestUpInteractiveInterruptedBeforeTheStartPhase(t *testing.T) {
 
 	assert.Assert(t, errors.Is(err, context.Canceled), "err: %v", err)
 	assert.Equal(t, h.daemon.indexOf("start"), -1, "no container is started: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveMonitorRunsBeforeTheStartPhase: the monitor follows the
+// application from the moment the Start phase begins, which can last as long as
+// its dependency waits: the cascade, the late-starter stop and the log
+// following are dead until it runs. The fake engine holds a container start
+// until the events subscription is opened.
+func TestUpInteractiveMonitorRunsBeforeTheStartPhase(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.daemon.startWaitsForEvents = true
+
+	assert.NilError(t, h.up(t))
+
+	assert.Assert(t, !h.daemon.startedWithoutMonitor.Load(), "a container start came before the monitor was subscribing: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveInterruptedDuringTheCreatePhase: an interruption met by the
+// Create phase ends the up with it: the phase runs on the caller's context,
+// whose cancellation the engine reports, and the session is never set up.
+func TestUpInteractiveInterruptedDuringTheCreatePhase(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	h.daemon.onCreate = cancel
+
+	err := h.upWith(t, ctx, cancel)
+
+	assert.Assert(t, errors.Is(err, context.Canceled), "err: %v", err)
+	for _, call := range []string{"attach", "events", "start"} {
+		assert.Equal(t, h.daemon.indexOf(call), -1, "%s must not be reached: %v", call, h.daemon.recorded())
+	}
 }

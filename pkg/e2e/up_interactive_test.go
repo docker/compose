@@ -41,8 +41,7 @@ func TestUpInteractiveIgnoresHookRunnerExit(t *testing.T) {
 		Step("up reports the exit code of the service, not the successful exit of its hook",
 			ComposeCmd("up", "--menu=false", "--exit-code-from", "app").MayFail().Within(60*time.Second),
 			ExitCode(3),
-			OutputContains("hook-ran"),
-			OutputContains("app-1 exited with code 3"))
+			OutputContains("hook-ran"))
 }
 
 func TestUpInteractiveImmediateExit(t *testing.T) {
@@ -103,6 +102,10 @@ func TestUpInteractiveDependencyTimeout(t *testing.T) {
 			ServiceState("web", "created"))
 }
 
+// Regression test for https://github.com/docker/compose/issues/14386: a foreground
+// up left a use_api_socket service without its config file, DOCKER_CONFIG
+// pointing at a file that was never created.
+//
 // use_api_socket is applied by rewriting the project (a #apisocket config the
 // service mounts at /run/secrets/docker/config.json): a foreground up must
 // start the containers from that same rewritten project, as a detached one

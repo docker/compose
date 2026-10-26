@@ -228,7 +228,8 @@ type upSession struct {
 // Start phase of created's plan, runs it, then follows the application until
 // it terminates. The Create phase already ran: the session's own signal
 // handling only starts after it, so an interruption of the Create phase is the
-// caller's, through ctx.
+// caller's, through ctx. An interruption met before the Start phase starts
+// nothing: the containers are left created.
 func (s *composeService) runInteractiveUp(ctx context.Context, created *createdUp, options api.UpOptions) error {
 	// the plan's own project, not the caller's: the one the Start phase runs
 	// on, so the session, the watcher and the teardown follow the same model
