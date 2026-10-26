@@ -65,6 +65,11 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		return nil, fmt.Errorf("saving creds for API socket: %w", err)
 	}
 
+	// a project that did not go through environment resolution (the one
+	// `compose start` loads) has no maps to write into
+	if project.Configs == nil {
+		project.Configs = types.Configs{}
+	}
 	project.Configs["#apisocket"] = types.ConfigObjConfig{
 		Content: configBuf.String(),
 	}
@@ -79,6 +84,9 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 			Target: "/var/run/docker.sock",
 		})
 
+		if service.Environment == nil {
+			service.Environment = types.MappingWithEquals{}
+		}
 		_, envvarPresent := service.Environment["DOCKER_CONFIG"]
 
 		// If the DOCKER_CONFIG env var is already present, we assume the client knows

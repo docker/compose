@@ -19,7 +19,9 @@
 package compose
 
 import (
+	"archive/tar"
 	"context"
+	"io"
 	"strconv"
 	"sync"
 	"testing"
@@ -186,6 +188,51 @@ func TestStart_WaitTimeoutBoundsDependencyWaits(t *testing.T) {
 	defer cancel()
 	err := svc.start(ctx, "prj", api.StartOptions{Project: project, WaitTimeout: 200 * time.Millisecond})
 	assert.Error(t, err, "timeout waiting for dependencies")
+}
+
+// TestStart_UseAPISocketServiceGetsItsConfigFile pins that start() applies
+// use_api_socket to the project it works on: the config file the option adds is
+// injected when a container starts, from that project, so a container created
+// beforehand and only started here (`create` then `start`) would otherwise get
+// DOCKER_CONFIG pointing at a file that was never created. The caller's project
+// is left as it was.
+func TestStart_UseAPISocketServiceGetsItsConfigFile(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	svc.contextInfo = linuxContextInfo{}
+
+	// no environment and no configs map, as in the project `compose start`
+	// loads, which does not resolve the environment
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine", UseAPISocket: true}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
+
+	ctr := serviceContainer("web")
+	ctr.State = container.StateCreated
+	ctr.Labels[api.ProjectLabel] = "prj"
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{ctr}}, nil)
+
+	var injected []string
+	copied := apiClient.EXPECT().CopyToContainer(gomock.Any(), ctr.ID, gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ string, opts client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+			tr := tar.NewReader(opts.Content)
+			for {
+				header, err := tr.Next()
+				if err == io.EOF {
+					break
+				}
+				assert.NilError(t, err)
+				injected = append(injected, header.Name)
+			}
+			return client.CopyToContainerResult{}, nil
+		})
+	apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(copied)
+
+	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project})
+
+	assert.NilError(t, err)
+	assert.DeepEqual(t, injected, []string{"/run/secrets/docker/config.json"})
+	assert.Assert(t, project.Configs == nil && project.Services["web"].Environment == nil, "the caller's project must not be transformed")
 }
 
 // TestGetDependencyCondition locks the --wait condition selection: a service
