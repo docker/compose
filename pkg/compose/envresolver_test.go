@@ -84,6 +84,17 @@ func Test_EnvResolverWithCase(t *testing.T) {
 			expectedOk:      true,
 		},
 		{
+			name: "case insensitive/exact match wins over folded keys",
+			environment: map[string]string{
+				"FOO": "upper",
+				"foo": "lower",
+			},
+			caseInsensitive: true,
+			search:          "FOO",
+			expectedValue:   "upper",
+			expectedOk:      true,
+		},
+		{
 			name: "case insensitive/unmatch",
 			environment: map[string]string{
 				"Env1": "Value1",
@@ -112,4 +123,14 @@ func Test_EnvResolverWithCase(t *testing.T) {
 			assert.Equal(t, ok, test.expectedOk)
 		})
 	}
+
+	// FOO and foo fold to the same name: which one a folded lookup resolves
+	// to is documented as indefinite, so pin only the shape of the result
+	// (resolves, to one of the folded values) rather than a specific value.
+	t.Run("case insensitive/folded keys conflict is indefinite", func(t *testing.T) {
+		f := envResolverWithCase(map[string]string{"FOO": "upper", "foo": "lower"}, true)
+		v, ok := f("Foo")
+		assert.Assert(t, ok)
+		assert.Assert(t, v == "upper" || v == "lower", "got %q", v)
+	})
 }

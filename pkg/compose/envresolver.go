@@ -49,18 +49,17 @@ func envResolverWithCase(environment map[string]string, caseInsensitive bool) fu
 	// variable names must be treated case-insensitively.
 	// Resolves in this way:
 	// * Return the value if its name matches with the passed name case-sensitively.
-	// * Otherwise, return the value if its lower-cased name matches lower-cased passed name.
+	// * Otherwise, return the value if its name case-insensitively matches the passed name.
 	//     * The value is indefinite if multiple variable matches.
-	loweredEnvironment := make(map[string]string, len(environment))
-	for k, v := range environment {
-		loweredEnvironment[strings.ToLower(k)] = v
-	}
 	return func(s string) (string, bool) {
-		v, ok := environment[s]
-		if ok {
+		if v, ok := environment[s]; ok {
 			return v, ok
 		}
-		v, ok = loweredEnvironment[strings.ToLower(s)]
-		return v, ok
+		for k, v := range environment {
+			if strings.EqualFold(k, s) {
+				return v, true
+			}
+		}
+		return "", false
 	}
 }
