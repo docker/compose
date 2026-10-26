@@ -112,6 +112,26 @@ services:
 	}, cmp.Ignore()))
 }
 
+// a processFile failure must say which file it came from: a project can
+// carry many compose files and its extends references add more, so an
+// unattributed error leaves the user guessing which one to fix
+func Test_createLayers_error_includes_file_name(t *testing.T) {
+	project := &types.Project{Name: "test", WorkingDir: t.TempDir()}
+	project.ComposeFiles = []string{filepath.Join(t.TempDir(), "missing.yaml")}
+
+	service := &composeService{}
+	_, err := service.createLayers(t.Context(), project, api.PublishOptions{})
+	assert.ErrorContains(t, err, "failed to process compose file")
+	assert.ErrorContains(t, err, "missing.yaml")
+}
+
+func Test_processExtends_error_includes_file_name(t *testing.T) {
+	extFile := filepath.Join(t.TempDir(), "missing.yaml")
+	_, err := processExtends(t.Context(), &types.Project{Name: "test"}, map[string]string{extFile: "deadbeef"})
+	assert.ErrorContains(t, err, "failed to process compose file")
+	assert.ErrorContains(t, err, "missing.yaml")
+}
+
 func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	dir := t.TempDir()
 	envPath := dir + "/secrets.env"
