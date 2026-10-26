@@ -40,6 +40,12 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 	if !useAPISocket {
 		return project, nil
 	}
+	// The project already went through here, as the plan's own project does
+	// when it is handed to a later plan (a watch rebuild): transforming it a
+	// second time would mount the socket and the config file twice.
+	if _, applied := project.Configs["#apisocket"]; applied {
+		return project, nil
+	}
 
 	if s.getContextInfo().ServerOSType() == "windows" {
 		return nil, errors.New("use_api_socket can't be used with a Windows Docker Engine")

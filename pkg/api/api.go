@@ -364,7 +364,8 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
-	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name.
+	// Ignored by Up, which works on the project it is given.
 	Project *types.Project
 	// Attach receives the containers' logs during Up's foreground session.
 	// It doubles as the mode switch: when nil, Up returns once containers
@@ -382,7 +383,9 @@ type StartOptions struct {
 	// ExitCodeFrom reports the exit code of the specified service. Honored
 	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
-	// Wait won't return until containers reached the running|healthy state
+	// Wait won't return until containers reached the running|healthy state.
+	// Honored by a detached Up (Attach nil); a foreground Up is not followed
+	// by this verification.
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services names the services the user explicitly targeted; it only

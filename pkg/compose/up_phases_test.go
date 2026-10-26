@@ -56,6 +56,10 @@ type interactiveUpDaemon struct {
 	eventLog *fakeEventLog
 	// createErr, when set, fails ContainerCreate
 	createErr error
+	// onAttach and onInfo, when set, run once the session attached to the
+	// container, and once it read the daemon's time
+	onAttach func()
+	onInfo   func()
 	// slowSubscription delays the completion of the events subscription well
 	// past the moment the container has started and exited
 	slowSubscription bool
@@ -136,6 +140,9 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 	apiClient.EXPECT().ContainerAttach(gomock.Any(), "c1", gomock.Any()).AnyTimes().
 		DoAndReturn(func(context.Context, string, client.ContainerAttachOptions) (client.ContainerAttachResult, error) {
 			d.record("attach")
+			if d.onAttach != nil {
+				d.onAttach()
+			}
 			return client.ContainerAttachResult{}, errors.New("attach not supported")
 		})
 	apiClient.EXPECT().ContainerLogs(gomock.Any(), "c1", gomock.Any()).AnyTimes().
@@ -143,8 +150,15 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 
 	// the monitor reads the daemon's time to know from when to ask for events
 	apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).AnyTimes().
-		DoAndReturn(func(context.Context, client.InfoOptions) (client.SystemInfoResult, error) {
-			return d.eventLog.info()
+		DoAndReturn(func(ctx context.Context, _ client.InfoOptions) (client.SystemInfoResult, error) {
+			if err := ctx.Err(); err != nil {
+				return client.SystemInfoResult{}, err
+			}
+			res, err := d.eventLog.info()
+			if d.onInfo != nil {
+				d.onInfo()
+			}
+			return res, err
 		})
 	apiClient.EXPECT().Events(gomock.Any(), gomock.Any()).AnyTimes().
 		DoAndReturn(func(_ context.Context, opts client.EventsListOptions) client.EventsResult {
@@ -170,8 +184,8 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			defer d.startedOnce.Do(func() { close(d.started) })
 			d.eventLog.emit(containerMessage(events.ActionStart, "c1", "test-web-1", "web", labels))
 			// The engine reports the exit some time after the start call, not
-			// within it: long enough here for the monitor, launched just
-			// before the Start phase, to have taken its timestamp.
+			// within it: long enough here for the session to have read the
+			// daemon's time, which it does just before the Start phase.
 			timer := time.AfterFunc(containerExitDelay, func() {
 				d.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": "0"}))
 			})
@@ -238,6 +252,12 @@ func (h *interactiveUpHarness) up(t *testing.T) error {
 	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
+	return h.upWith(t, ctx, cancel)
+}
+
+// upWith is up on a context the test owns, to cancel it at a given point.
+func (h *interactiveUpHarness) upWith(t *testing.T, ctx context.Context, cancel context.CancelFunc) error {
+	t.Helper()
 	done := make(chan error, 1)
 	go func() { done <- h.svc.Up(ctx, interactiveUpProject(), interactiveUpOptions()) }()
 	select {
@@ -264,9 +284,10 @@ func TestUpInteractivePhaseOrder(t *testing.T) {
 	assert.NilError(t, h.up(t))
 
 	d := h.daemon
-	create, done, attach, start := d.indexOf("create"), d.indexOf("progress-done:up"), d.indexOf("attach"), d.indexOf("start")
-	assert.Assert(t, create >= 0 && done >= 0 && attach >= 0 && start >= 0, "calls: %v", d.recorded())
-	assert.Assert(t, create < done, "the container is created within the up progress scope: %v", d.recorded())
+	scope, create, done := d.indexOf("progress-start:up"), d.indexOf("create"), d.indexOf("progress-done:up")
+	attach, start := d.indexOf("attach"), d.indexOf("start")
+	assert.Assert(t, scope >= 0 && create >= 0 && done >= 0 && attach >= 0 && start >= 0, "calls: %v", d.recorded())
+	assert.Assert(t, scope < create && create < done, "the container is created within the up progress scope: %v", d.recorded())
 	assert.Assert(t, done < attach, "the session attaches once the up progress scope is over: %v", d.recorded())
 	assert.Assert(t, attach < start, "no container starts before the session is attached: %v", d.recorded())
 }
@@ -277,9 +298,9 @@ func TestUpInteractivePhaseOrder(t *testing.T) {
 // subscription is effective (modeled here as the subscription only completing
 // once the container has started). The exit must still be observed, or up
 // would wait on the container forever. The replay starts at the daemon's time,
-// read before the container listing: the daemon's clock is set here well apart
-// from the client's, as it is for a remote daemon, so that the events it
-// stamps are only replayed when asked for from its own time.
+// which the session reads before the Start phase: the daemon's clock is set
+// here well apart from the client's, as it is for a remote daemon, so that the
+// events it stamps are only replayed when asked for from its own time.
 func TestUpInteractiveSeesContainerExitingBeforeSubscription(t *testing.T) {
 	h := newInteractiveUpHarness(t)
 	h.daemon.slowSubscription = true
@@ -350,14 +371,50 @@ func TestUpInteractiveFailedCreateStopsThere(t *testing.T) {
 	assert.DeepEqual(t, h.daemon.recorded(), []string{"progress-start:up", "create", "progress-done:up"})
 }
 
-// TestUpInteractiveDryRunOnlyCreates: a dry-run interactive up plans the
-// Create phase and never gets to the session or the Start phase.
+// TestUpInteractiveDryRunOnlyCreates: a dry-run interactive up stops after the
+// Create phase: no session, no event subscription, no start. Only the service's
+// dry-run flag is set here; the engine calls a real dry run swaps for the dry-run
+// client are not what this pins, but the gate of Up.
 func TestUpInteractiveDryRunOnlyCreates(t *testing.T) {
 	h := newInteractiveUpHarness(t)
 	h.svc.dryRun = true
 
 	assert.NilError(t, h.up(t))
 
-	assert.DeepEqual(t, h.daemon.recorded(), []string{"progress-start:up", "create", "progress-done:up"})
+	for _, call := range []string{"attach", "events", "start"} {
+		assert.Equal(t, h.daemon.indexOf(call), -1, "%s must not be reached in a dry run: %v", call, h.daemon.recorded())
+	}
 	assert.Assert(t, strings.Contains(h.out.String(), "interactive run is not supported in dry-run mode"), "output: %q", h.out.String())
+}
+
+// TestUpInteractiveStartPhaseSurvivesCancellation: the Start phase runs on a
+// context that outlives the caller's, since an interruption is the session's to
+// handle once it is set up (it stops what the application started). Canceled
+// right after the session read the daemon's time, which is its last step before
+// the Start phase, up still starts the container.
+func TestUpInteractiveStartPhaseSurvivesCancellation(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	h.daemon.onInfo = cancel
+
+	_ = h.upWith(t, ctx, cancel)
+
+	assert.Assert(t, h.daemon.indexOf("start") >= 0, "the Start phase ran to the container start: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveInterruptedBeforeTheStartPhase: an interruption met while
+// the session reads the daemon's time is reported as such, wrapping the
+// context's error, which the CLI maps to its interruption exit code, and no
+// container is started.
+func TestUpInteractiveInterruptedBeforeTheStartPhase(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	h.daemon.onAttach = cancel
+
+	err := h.upWith(t, ctx, cancel)
+
+	assert.Assert(t, errors.Is(err, context.Canceled), "err: %v", err)
+	assert.Equal(t, h.daemon.indexOf("start"), -1, "no container is started: %v", h.daemon.recorded())
 }
