@@ -384,8 +384,8 @@ type StartOptions struct {
 	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state.
-	// Honored by a detached Up (Attach nil); a foreground Up is not followed
-	// by this verification.
+	// Up honors it in detached mode only (Attach nil): combined with Attach it
+	// is rejected, see UpOptions.Validate.
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services names the services the user explicitly targeted; it only
