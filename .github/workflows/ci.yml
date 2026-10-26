@@ -48,7 +48,7 @@ jobs:
           make ${{ matrix.target }}
 
   binary:
-    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
+    uses: docker/github-builder/.github/workflows/bake.yml@4345a1cea1e4cfb65c8a5e2b1b80f9e630068827 # v1.18.0
     permissions:
       contents: read # same as global permission
       id-token: write # for signing attestation(s) with GitHub OIDC Token
@@ -122,7 +122,7 @@ jobs:
 
   bin-image-test:
     if: github.event_name == 'pull_request'
-    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
+    uses: docker/github-builder/.github/workflows/bake.yml@4345a1cea1e4cfb65c8a5e2b1b80f9e630068827 # v1.18.0
     with:
       runner: amd64
       target: image-cross
@@ -140,7 +140,7 @@ jobs:
 
   relay-image-test:
     if: github.event_name == 'pull_request'
-    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
+    uses: docker/github-builder/.github/workflows/bake.yml@4345a1cea1e4cfb65c8a5e2b1b80f9e630068827 # v1.18.0
     with:
       runner: amd64
       target: relay-image-cross
