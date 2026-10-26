@@ -130,6 +130,7 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			if d.onCreate != nil {
 				d.onCreate()
 			}
+			// like the engine's client: an interrupted call reports it
 			if err := ctx.Err(); err != nil {
 				return client.ContainerCreateResult{}, err
 			}
@@ -445,7 +446,8 @@ func TestUpInteractiveInterruptedBeforeTheStartPhase(t *testing.T) {
 // application from the moment the Start phase begins, which can last as long as
 // its dependency waits: the cascade, the late-starter stop and the log
 // following are dead until it runs. The fake engine holds a container start
-// until the events subscription is opened.
+// until the events subscription is opened, which only the monitor does: a
+// Create-phase use of the events API would make this test vacuous.
 func TestUpInteractiveMonitorRunsBeforeTheStartPhase(t *testing.T) {
 	h := newInteractiveUpHarness(t)
 	h.daemon.startWaitsForEvents = true
@@ -470,4 +472,27 @@ func TestUpInteractiveInterruptedDuringTheCreatePhase(t *testing.T) {
 	for _, call := range []string{"attach", "events", "start"} {
 		assert.Equal(t, h.daemon.indexOf(call), -1, "%s must not be reached: %v", call, h.daemon.recorded())
 	}
+}
+
+// TestUpInteractiveCreatePhaseCarriesThePlanProject: the Start phase, the
+// session, the watcher and the teardown work on the plan's own project, which
+// carries what preparation resolved -- here use_api_socket's #apisocket config,
+// which the caller's project never gets.
+func TestUpInteractiveCreatePhaseCarriesThePlanProject(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.svc.contextInfo = linuxContextInfo{}
+	project := interactiveUpProject()
+	project.Configs = types.Configs{}
+	web := project.Services["web"]
+	web.UseAPISocket = true
+	web.Environment = types.MappingWithEquals{}
+	project.Services["web"] = web
+
+	created, err := h.svc.upCreatePhase(t.Context(), project, interactiveUpOptions())
+
+	assert.NilError(t, err)
+	_, plan := created.project.Configs["#apisocket"]
+	assert.Assert(t, plan, "the plan's project carries the use_api_socket config")
+	_, caller := project.Configs["#apisocket"]
+	assert.Assert(t, !caller, "the caller's project is not transformed")
 }

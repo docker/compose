@@ -225,9 +225,9 @@ func (c *monitor) Start(ctx context.Context) error {
 // as they were before the replay existed, with a warning: this is a missing
 // capability, not a reason to fail. A daemon that answers with no time or one
 // that can't be parsed is an error: the replay would have no sound starting
-// point, and nothing explains the answer. An interruption is an error too,
-// wrapping the context's: callers decide how to report it (Start ends quietly,
-// an interactive up returns it).
+// point, and nothing explains the answer. An interruption is an error too, the
+// client's, which carries the context's: callers decide how to report it (Start
+// ends quietly, an interactive up returns it).
 func (c *monitor) readDaemonTime(ctx context.Context) error {
 	if c.sinceRead {
 		return nil
