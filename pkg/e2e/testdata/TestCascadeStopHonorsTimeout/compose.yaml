@@ -1,0 +1,10 @@
+services:
+  app:
+    image: alpine
+    # PID 1 without a SIGTERM handler: only the kill at the end of the timeout stops it
+    command: sleep infinity
+    stop_grace_period: 2m
+
+  tests:
+    image: alpine
+    command: sh -c "sleep 1; exit 3"
