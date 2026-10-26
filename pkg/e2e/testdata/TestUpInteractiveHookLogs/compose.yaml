@@ -1,12 +1,16 @@
 services:
   app:
     image: alpine
-    command: sh -c 'echo "app-read:$(cat /shared/init.txt)"; sleep 3'
+    # the sleep keeps the container running while post_start execs into it and
+    # the session streams its output
+    command: sh -c 'echo "app-read:$(cat /shared/init.txt)"; sleep 5'
     volumes:
       - data:/shared
     pre_start:
       - image: alpine
-        command: sh -c 'echo "pre-start-file-content" > /shared/init.txt'
+        # prints a marker the service never logs, so its presence in the
+        # session can only come from the hook's own output stream
+        command: sh -c 'echo pre-start-hook-stdout; echo "pre-start-file-content" > /shared/init.txt'
     post_start:
       - command: echo post-start-hook-ran
 volumes:

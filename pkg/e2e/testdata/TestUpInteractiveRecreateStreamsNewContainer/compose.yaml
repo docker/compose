@@ -1,6 +1,7 @@
 services:
   app:
     image: alpine
+    # the sleep keeps the container running while the session attaches to it
     command: sh -c 'echo "value=$VALUE"; sleep 2'
     environment:
       VALUE: ${VALUE:-one}
