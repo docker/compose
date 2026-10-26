@@ -65,8 +65,9 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		return nil, fmt.Errorf("saving creds for API socket: %w", err)
 	}
 
-	// a project that did not go through environment resolution (the one
-	// `compose start` loads) has no maps to write into
+	// the maps to write into may be nil: a programmatic project has no Configs,
+	// and the one `compose start` loads, which resolves no environment, has no
+	// service Environment
 	if project.Configs == nil {
 		project.Configs = types.Configs{}
 	}

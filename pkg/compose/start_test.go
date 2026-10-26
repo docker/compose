@@ -24,6 +24,7 @@ import (
 	"io"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -196,7 +197,8 @@ func TestStart_WaitTimeoutBoundsDependencyWaits(t *testing.T) {
 // beforehand and only started here (`create` then `start`) would otherwise get
 // DOCKER_CONFIG pointing at a file that was never created. The caller's project
 // is left as it was, whether or not it has the maps the option writes into: the
-// project `compose start` loads does not resolve the environment, so it has none.
+// project `compose start` loads has no service Environment, a programmatic one
+// no Configs.
 func TestStart_UseAPISocketServiceGetsItsConfigFile(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -209,7 +211,8 @@ func TestStart_UseAPISocketServiceGetsItsConfigFile(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			svc, apiClient, _ := newStartTestService(t)
-			svc.contextInfo = linuxContextInfo{}
+			info := &countingContextInfo{}
+			svc.contextInfo = info
 
 			web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine", UseAPISocket: true, Environment: tt.env}}
 			project := &types.Project{Name: "prj", Services: types.Services{"web": web}, Configs: tt.configs}
@@ -241,10 +244,49 @@ func TestStart_UseAPISocketServiceGetsItsConfigFile(t *testing.T) {
 
 			assert.NilError(t, err)
 			assert.DeepEqual(t, injected, []string{"/run/secrets/docker/config.json"})
+			assert.Assert(t, info.osTypeCalls.Load() > 0, "use_api_socket must have been applied")
 			assert.Equal(t, len(project.Configs), 0, "the caller's configs must not be written to")
 			assert.Equal(t, len(project.Services["web"].Environment), 0, "the caller's service environment must not be written to")
 		})
 	}
+}
+
+// countingContextInfo is a Linux engine's context that counts how often
+// useAPISocket got past its early return, which tells that it was applied.
+type countingContextInfo struct{ osTypeCalls atomic.Int32 }
+
+func (*countingContextInfo) CurrentContext() string { return "default" }
+func (c *countingContextInfo) ServerOSType() string {
+	c.osTypeCalls.Add(1)
+	return "linux"
+}
+func (*countingContextInfo) BuildKitEnabled() (bool, error) { return false, nil }
+
+// TestStart_AProjectAlreadyRewrittenIsInjectedOnce pins that start() does not
+// rewrite twice a project that already went through use_api_socket, as the one
+// `run` hands to the dependencies it starts: the config file would be injected
+// once per duplicated entry.
+func TestStart_AProjectAlreadyRewrittenIsInjectedOnce(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	svc.contextInfo = &countingContextInfo{}
+
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine", UseAPISocket: true, Environment: types.MappingWithEquals{}}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}, Configs: types.Configs{}}
+	project, err := svc.useAPISocket(project)
+	assert.NilError(t, err)
+
+	ctr := serviceContainer("web")
+	ctr.State = container.StateCreated
+	ctr.Labels[api.ProjectLabel] = "prj"
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{ctr}}, nil)
+	copied := apiClient.EXPECT().CopyToContainer(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.CopyToContainerResult{}, nil).Times(1)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(copied)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project}))
+	assert.Equal(t, len(project.Services["web"].Configs), 1, "the project handed to start was rewritten again")
 }
 
 // TestGetDependencyCondition locks the --wait condition selection: a service
