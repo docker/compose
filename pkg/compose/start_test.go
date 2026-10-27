@@ -82,6 +82,14 @@ func (r *recordingEventProcessor) contains(entry string) bool {
 // so "no expectation" doubles as a "no daemon interaction" assertion.
 func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *recordingEventProcessor) {
 	t.Helper()
+	return newStartTestServiceWithConfig(t, &configfile.ConfigFile{})
+}
+
+// newStartTestServiceWithConfig is newStartTestService for a given CLI
+// configuration, the source of the registry credentials use_api_socket hands
+// over.
+func newStartTestServiceWithConfig(t *testing.T, config *configfile.ConfigFile) (*composeService, *mocks.MockAPIClient, *recordingEventProcessor) {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
@@ -92,7 +100,7 @@ func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *
 	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
 	// the generic pre_start inheritance goes through getCreateConfigs, which
 	// reads the CLI configuration and the daemon host
-	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(config).AnyTimes()
 	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
 	rec := &recordingEventProcessor{}
@@ -210,7 +218,7 @@ func TestStart_UseAPISocketServiceGetsItsConfigFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, apiClient, _ := newStartTestService(t)
+			svc, apiClient, _ := newStartTestServiceWithConfig(t, hostRegistryConfig())
 			info := &countingContextInfo{}
 			svc.contextInfo = info
 
@@ -267,7 +275,7 @@ func (*countingContextInfo) BuildKitEnabled() (bool, error) { return false, nil 
 // `run` hands to the dependencies it starts: the config file would be injected
 // once per duplicated entry.
 func TestStart_AProjectAlreadyRewrittenIsInjectedOnce(t *testing.T) {
-	svc, apiClient, _ := newStartTestService(t)
+	svc, apiClient, _ := newStartTestServiceWithConfig(t, hostRegistryConfig())
 	svc.contextInfo = &countingContextInfo{}
 
 	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine", UseAPISocket: true, Environment: types.MappingWithEquals{}}}
