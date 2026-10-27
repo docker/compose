@@ -442,11 +442,21 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 }
 
 // startMx serializes the plan executor's ContainerStart calls across the whole
-// process. It is a workaround for docker/compose#12846 (added by #12851): with
-// Engine 28.0 to 28.2, containers started concurrently could be assigned the
-// same published host port, a flaw of the daemon's port allocator. That flaw
-// is fixed since Engine 28.3.0 (moby/moby#50054), so beyond it the mutex serves
-// no purpose, and it is unclear it ever prevented the duplicates reported.
+// process. It was added by docker/compose#12851 as a workaround for
+// docker/compose#12846, which was not a race between container starts but a
+// flaw of the daemon's port allocator: with Engine 28.0 to 28.2, a container
+// with several random published ports, one on 0.0.0.0 and one on a specific
+// address, could be given the same host port twice. That flaw is fixed since
+// Engine 28.3.0 (moby/moby#50054). A lock around ContainerStart only orders
+// the starts, so it could not help against that flaw, and no other reason to
+// keep the mutex is known.
+//
+// It is not what starts the replicas of a service one after the other, which
+// docker/compose#8530 (a port range shared by the replicas) required and
+// docker/compose#10067 introduced: that order is the plan's replica chain
+// (each replica's start waits for the previous one's), and does not depend on
+// this mutex.
+//
 // Only this path takes it: restart, run, the relay and the hook runners start
 // their containers without it.
 //
@@ -454,10 +464,10 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 // support.
 //
 // While it exists, it deliberately stays a package-level variable rather than
-// a composeService field: the race lives in the daemon, not in a service
-// instance, so two instances (e.g. SDK users) driving the same daemon must
-// still exclude each other. A per-instance lock would silently reintroduce the
-// duplicate-port assignment between them.
+// a composeService field: what it serializes is a call to the daemon, not
+// something of a service instance, so two instances (e.g. SDK users) driving
+// the same daemon must still exclude each other. A per-instance lock would
+// silently stop serializing the starts of two instances.
 var startMx sync.Mutex
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
