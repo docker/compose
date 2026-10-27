@@ -445,17 +445,23 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	return ctr, nil
 }
 
-// startMx serializes ContainerStart calls across the whole process: the
-// engine allocates published ports from ranges non-atomically, and two
-// concurrent starts can be assigned the same port. Every code path calling
-// ContainerStart on a service container must hold it (the plan executor's
-// execStartContainer does, on both of its paths).
+// startMx serializes the plan executor's ContainerStart calls across the whole
+// process. It is a workaround for docker/compose#12846 (added by #12851): with
+// Engine 28.0 to 28.2, containers started concurrently could be assigned the
+// same published host port, a flaw of the daemon's port allocator. That flaw
+// is fixed since Engine 28.3.0 (moby/moby#50054), so beyond it the mutex serves
+// no purpose, and it is unclear it ever prevented the duplicates reported.
+// Only this path takes it: restart, run, the relay and the hook runners start
+// their containers without it.
 //
-// It deliberately stays a package-level variable rather than a composeService
-// field: the race lives in the daemon, not in a service instance, so two
-// instances (e.g. SDK users) driving the same daemon must still exclude each
-// other. A per-instance lock would silently reintroduce the duplicate-port
-// assignment between them.
+// TODO: remove startMx, and the locking around it, once Engine 28.x is out of
+// support.
+//
+// While it exists, it deliberately stays a package-level variable rather than
+// a composeService field: the race lives in the daemon, not in a service
+// instance, so two instances (e.g. SDK users) driving the same daemon must
+// still exclude each other. A per-instance lock would silently reintroduce the
+// duplicate-port assignment between them.
 var startMx sync.Mutex
 
 func (s *composeService) createMobyContainer(ctx context.Context, project *types.Project, service types.ServiceConfig,
