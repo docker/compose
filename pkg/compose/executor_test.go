@@ -227,7 +227,7 @@ func emptyObservedState(project string) *ObservedState {
 // wiring and group tracker — not a hand-rolled loop over executeNode.
 // A best-effort removal failure (stale pre_start hook runner purge) is
 // warn-only: the plan carries on, and the removal passes RemoveVolumes so the
-// runner's anonymous volumes go with it — the imperative purge semantics.
+// runner's anonymous volumes go with it.
 func TestExecutePlanBestEffortRemoveContainerFailureTolerated(t *testing.T) {
 	svc, apiClient := newTestService(t)
 

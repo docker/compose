@@ -273,8 +273,8 @@ func TestCollectObservedState(t *testing.T) {
 // test for a Copilot review finding on #14296: ScopeStart's planStartPhase
 // never reads resolvedNetworks/resolvedVolumes (only reconcileNetworks/
 // reconcileVolumes, which ScopeStart never runs, do), so querying them
-// unconditionally gave `compose start` new daemon dependencies the old
-// imperative engine never had (only ever called getContainers) -- a problem
+// unconditionally gave `compose start` new daemon dependencies it never had
+// (it only ever called getContainers) -- a problem
 // for an authorization plugin permitting container list/start but denying
 // network or volume listing. No NetworkList/VolumeList/NetworkInspect/
 // VolumeInspect expectation is registered here: gomock fails the test if
