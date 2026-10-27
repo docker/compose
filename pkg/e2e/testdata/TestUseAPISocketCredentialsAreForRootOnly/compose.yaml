@@ -1,0 +1,7 @@
+services:
+  app:
+    image: alpine
+    init: true
+    use_api_socket: true
+    user: "1000:1000"
+    command: sleep infinity
