@@ -114,7 +114,7 @@ func TestExecWaitCondition_OptionalMissingDependencyIsTolerated(t *testing.T) {
 // TestExecWaitCondition_HealthyConditionSatisfied drives execWaitCondition
 // against a live dependency container that reports healthy on the first
 // probe, reusing the exact same isServiceHealthy/waitDependency primitives
-// the imperative engine's waitDependencies uses.
+// waitDependencies uses.
 func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 	svc, apiClient, recorder := newStartPhaseTestService(t)
 
@@ -154,9 +154,7 @@ func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 
 // TestExecutePlanWaitConditionRespectsContextDeadline is a regression test
 // for a gap a reviewer caught on upDetached (pkg/compose/up.go): the plan's
-// own OpWaitCondition nodes have no timeout of their own (unlike the
-// imperative engine's waitDependencies, which already threaded WaitTimeout
-// through every per-dependency wait, not just the final --wait check) --
+// own OpWaitCondition nodes have no timeout of their own --
 // they rely entirely on whatever ctx they're given (directly, or via
 // exec.waitTimeout -- see TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes for
 // that path specifically). This drives a real OpWaitCondition node
@@ -1020,8 +1018,7 @@ func TestExecutePlanStartPhaseEventContract(t *testing.T) {
 // container.Summary — CreateNodeID only), exercising resolveContainerSummary's
 // live-view lookup. It asserts the group emits exactly one Starting→Started
 // pair, with Starting firing at the StartContainer node — not at
-// RunPreStart, which must run silently first, matching the imperative
-// engine's startService.
+// RunPreStart, which must run silently first.
 func TestExecutePlanStartPhaseFullChainThroughCreateNode(t *testing.T) {
 	svc, apiClient, recorder := newStartPhaseTestService(t)
 

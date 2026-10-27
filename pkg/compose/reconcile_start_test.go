@@ -166,7 +166,7 @@ func TestPlanStart_HooksAndReplicaChain(t *testing.T) {
 
 // With a replica already running and untouched by the plan, pre_start is
 // gated off and the running replica gets no node — only the non-running one
-// starts, the imperative isNotRunning role expressed in the plan.
+// starts.
 func TestPlanStart_RunningReplicaGatesPreStart(t *testing.T) {
 	two := 2
 	service := types.ServiceConfig{
@@ -232,9 +232,9 @@ func TestPlanStart_RecreatedReplicaTargetsCreateNode(t *testing.T) {
 }
 
 // An exceptional-state container (paused, dead, ...) gets its bare
-// create-phase restart and NOTHING in the start phase: the imperative engine
-// finds it running when the start phase looks, so it neither re-starts nor
-// injects — and its being running gates pre_start for the whole service.
+// create-phase restart and NOTHING in the start phase: it is running when the
+// start phase looks, so it neither re-starts nor injects — and its being
+// running gates pre_start for the whole service.
 func TestPlanStart_ExceptionalStateReplicaCountsAsRunning(t *testing.T) {
 	hook := types.PreStartHook{}
 	hook.Command = []string{"echo", "hi"}
@@ -268,9 +268,9 @@ func TestPlanStart_ExceptionalStateReplicaCountsAsRunning(t *testing.T) {
 	assert.Assert(t, createPhase != nil, "the historical bare restart must remain:\n%s", plan)
 }
 
-// Dependency conditions are re-verified even when nothing has to start — the
-// imperative engine calls waitDependencies for every visited service before
-// looking at what to start, so an up with everything running still fails on
+// Dependency conditions are re-verified even when nothing has to start — every
+// visited service evaluates its dependencies before looking at what to start,
+// so an up with everything running still fails on
 // an unhealthy required dependency. The dependent's visit end (the wait) also
 // orders whoever depends on IT via service_started.
 func TestPlanStart_AllRunningStillWaitsOnConditions(t *testing.T) {
@@ -307,7 +307,7 @@ func TestPlanStart_AllRunningStillWaitsOnConditions(t *testing.T) {
 	assert.Assert(t, !wait.Operation.BestEffort)
 }
 
-// Imperative parity (startService): a service with scale: 0 is still visited
+// A service with scale: 0 is still visited
 // -- its depends_on conditions are evaluated before the no-op, so an unhealthy
 // dependency still fails `up`/`start` and whatever is ordered after the
 // service is ordered after those prerequisites -- and under scope Start the
@@ -370,7 +370,7 @@ func TestPlanStart_ScaleZeroIsStillVisited(t *testing.T) {
 	}
 }
 
-// Imperative parity (startService): under scope Start, a scale>0 service
+// Under scope Start, a scale>0 service
 // with no container at all fails the plan the way `compose start` fails.
 func TestPlanStart_NoContainerToStartFails(t *testing.T) {
 	project := &types.Project{
@@ -382,7 +382,7 @@ func TestPlanStart_NoContainerToStartFails(t *testing.T) {
 	assert.ErrorContains(t, err, `service "app" has no container to start`)
 }
 
-// Imperative parity (startService): the "no container to start" check is
+// The "no container to start" check is
 // project-wide. A service without a container next to existing ones is a
 // no-op for `compose start` (the other services still start); only a project
 // with no container at all fails.
@@ -467,7 +467,7 @@ func TestPlanStart_OrdinaryPathSkipsPreStartWhenLowestIsRelay(t *testing.T) {
 }
 
 // A depends_on naming a service that is neither declared nor disabled is
-// the same hard error the imperative engine raises (shouldWaitForDependency
+// a hard error (shouldWaitForDependency
 // propagates it) — reachable via `compose start` without a compose file,
 // where projectFromName never populates DisabledServices.
 func TestPlanStart_MissingDependencyFails(t *testing.T) {
@@ -487,13 +487,13 @@ func TestPlanStart_MissingDependencyFails(t *testing.T) {
 	assert.ErrorContains(t, err, "ghost")
 
 	// ordering parity: with NO container at all under scope Start, the
-	// dependency error still wins over errNoContainerToStart — the
-	// imperative startService waits on dependencies first
+	// dependency error still wins over errNoContainerToStart — dependencies
+	// are evaluated first
 	_, err = reconcile(t.Context(), project, emptyObserved(), startScopeOptions(ScopeStart), noPrompt)
 	assert.ErrorContains(t, err, "ghost")
 }
 
-// Imperative parity (startService): waitDependencies runs for every service,
+// Dependencies are evaluated for every service,
 // providers included — a provider's own depends_on must produce its wait
 // nodes instead of being skipped with the container-start machinery.
 func TestPlanStart_ProviderWaitsOnDependencies(t *testing.T) {
@@ -692,7 +692,7 @@ func TestPlanStart_ScaledExceptionalStateConsumerWaitsForEveryRestart(t *testing
 }
 
 // A replica condemned by scale-down must never receive a start-phase node:
-// the imperative engine only starts what survives the convergence — and the
+// only what survives the convergence is started — and the
 // condemned replica does not count as running for the pre_start gating.
 func TestPlanStart_ScaleDownTargetIsNeverStarted(t *testing.T) {
 	one := 1
@@ -730,7 +730,7 @@ func TestPlanStart_ScaleDownTargetIsNeverStarted(t *testing.T) {
 // A running container the create phase stops WITHOUT recreating (network
 // recreate) is down when the start phase looks: the plan restarts it —
 // ordered after its last reconnect — and it does not gate pre_start, exactly
-// like the imperative engine restarting it from its second snapshot.
+// as the container is down when the start phase looks.
 func TestStartPhaseReplicas_StoppedByPlanRestarts(t *testing.T) {
 	stop := &PlanNode{ID: 1, Operation: Operation{Type: OpStopContainer}}
 	reconnect := &PlanNode{ID: 2, Operation: Operation{Type: OpConnectNetwork}}
@@ -992,9 +992,9 @@ func TestPlanStart_OrdinaryPathBareStartsAStaleRelay(t *testing.T) {
 // test for the second Copilot review finding on #14296, the symmetric gap:
 // a service declared provider: whose observed container is NOT a relay (a
 // stale normal replica left over from before the service became
-// provider-backed) must still be started -- the OLD imperative engine's
-// startService only special-cased Provider != nil for the ZERO-containers
-// case, so an existing non-relay container was always started normally,
+// provider-backed) must still be started -- Provider != nil is only
+// special-cased for the ZERO-containers
+// case, so an existing non-relay container is always started normally,
 // including post_start hooks. planProviderRelayRestart's first version
 // silently dropped this case (filtered on isRelayContainer), returning
 // success without starting anything.
@@ -1033,8 +1033,8 @@ func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
 	assert.Assert(t, start.Operation.Service != nil,
 		"a stale non-relay container must get an enriched start (injection applies), like any ordinary replica:\n%s", plan)
 	// A Copilot review finding on the post_start-only version of this fix:
-	// pre_start must also run for this path, exactly like the imperative
-	// engine's own lowestNumberedContainer(toStart) + isRelayContainer gate.
+	// pre_start must also run for this path, gated on the lowest-numbered
+	// container to start and on isRelayContainer.
 	if pre == nil {
 		t.Fatalf("expected pre_start hooks to run before starting prov's stale non-relay container:\n%s", plan)
 	}
@@ -1094,8 +1094,8 @@ func TestPlanStart_ProviderPathChainsMultipleStaleContainers(t *testing.T) {
 // replica a relay?" on every iteration of the chain-building loop, so when
 // the lowest-numbered stale container was the relay (skipped) but a later
 // one was an ordinary stale replica, pre_start still ran against that later
-// one. The old imperative engine's own gate -- lowestNumberedContainer(toStart)
-// checked once -- never falls through like that: if its single candidate is
+// one. The gate -- the lowest-numbered container to start, checked once --
+// never falls through like that: if its single candidate is
 // a relay, pre_start is skipped entirely for the whole chain, with no
 // fallback to a later non-relay container.
 func TestPlanStart_ProviderPathPreStartGateDoesNotRetryPastARelay(t *testing.T) {

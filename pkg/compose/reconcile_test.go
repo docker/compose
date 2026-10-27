@@ -1336,9 +1336,8 @@ func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 // depends_on could start before their dependencies' operations complete.
 // Stale pre_start hook runners (left by a previous run that failed before
 // removing them) are purged by the plan when pre_start is going to run again:
-// hooks declared and no replica running at observation — the imperative
-// gating. Removals are best-effort and drop the runner's anonymous volumes,
-// like the warn-only imperative purge they mirror.
+// hooks declared and no replica running at observation. Removals are
+// best-effort (warn-only) and drop the runner's anonymous volumes.
 func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
