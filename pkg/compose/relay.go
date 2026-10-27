@@ -42,10 +42,6 @@ func isRelayContainer(ctr container.Summary) bool {
 	return relaymgr.IsContainer(ctr)
 }
 
-func checkRelayTarget(target container.Summary, serviceName, operation string) error {
-	return relaymgr.CheckTarget(target, serviceName, operation)
-}
-
 // ensureRelayLinkNetworksDown returns down ops removing every provider
 // service's relay link network, one op per network, each gated on the shared
 // limiter like its siblings.

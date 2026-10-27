@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package containerops
 
 import (
 	"context"
@@ -30,6 +30,9 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/relay"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -41,13 +44,8 @@ const (
 	acrossServices = fromService | toService
 )
 
-func (s *composeService) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
-	return Run(ctx, func(ctx context.Context) error {
-		return s.copy(ctx, projectName, options)
-	}, "copy", s.events)
-}
-
-func (s *composeService) copy(ctx context.Context, projectName string, options api.CopyOptions) error {
+// Copy copies files between the host and the containers of a service.
+func (s *Service) Copy(ctx context.Context, projectName string, options api.CopyOptions) error {
 	projectName = strings.ToLower(projectName)
 	srcService, srcPath := splitCpArg(options.Source)
 	destService, dstPath := splitCpArg(options.Destination)
@@ -78,15 +76,15 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
-		name := getCanonicalContainerName(ctr)
+	return forEachContainerConcurrent(ctx, s.backend.MaxConcurrency(), containers, func(ctx context.Context, ctr container.Summary) error {
+		name := naming.CanonicalContainerName(ctr)
 		var msg string
 		if direction == fromService {
 			msg = fmt.Sprintf("%s:%s to %s", name, srcPath, dstPath)
 		} else {
 			msg = fmt.Sprintf("%s to %s:%s", srcPath, name, dstPath)
 		}
-		s.events.On(api.Resource{
+		s.backend.Events().On(api.Resource{
 			ID:      name,
 			Text:    api.StatusCopying,
 			Details: msg,
@@ -95,7 +93,7 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 		if err := copyFunc(ctx, ctr.ID, srcPath, dstPath, options); err != nil {
 			return err
 		}
-		s.events.On(api.Resource{
+		s.backend.Events().On(api.Resource{
 			ID:      name,
 			Text:    api.StatusCopied,
 			Details: msg,
@@ -105,30 +103,30 @@ func (s *composeService) copy(ctx context.Context, projectName string, options a
 	})
 }
 
-func (s *composeService) listContainersTargetedForCopy(ctx context.Context, projectName string, options api.CopyOptions, direction copyDirection, serviceName string) (Containers, error) {
-	var containers Containers
+func (s *Service) listContainersTargetedForCopy(ctx context.Context, projectName string, options api.CopyOptions, direction copyDirection, serviceName string) ([]container.Summary, error) {
+	var containers []container.Summary
 	var err error
 	switch {
 	case options.Index > 0:
-		ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffExclude, true, serviceName, options.Index)
+		ctr, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffExclude, true, serviceName, options.Index)
 		if err != nil {
 			return nil, err
 		}
-		if err := checkRelayTarget(ctr, serviceName, "cp"); err != nil {
+		if err := relay.CheckTarget(ctr, serviceName, "cp"); err != nil {
 			return nil, err
 		}
 		return append(containers, ctr), nil
 	default:
-		withOneOff := oneOffExclude
+		withOneOff := inspect.OneOffExclude
 		if options.All {
-			withOneOff = oneOffInclude
+			withOneOff = inspect.OneOffInclude
 		}
-		containers, err = s.getContainers(ctx, projectName, withOneOff, true, serviceName)
+		containers, err = s.backend.Containers(ctx, projectName, withOneOff, true, serviceName)
 		if err != nil {
 			return nil, err
 		}
 		for _, ctr := range containers {
-			if err := checkRelayTarget(ctr, serviceName, "cp"); err != nil {
+			if err := relay.CheckTarget(ctr, serviceName, "cp"); err != nil {
 				return nil, err
 			}
 		}
@@ -143,7 +141,7 @@ func (s *composeService) listContainersTargetedForCopy(ctx context.Context, proj
 	}
 }
 
-func (s *composeService) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, options api.CopyOptions) error {
+func (s *Service) copyToContainer(ctx context.Context, containerID string, srcPath string, dstPath string, options api.CopyOptions) error {
 	var err error
 	if srcPath != "-" {
 		// Get an absolute source path.
@@ -156,7 +154,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 	// Prepare destination copy info by stat-ing the container path.
 	dstInfo := archive.CopyInfo{Path: dstPath}
 	var dstStat container.PathStat
-	res, err := s.apiClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+	res, err := s.backend.APIClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
 		Path: dstPath,
 	})
 	if err == nil {
@@ -173,7 +171,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		}
 
 		dstInfo.Path = linkTarget
-		res, err = s.apiClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+		res, err = s.backend.APIClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
 			Path: linkTarget,
 		})
 		if err == nil {
@@ -202,7 +200,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 	)
 
 	if srcPath == "-" {
-		content = s.stdin()
+		content = s.backend.CLI().In()
 		resolvedDstPath = dstInfo.Path
 		if !dstInfo.IsDir {
 			return fmt.Errorf("destination \"%s:%s\" must be a directory", containerID, dstPath)
@@ -233,7 +231,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		// info which directory to extract to, which may be the parent of the
 		// destination that the user specified.
 		// Don't create the archive if running in Dry Run mode
-		if !s.dryRun {
+		if !s.backend.DryRun() {
 			dstDir, preparedArchive, err := archive.PrepareArchiveCopy(srcArchive, srcInfo, dstInfo)
 			if err != nil {
 				return err
@@ -245,7 +243,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 		}
 	}
 
-	_, err = s.apiClient().CopyToContainer(ctx, containerID, client.CopyToContainerOptions{
+	_, err = s.backend.APIClient().CopyToContainer(ctx, containerID, client.CopyToContainerOptions{
 		DestinationPath:           resolvedDstPath,
 		Content:                   content,
 		AllowOverwriteDirWithFile: false,
@@ -254,7 +252,7 @@ func (s *composeService) copyToContainer(ctx context.Context, containerID string
 	return err
 }
 
-func (s *composeService) copyFromContainer(ctx context.Context, containerID, srcPath, dstPath string, options api.CopyOptions) error {
+func (s *Service) copyFromContainer(ctx context.Context, containerID, srcPath, dstPath string, options api.CopyOptions) error {
 	var err error
 	if dstPath != "-" {
 		// Get an absolute destination path.
@@ -272,7 +270,7 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 	var rebaseName string
 	if options.FollowLink {
 		var srcStat container.PathStat
-		res, err := s.apiClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+		res, err := s.backend.APIClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
 			Path: srcPath,
 		})
 		if err == nil {
@@ -293,7 +291,7 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 		}
 	}
 
-	res, err := s.apiClient().CopyFromContainer(ctx, containerID, client.CopyFromContainerOptions{
+	res, err := s.backend.APIClient().CopyFromContainer(ctx, containerID, client.CopyFromContainerOptions{
 		SourcePath: srcPath,
 	})
 	if err != nil {
@@ -302,7 +300,7 @@ func (s *composeService) copyFromContainer(ctx context.Context, containerID, src
 	defer res.Content.Close() //nolint:errcheck
 
 	if dstPath == "-" {
-		_, err = io.Copy(s.stdout(), res.Content)
+		_, err = io.Copy(s.backend.CLI().Out(), res.Content)
 		return err
 	}
 

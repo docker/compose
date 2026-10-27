@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package containerops
 
 import (
 	"context"
@@ -27,52 +27,50 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/moby/sys/atomicwriter"
 
+	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
-	return Run(ctx, func(ctx context.Context) error {
-		return s.export(ctx, projectName, options)
-	}, "export", s.events)
-}
-
-func (s *composeService) export(ctx context.Context, projectName string, options api.ExportOptions) error {
+// Export writes the filesystem of a container of a service as a tar archive.
+func (s *Service) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
 	projectName = strings.ToLower(projectName)
 
-	container, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
+	container, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return err
 	}
 
 	if options.Output == "" {
-		if s.stdout().IsTerminal() {
+		if s.backend.CLI().Out().IsTerminal() {
 			return errors.New("output option is required when exporting to terminal")
 		}
 	} else if err := command.ValidateOutputPath(options.Output); err != nil {
 		return fmt.Errorf("failed to export container: %w", err)
 	}
 
-	name := getCanonicalContainerName(container)
-	s.events.On(api.Resource{
+	name := naming.CanonicalContainerName(container)
+	s.backend.Events().On(api.Resource{
 		ID:     name,
 		Text:   api.StatusExporting,
 		Status: api.Working,
 	})
 
-	responseBody, err := s.apiClient().ContainerExport(ctx, container.ID, client.ContainerExportOptions{})
+	responseBody, err := s.backend.APIClient().ContainerExport(ctx, container.ID, client.ContainerExportOptions{})
 	if err != nil {
 		return err
 	}
 
 	defer func() {
 		if err := responseBody.Close(); err != nil {
-			s.events.On(errorEventf(name, "Failed to close response body: %s", err.Error()))
+			s.backend.Events().On(progress.Error(name, "Failed to close response body: "+err.Error()))
 		}
 	}()
 
-	if !s.dryRun {
+	if !s.backend.DryRun() {
 		if options.Output == "" {
-			_, err := io.Copy(s.stdout(), responseBody)
+			_, err := io.Copy(s.backend.CLI().Out(), responseBody)
 			return err
 		} else {
 			writer, err := atomicwriter.New(options.Output, 0o600)
@@ -86,7 +84,7 @@ func (s *composeService) export(ctx context.Context, projectName string, options
 		}
 	}
 
-	s.events.On(api.Resource{
+	s.backend.Events().On(api.Resource{
 		ID:     name,
 		Text:   api.StatusExported,
 		Status: api.Done,

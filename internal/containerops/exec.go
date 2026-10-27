@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package containerops
 
 import (
 	"context"
@@ -24,16 +24,19 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
 
+	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/relay"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+// Exec runs a command in a running container of a service and returns its exit code.
+func (s *Service) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
 	projectName = strings.ToLower(projectName)
-	target, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
+	target, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return 0, err
 	}
-	if err := checkRelayTarget(target, options.Service, "exec"); err != nil {
+	if err := relay.CheckTarget(target, options.Service, "exec"); err != nil {
 		return 0, err
 	}
 
@@ -52,7 +55,7 @@ func (s *composeService) Exec(ctx context.Context, projectName string, options a
 		}
 	}
 
-	err = container.RunExec(ctx, s.dockerCli, target.ID, exec)
+	err = container.RunExec(ctx, s.backend.CLI(), target.ID, exec)
 	var sterr cli.StatusError
 	if errors.As(err, &sterr) {
 		return sterr.StatusCode, err

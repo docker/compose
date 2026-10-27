@@ -66,7 +66,7 @@ func TestCopyToService_ConcurrencyIsBoundedAcrossContainers(t *testing.T) {
 		}).
 		Times(numContainers)
 
-	err := svc.copy(t.Context(), "prj", compose.CopyOptions{
+	err := svc.Copy(t.Context(), "prj", compose.CopyOptions{
 		Source:      srcFile,
 		Destination: "myservice:/dest",
 	})
