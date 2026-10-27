@@ -195,7 +195,8 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 // condition is satisfied (done), definitively failed (err), or ctx is
 // cancelled. Each check reports (done, err): (false, nil) means keep polling.
 // origCtx is ctx as it stood before the caller wrapped it with this wait's
-// own timeout (if any) -- comparing origCtx.Err() against ctx.Err() at the
+// own timeout (if any: waitDependencies sets none, the plan's wait nodes do,
+// see execBoundedWaitCondition) -- comparing origCtx.Err() against ctx.Err() at the
 // moment ctx.Done() fires is how this tells apart a DeadlineExceeded this
 // specific call's own wrap is responsible for from one inherited from an
 // ancestor context the caller never touched. A bare "did the caller
