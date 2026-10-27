@@ -2128,3 +2128,474 @@ func TestPlanRunOfAnEmptyOrSinglePhasePlan(t *testing.T) {
 		assert.NilError(t, pr.runStart(t.Context(), nil))
 	})
 }
+
+// TestExecutePlanStartHoldsTheStartMutex pins that every ContainerStart the
+// plan issues goes through a call site holding startMx, the bare start of a
+// paused or dead container as much as the start of a service container, which
+// also injects its secrets and configs. startMx is a workaround for a flaw of
+// engine 28.0 to 28.2 (see its doc comment), kept until Engine 28.x is out of
+// support: the mutex is probed from inside ContainerStart, where it must be
+// held, so that dropping it from either path is a decision, not an accident.
+// The test is not parallel, so no other test holds startMx while it runs.
+func TestExecutePlanStartHoldsTheStartMutex(t *testing.T) {
+	tests := []struct {
+		name    string
+		service *types.ServiceConfig
+	}{
+		{name: "a bare start of a paused or dead container"},
+		{name: "the start of a service container", service: &types.ServiceConfig{Name: "web"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient, _ := newStartPhaseTestService(t)
+			ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+			apiClient.EXPECT().ContainerStart(gomock.Any(), "web-id", gomock.Any()).
+				DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+					if startMx.TryLock() {
+						startMx.Unlock()
+						t.Error("ContainerStart was called without holding startMx")
+					}
+					return client.ContainerStartResult{}, nil
+				})
+
+			plan := &Plan{}
+			plan.addNode(Operation{
+				Type:       OpStartContainer,
+				ResourceID: "service:web:1",
+				Cause:      "start",
+				Service:    tt.service,
+				Container:  &ctr,
+			}, "")
+
+			project := &types.Project{Name: "test", Services: types.Services{"web": {Name: "web"}}}
+			exec := svc.newPlanExecutor(project, emptyObservedState("test"))
+			assert.NilError(t, exec.run(t.Context(), plan))
+		})
+	}
+}
+
+// TestExecutePlanFailureRelaysDownALongChainUntouched pins that the error a
+// plan fails with is the one of the node that failed, however long the chain
+// of nodes held behind it: here the wait on a dependency that has no
+// container, with the pre_start hooks, the start and the post_start hooks of
+// the service that depends on it after it -- the shape of a replica's chain in
+// the start phase. None of them runs, and the error is the wait's own, with
+// nothing in front of it. How each hop of the chain relays the failure is
+// TestRunNodeRelaysTheOriginalErrorDownALongChain's.
+func TestExecutePlanFailureRelaysDownALongChainUntouched(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{
+		Name:      "web",
+		PreStart:  []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}},
+	}
+	project := &types.Project{Name: "test", Services: types.Services{"web": service}}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+
+	// no expectation on the daemon at all: nothing but the wait may run
+	plan := &Plan{}
+	wait := plan.addNode(Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:service_healthy",
+		Name:       "db",
+		Condition:  types.ServiceConditionHealthy,
+	}, "")
+	wait.Phase = PhaseStart
+	preStart := plan.addNode(Operation{
+		Type:       OpRunPreStart,
+		ResourceID: "service:web:1",
+		Cause:      "pre_start hooks",
+		Service:    &service,
+		Container:  &ctr,
+	}, "start:web:1", wait)
+	preStart.Phase = PhaseStart
+	start := plan.addNode(Operation{
+		Type:       OpStartContainer,
+		ResourceID: "service:web:1",
+		Cause:      "start",
+		Service:    &service,
+		Container:  &ctr,
+	}, "start:web:1", preStart)
+	start.Phase = PhaseStart
+	post := plan.addNode(Operation{
+		Type:       OpRunPostStart,
+		ResourceID: "service:web:1",
+		Cause:      "post_start hooks",
+		Service:    &service,
+		Container:  &ctr,
+	}, "start:web:1", start)
+	post.Phase = PhaseStart
+
+	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
+
+	assert.Error(t, err, "missing dependency db")
+}
+
+// TestPlanRunRefusesACreateNodeDependingOnAStartNode pins that a plan that
+// could only deadlock is refused before anything runs: a Create-phase node
+// waiting on a Start-phase one would wait forever, as the Start phase is only
+// dispatched once the Create phase is over.
+func TestPlanRunRefusesACreateNodeDependingOnAStartNode(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+	service := types.ServiceConfig{Name: "web"}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+
+	plan := &Plan{}
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &service, Container: &ctr}, "")
+	start.Phase = PhaseStart
+	plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: "default"}, "", start)
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	_, err := exec.begin(plan)
+
+	assert.ErrorContains(t, err, "invalid plan: create-phase node 2 depends on start-phase node 1")
+}
+
+// TestExecStartContainer_BailsOutWhenContextCanceled is the start node's side
+// of TestExecRunPreStart_BailsOutWhenContextCanceled: once ctx is canceled (a
+// sibling node failed, or the caller gave up), a start must neither inject the
+// container's secrets and configs nor start it. No daemon expectation is
+// registered: an unexpected call fails the test.
+func TestExecStartContainer_BailsOutWhenContextCanceled(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+	service := types.ServiceConfig{Name: "web"}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test", Services: types.Services{"web": service}}, emptyObservedState("test"))
+	err := exec.execStartContainer(ctx, Operation{Type: OpStartContainer, Service: &service, Container: &ctr})
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// TestExecRunPostStart_BailsOutWhenContextCanceled is the same for the
+// post_start hooks: none runs once ctx is canceled.
+func TestExecRunPostStart_BailsOutWhenContextCanceled(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+	service := types.ServiceConfig{
+		Name:      "web",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"/notify.sh"}}},
+	}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	err := exec.execRunPostStart(ctx, Operation{Type: OpRunPostStart, Service: &service, Container: &ctr})
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// TestExecutePlanBoundedConcurrencyNeverBlocksAPrerequisite pins the executor
+// constraint that a concurrency cap must not be put on the goroutines of the
+// plan's nodes: every node waits on its prerequisites in a goroutine of its
+// own, so a cap on the goroutines would let nodes waiting for a prerequisite
+// hold every slot, and the prerequisite never run. Here --parallel is 1 and
+// the nodes depend on nodes created after them (the first waits for the
+// third, which waits for the second), so that no creation order saves them:
+// the plan has to complete, in the order of its edges.
+func TestExecutePlanBoundedConcurrencyNeverBlocksAPrerequisite(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+	svc.maxConcurrency = 1
+
+	ctrs := map[string]container.Summary{}
+	plan := &Plan{}
+	nodes := map[string]*PlanNode{}
+	for _, name := range []string{"first", "second", "third"} {
+		ctr := container.Summary{ID: name + "-id", Names: []string{"/test-" + name + "-1"}}
+		ctrs[name] = ctr
+		nodes[name] = plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:" + name + ":1", Cause: "start", Container: &ctr}, "")
+	}
+	// the dependencies point at nodes created later
+	nodes["first"].DependsOn = []*PlanNode{nodes["third"]}
+	nodes["third"].DependsOn = []*PlanNode{nodes["second"]}
+	second := apiClient.EXPECT().ContainerStart(gomock.Any(), "second-id", gomock.Any()).Return(client.ContainerStartResult{}, nil)
+	third := apiClient.EXPECT().ContainerStart(gomock.Any(), "third-id", gomock.Any()).Return(client.ContainerStartResult{}, nil).After(second)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "first-id", gomock.Any()).Return(client.ContainerStartResult{}, nil).After(third)
+
+	// the deadline only turns a deadlock into a prompt failure
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	assert.NilError(t, exec.run(ctx, plan))
+}
+
+// TestExecutePlanStartingIsReportedWhenTheContainerStarts pins when the row of
+// a replica reads Starting: when its container is started, not when the chain
+// that leads to it begins. The pre_start hooks of the service run silently
+// before it; the row's Working event is the start's own.
+func TestExecutePlanStartingIsReportedWhenTheContainerStarts(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+
+	service := types.ServiceConfig{
+		Name:     "web",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+	const row = "Container test-web-1"
+	rowNow := func() []string {
+		recorder.mu.Lock()
+		defer recorder.mu.Unlock()
+		return slices.Clone(recorder.byID[row])
+	}
+
+	// the pre_start node first asks the daemon whether a replica already runs,
+	// and finds one: it has nothing to run, and the row is still silent
+	var duringPreStart, atStart []string
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, client.ContainerListOptions) (client.ContainerListResult, error) {
+			duringPreStart = rowNow()
+			return client.ContainerListResult{Items: []container.Summary{ctr}}, nil
+		})
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "web-id", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
+			atStart = rowNow()
+			return client.ContainerStartResult{}, nil
+		})
+
+	plan := &Plan{}
+	preStart := plan.addNode(Operation{Type: OpRunPreStart, ResourceID: "service:web:1", Cause: "pre_start hooks", Service: &service, Container: &ctr}, "start:web:1")
+	preStart.Phase = PhaseStart
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &service, Container: &ctr}, "start:web:1", preStart)
+	start.Phase = PhaseStart
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test", Services: types.Services{"web": service}}, emptyObservedState("test"))
+	assert.NilError(t, exec.run(t.Context(), plan))
+
+	assert.Equal(t, len(duringPreStart), 0, "the row must say nothing during pre_start: %v", duringPreStart)
+	assert.DeepEqual(t, atStart, []string{api.StatusStarting})
+	assert.DeepEqual(t, recorder.byID[row], []string{api.StatusStarting, api.StatusStarted})
+}
+
+// TestRunNodeRelaysTheOriginalErrorDownALongChain pins what each node of a
+// chain does with the failure of the node it depends on: it does not run, and
+// it passes on the ORIGINAL error -- the one the failing node recorded, not
+// the "dependency failed" error its neighbour returned -- so that the root
+// cause stays legible however many hops down the chain a node is: a
+// replica's chain (create, pre_start, start, post_start) is three hops long.
+func TestRunNodeRelaysTheOriginalErrorDownALongChain(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+	service := types.ServiceConfig{Name: "web"}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+
+	plan := &Plan{}
+	failing := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	failing.Phase = PhaseStart
+	chain := []*PlanNode{failing}
+	for _, op := range []OperationType{OpRunPreStart, OpStartContainer, OpRunPostStart} {
+		node := plan.addNode(Operation{Type: op, ResourceID: "service:web:1", Service: &service, Container: &ctr}, "start:web:1", chain[len(chain)-1])
+		node.Phase = PhaseStart
+		chain = append(chain, node)
+	}
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	run, err := exec.begin(plan)
+	assert.NilError(t, err)
+
+	// the first node failed: what the executor does when its operation fails
+	original := errors.New("db is unhealthy")
+	run.rs.recordFailure(failing.ID, original)
+	close(run.rs.done[failing.ID])
+
+	phase := newPhaseCancel(t.Context())
+	for hop, node := range chain[1:] {
+		err := exec.runNode(node, run.rs, phase)
+
+		assert.Assert(t, errors.Is(err, original), "hop %d: %v", hop+1, err)
+		assert.Equal(t, err.Error(), "dependency failed: db is unhealthy", "hop %d wrapped the error once more", hop+1)
+	}
+}
+
+// runNodeFixture is a planExecutor and the state of a planRun, to drive
+// runNode on the nodes of plan one at a time: what the goroutines of a phase do
+// concurrently, with an interleaving the test picks.
+func runNodeFixture(t *testing.T, plan *Plan) (*planExecutor, *planRun) {
+	t.Helper()
+	svc, _, _ := newStartPhaseTestService(t)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	run, err := exec.begin(plan)
+	assert.NilError(t, err)
+	return exec, run
+}
+
+func bareStartNode(plan *Plan, name string, after ...*PlanNode) *PlanNode {
+	ctr := container.Summary{ID: name + "-id", Names: []string{"/test-" + name + "-1"}}
+	node := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:" + name + ":1", Cause: "start", Container: &ctr}, "", after...)
+	node.Phase = PhaseStart
+	return node
+}
+
+// TestRunNodeRecordsACancellationWhileWaitingAsAFailure pins that a node
+// given up while it waits for its prerequisites is recorded as failed, so that
+// the nodes depending on it skip: their own wait can find its done channel
+// closed and the phase's context canceled at once, and select picks either --
+// the one that sees only the closed channel must still find the failure, or it
+// would go on to start with a canceled context, and report a Starting it never
+// finishes.
+func TestRunNodeRecordsACancellationWhileWaitingAsAFailure(t *testing.T) {
+	plan := &Plan{}
+	prerequisite := bareStartNode(plan, "db")
+	waiting := bareStartNode(plan, "web", prerequisite)
+	exec, run := runNodeFixture(t, plan)
+	phase := newPhaseCancel(t.Context())
+	phase.cancel() // the prerequisite never completes: the phase is over
+
+	err := exec.runNode(waiting, run.rs, phase)
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.ErrorIs(t, run.rs.failedDependency([]*PlanNode{waiting}), context.Canceled, "the dependents of the node must find it failed")
+}
+
+// TestRunNodeRecordsAGroupGivenUpAsAFailure is the same for a node that does
+// not start because the group of its resource ended meanwhile (another node of
+// the group failed while this one was getting a slot).
+func TestRunNodeRecordsAGroupGivenUpAsAFailure(t *testing.T) {
+	plan := &Plan{}
+	ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+	node := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Container: &ctr}, "start:web:1")
+	node.Phase = PhaseStart
+	exec, run := runNodeFixture(t, plan)
+	run.rs.groups.groups["start:web:1"].finished = true
+
+	err := exec.runNode(node, run.rs, newPhaseCancel(t.Context()))
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.ErrorIs(t, run.rs.failedDependency([]*PlanNode{node}), context.Canceled, "the dependents of the node must find it failed")
+}
+
+// TestRunNodeDoesNotCountAnInterruptedWaitAsASuccess pins that a wait ended
+// by its caller going away -- it then ends quietly, with no error -- is not
+// recorded as a success: its condition was never met, and what is reported for
+// the nodes held behind it must not take it for satisfied.
+func TestRunNodeDoesNotCountAnInterruptedWaitAsASuccess(t *testing.T) {
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	wait.Phase = PhaseStart
+	exec, run := runNodeFixture(t, plan)
+	exec.containersByService["db"] = Containers{{ID: "db-id", Names: []string{"/test-db-1"}, Labels: map[string]string{api.ServiceLabel: "db"}}}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := exec.runNode(wait, run.rs, newPhaseCancel(ctx))
+
+	assert.NilError(t, err)
+	assert.Assert(t, !run.rs.succeeded(wait.ID), "the wait ended unmet, it is not a success")
+	assert.NilError(t, run.rs.failedDependency([]*PlanNode{wait}))
+}
+
+// TestRunPhaseFailsWithTheErrorOfTheNodeThatFailedFirst pins what a phase
+// returns once one of its nodes failed: that node's error, and not the first
+// error the phase's goroutines happen to return, which may be the bare
+// context.Canceled of a node that was given up because of it (errgroup keeps
+// whichever comes first).
+func TestRunPhaseFailsWithTheErrorOfTheNodeThatFailedFirst(t *testing.T) {
+	plan := &Plan{}
+	failed := bareStartNode(plan, "db")
+	casualty := bareStartNode(plan, "web", failed)
+	exec, run := runNodeFixture(t, plan)
+	origin := errors.New("no space left on device")
+	phase := newPhaseCancel(t.Context())
+	phase.err = origin // what the failure of the prerequisite registered...
+	phase.cancel()     // ...before its dependent, still waiting for it, was given up
+
+	err := exec.runPhase([]*PlanNode{casualty}, run.rs, phase)
+
+	assert.Equal(t, err, origin)
+}
+
+// TestExecCreateHookContainer_TargetsTheLowestNumberedReplica pins which
+// replica a pre_start hook shares the volumes of: the lowest-numbered one of
+// the live view, the one the start phase hands the hooks, whatever order the
+// replicas are in.
+func TestExecCreateHookContainer_TargetsTheLowestNumberedReplica(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	replica := func(number string) container.Summary {
+		return container.Summary{ID: "c" + number, Labels: map[string]string{api.ContainerNumberLabel: number}}
+	}
+	var created client.ContainerCreateOptions
+	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.ContainerCreateOptions) (client.ContainerCreateResult, error) {
+			created = opts
+			return client.ContainerCreateResult{ID: "hook-id"}, nil
+		})
+
+	plan := &Plan{}
+	hook := plan.addNode(Operation{
+		Type:       OpCreateHookContainer,
+		ResourceID: "hook:web:pre_start:0",
+		Cause:      "pre_start hook",
+		Service:    &service,
+		HookIndex:  0,
+		Name:       getHookContainerName("test", "web", 0),
+	}, "")
+	exec := svc.newPlanExecutor(&types.Project{Name: "test", Services: types.Services{"web": service}}, emptyObservedState("test"))
+	// neither the first nor the last of the view is the lowest-numbered
+	exec.containersByService["web"] = Containers{replica("3"), replica("1"), replica("2")}
+
+	assert.NilError(t, exec.execCreateHookContainer(t.Context(), hook))
+
+	assert.DeepEqual(t, created.HostConfig.VolumesFrom, []string{"c1"})
+}
+
+// TestExecCreateHookContainer_BailsOutWhenContextCanceled pins that a runner
+// is not created once ctx is canceled -- a replica's creation that failed
+// canceled the phase, and the live view this node resolves its target from is
+// then incomplete: it ends on the cancellation, not on an internal error about
+// a missing container, and calls nothing.
+func TestExecCreateHookContainer_BailsOutWhenContextCanceled(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+	service := types.ServiceConfig{
+		Name:     "web",
+		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+	}
+	plan := &Plan{}
+	hook := plan.addNode(Operation{Type: OpCreateHookContainer, ResourceID: "hook:web:pre_start:0", Service: &service, HookIndex: 0, Name: "test-web-pre_start-0"}, "")
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	err := exec.execCreateHookContainer(ctx, hook)
+
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// TestExecStopContainer_PassesTheTimeoutInWholeSeconds pins how the timeout of
+// a stop of the plan (the one that precedes a container's recreation, from
+// up --timeout) reaches the daemon: in whole seconds, and not at all when
+// none was given, so that the container's own stop timeout applies.
+func TestExecStopContainer_PassesTheTimeoutInWholeSeconds(t *testing.T) {
+	seconds := func(d time.Duration) *time.Duration { return &d }
+	tests := []struct {
+		name    string
+		timeout *time.Duration
+		want    *int
+	}{
+		{name: "none given"},
+		{name: "whole seconds", timeout: seconds(7 * time.Second), want: intPtr(7)},
+		{name: "a fraction of a second is dropped", timeout: seconds(1900 * time.Millisecond), want: intPtr(1)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient, _ := newStartPhaseTestService(t)
+			ctr := container.Summary{ID: "web-id", Names: []string{"/test-web-1"}}
+			var got client.ContainerStopOptions
+			apiClient.EXPECT().ContainerStop(gomock.Any(), "web-id", gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, opts client.ContainerStopOptions) (client.ContainerStopResult, error) {
+					got = opts
+					return client.ContainerStopResult{}, nil
+				})
+			exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+
+			err := exec.execStopContainer(t.Context(), Operation{Type: OpStopContainer, Container: &ctr, Timeout: tt.timeout})
+
+			assert.NilError(t, err)
+			assert.DeepEqual(t, got.Timeout, tt.want)
+		})
+	}
+}
