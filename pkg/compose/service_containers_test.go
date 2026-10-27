@@ -927,7 +927,10 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		unsupportedDeps := types.DependsOnConfig{
 			"db": {Condition: "some_future_condition", Required: true},
 		}
-		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", unsupportedDeps, containers)
+		// the bound makes a regression that waits fail instead of hanging
+		ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+		defer cancel()
+		err := tested.(*composeService).waitDependencies(ctx, &project, "app", unsupportedDeps, containers)
 		assert.NilError(t, err)
 
 		var messages []string
@@ -1147,6 +1150,7 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 					// the same end, whatever the instant the timeout expired at
 					assert.Equal(t, duringInspect == nil, betweenPolls == nil)
 					assert.Equal(t, errors.Is(duringInspect, errWaitTimeout), errors.Is(betweenPolls, errWaitTimeout))
+					assert.Equal(t, errors.Is(duringInspect, context.DeadlineExceeded), errors.Is(betweenPolls, context.DeadlineExceeded))
 					if required {
 						assert.Assert(t, errors.Is(duringInspect, errWaitTimeout), "got %v", duringInspect)
 						assert.ErrorIs(t, duringInspect, context.DeadlineExceeded)
