@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package containerops
 
 import (
 	"context"
@@ -22,33 +22,30 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
-	return Run(ctx, func(ctx context.Context) error {
-		return s.commit(ctx, projectName, options)
-	}, "commit", s.events)
-}
-
-func (s *composeService) commit(ctx context.Context, projectName string, options api.CommitOptions) error {
+// Commit creates an image from the changes made to a container of a service.
+func (s *Service) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
 	projectName = strings.ToLower(projectName)
 
-	ctr, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
+	ctr, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return err
 	}
 
-	name := getCanonicalContainerName(ctr)
+	name := naming.CanonicalContainerName(ctr)
 
-	s.events.On(api.Resource{
+	s.backend.Events().On(api.Resource{
 		ID:     name,
 		Status: api.Working,
 		Text:   api.StatusCommitting,
 	})
 
-	if s.dryRun {
-		s.events.On(api.Resource{
+	if s.backend.DryRun() {
+		s.backend.Events().On(api.Resource{
 			ID:     name,
 			Status: api.Done,
 			Text:   api.StatusCommitted,
@@ -57,7 +54,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return nil
 	}
 
-	response, err := s.apiClient().ContainerCommit(ctx, ctr.ID, client.ContainerCommitOptions{
+	response, err := s.backend.APIClient().ContainerCommit(ctx, ctr.ID, client.ContainerCommitOptions{
 		Reference: options.Reference,
 		Comment:   options.Comment,
 		Author:    options.Author,
@@ -68,7 +65,7 @@ func (s *composeService) commit(ctx context.Context, projectName string, options
 		return err
 	}
 
-	s.events.On(api.Resource{
+	s.backend.Events().On(api.Resource{
 		ID:     name,
 		Text:   "Committed as " + response.ID,
 		Status: api.Done,
