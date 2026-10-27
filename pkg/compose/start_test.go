@@ -26,6 +26,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -307,4 +308,168 @@ func TestGetDependencyCondition(t *testing.T) {
 
 	assert.Equal(t, getDependencyCondition(oneShot, project), types.ServiceConditionCompletedSuccessfully)
 	assert.Equal(t, getDependencyCondition(web, project), ServiceConditionRunningOrHealthy)
+}
+
+func inspectResultOf(id, name string, status container.ContainerState, exitCode int, health *container.Health) client.ContainerInspectResult {
+	config := &container.Config{}
+	if health != nil {
+		config.Healthcheck = &container.HealthConfig{Test: []string{"CMD", "true"}}
+	}
+	return client.ContainerInspectResult{Container: container.InspectResponse{
+		ID:     id,
+		Name:   "/" + name,
+		Config: config,
+		State:  &container.State{Status: status, ExitCode: exitCode, Health: health},
+	}}
+}
+
+// TestStart_WaitVerifiesTheApplicationIsReady pins what --wait adds to start:
+// once the containers are started, every service has to be up (running, and
+// healthy when it has a healthcheck) before start returns, or start fails
+// naming the --wait-timeout that elapsed. Without --wait, start returns as soon
+// as the containers are started, and checks nothing.
+func TestStart_WaitVerifiesTheApplicationIsReady(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	web.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
+	webCtr := stoppedServiceContainer("web", 1, container.StateRunning)
+
+	newService := func(t *testing.T, health container.HealthStatus) *composeService {
+		svc, apiClient, _ := newStartTestService(t)
+		apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+			Return(client.ContainerListResult{Items: []container.Summary{webCtr}}, nil).AnyTimes()
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), webCtr.ID, gomock.Any()).AnyTimes().
+			Return(inspectResultOf(webCtr.ID, "prj-web-1", container.StateRunning, 0, &container.Health{Status: health}), nil)
+		return svc
+	}
+
+	t.Run("a service not ready in time fails the start", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			svc := newService(t, container.Starting)
+
+			err := svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 2 * time.Second})
+
+			assert.Error(t, err, "application not healthy after 2s")
+		})
+	})
+
+	t.Run("a service that is ready lets it succeed", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			svc := newService(t, container.Healthy)
+
+			assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 5 * time.Second}))
+		})
+	})
+
+	t.Run("without --wait nothing is verified", func(t *testing.T) {
+		svc := newService(t, container.Starting)
+
+		assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project}))
+	})
+}
+
+// TestStart_WaitSatisfiesAOneShotServiceByItsCompletion pins that the --wait
+// verification expects a service that others depend on with
+// service_completed_successfully to have exited with 0, not to be running: a
+// one-shot service is done once it has run, and would otherwise make --wait
+// fail forever. One that completes with an error code fails it, naming the
+// service and the code.
+func TestStart_WaitSatisfiesAOneShotServiceByItsCompletion(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		exitCode int
+		err      string
+	}{
+		{name: "the one-shot service completed", exitCode: 0},
+		{name: "the one-shot service failed", exitCode: 3, err: `service "init" didn't complete successfully: exit 3`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				svc, apiClient, _ := newStartTestService(t)
+
+				initService := types.ServiceConfig{Name: "init", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+				app := types.ServiceConfig{Name: "app", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+				app.DependsOn = types.DependsOnConfig{"init": {Condition: types.ServiceConditionCompletedSuccessfully, Required: true}}
+				project := &types.Project{Name: "prj", Services: types.Services{"init": initService, "app": app}}
+
+				initCtr := stoppedServiceContainer("init", 1, container.StateExited)
+				appCtr := stoppedServiceContainer("app", 1, container.StateRunning)
+				apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+					Return(client.ContainerListResult{Items: []container.Summary{initCtr, appCtr}}, nil)
+				apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(client.ContainerStartResult{}, nil)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), initCtr.ID, gomock.Any()).AnyTimes().
+					Return(inspectResultOf(initCtr.ID, "prj-init-1", container.StateExited, tt.exitCode, nil), nil)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), appCtr.ID, gomock.Any()).AnyTimes().
+					Return(inspectResultOf(appCtr.ID, "prj-app-1", container.StateRunning, 0, nil), nil)
+
+				err := svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 5 * time.Second})
+
+				if tt.err == "" {
+					assert.NilError(t, err)
+				} else {
+					assert.ErrorContains(t, err, tt.err)
+				}
+			})
+		})
+	}
+}
+
+// TestStart_StartsTheReplicasOneAfterTheOther pins the order a service's
+// stopped replicas start in: by replica number, each start waiting for the
+// previous one's.
+func TestStart_StartsTheReplicasOneAfterTheOther(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}, Scale: intPtr(3)}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
+	replicas := []container.Summary{
+		stoppedServiceContainer("web", 3, container.StateExited),
+		stoppedServiceContainer("web", 1, container.StateExited),
+		stoppedServiceContainer("web", 2, container.StateExited),
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+		Return(client.ContainerListResult{Items: replicas}, nil)
+	first := apiClient.EXPECT().ContainerStart(gomock.Any(), "prj-web-1-id", gomock.Any()).Return(client.ContainerStartResult{}, nil)
+	second := apiClient.EXPECT().ContainerStart(gomock.Any(), "prj-web-2-id", gomock.Any()).Return(client.ContainerStartResult{}, nil).After(first)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "prj-web-3-id", gomock.Any()).Return(client.ContainerStartResult{}, nil).After(second)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project}))
+}
+
+// TestStart_WithoutAProjectStartsTheSelectedServicesOnly pins `compose start
+// web` run without a compose file: the project is rebuilt from the project's
+// containers, and only the services asked for (with what they depend on) are
+// started, the other containers of the project staying as they are.
+func TestStart_WithoutAProjectStartsTheSelectedServicesOnly(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	webCtr := stoppedServiceContainer("web", 1, container.StateExited)
+	jobCtr := stoppedServiceContainer("job", 1, container.StateExited)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+		Return(client.ContainerListResult{Items: []container.Summary{webCtr, jobCtr}}, nil)
+	// no expectation to start the job's container: it would fail the test
+	apiClient.EXPECT().ContainerStart(gomock.Any(), webCtr.ID, gomock.Any()).Return(client.ContainerStartResult{}, nil)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{AttachTo: []string{"web"}}))
+}
+
+// TestStart_WithoutAProjectListsTheContainersWithoutTheOneOffs pins that the
+// project `compose start` rebuilds from the containers it finds is made of the
+// project's own containers only, never of the one-off ones (the ones `compose
+// run` left behind): the listing it asks the daemon for leaves them out.
+func TestStart_WithoutAProjectListsTheContainersWithoutTheOneOffs(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	webCtr := stoppedServiceContainer("web", 1, container.StateExited)
+	var firstListing client.ContainerListOptions
+	var listings atomic.Int32
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+		DoAndReturn(func(_ context.Context, opts client.ContainerListOptions) (client.ContainerListResult, error) {
+			if listings.Add(1) == 1 {
+				firstListing = opts
+			}
+			return client.ContainerListResult{Items: []container.Summary{webCtr}}, nil
+		})
+	apiClient.EXPECT().ContainerStart(gomock.Any(), webCtr.ID, gomock.Any()).Return(client.ContainerStartResult{}, nil)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{}))
+
+	assert.Assert(t, firstListing.Filters["label"][oneOffFilter(false)], "the listing must exclude one-off containers: %v", firstListing.Filters)
 }
