@@ -31,6 +31,12 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// This file gathers the waits on depends_on conditions: the polling of a
+// dependency's containers (waitDependency and the per-condition checks), shared
+// by the plan's OpWaitCondition nodes and by the commands that wait outside a
+// plan (waitDependencies: restart, run and the --wait verification of up and
+// start), and the gate deciding which dependencies need a wait at all.
+
 // ServiceConditionRunningOrHealthy is a service condition on status running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
