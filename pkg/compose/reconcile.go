@@ -122,8 +122,8 @@ type reconciler struct {
 	// r.project is never reassigned between the two calls.
 	dependencyGraph *Graph
 	// removedByPlan records replicas the create phase condemns (scale-down
-	// stop+remove): the start phase must never plan a start for them — the
-	// imperative engine only ever starts what survives the convergence.
+	// stop+remove): the start phase must never plan a start for them — only
+	// what survives the convergence is started.
 	removedByPlan map[string]bool
 	// hookRunnerNodes records, per service, the create-phase nodes that
 	// materialize the pre_start hook runners, so the start-phase RunPreStart
@@ -960,8 +960,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 // per_replica return below. The start phase only executes runners prepared
 // here; it never creates one itself.
 //
-// Purges are best-effort (mirroring the historical imperative purge, which was
-// warn-only) but the creates depend on them: runner names are deterministic,
+// Purges are best-effort (a failed removal only warns) but the creates depend
+// on them: runner names are deterministic,
 // so a genuinely stuck old runner surfaces as a name conflict on the create.
 // The creates also depend on every replica node and on the infrastructure, so
 // the executor resolves the target replica (VolumesFrom) against a final live
@@ -1138,12 +1138,11 @@ func (r *reconciler) hasVolumeMismatch(expected types.ServiceConfig, oc Observed
 }
 
 // planStartPhase appends the Start phase to the plan: for every service, a
-// replica chain of start-phase operations reproducing the imperative
-// engine's semantics — dependency conditions first, one optional
-// OpRunPreStart when no replica was running at observation, then per
+// replica chain of start-phase operations — dependency conditions first, one
+// optional OpRunPreStart when no replica was running at observation, then per
 // replica inject+start (OpStartContainer, enriched by the executor) and
 // post_start hooks, each replica chained after the previous one to keep
-// today's sequential start order, now visible in the plan.
+// the sequential start order, visible in the plan.
 //
 // Conditions other than service_started materialize as OpWaitCondition
 // nodes, deduplicated per (service, condition) across dependents; health is
@@ -1257,12 +1256,12 @@ func (r *reconciler) exceptionalStateRestartNodes(service string) []*PlanNode {
 
 // startPhaseReplicas collects the replicas to start, ascending number:
 // containers materialized by the create phase plus observed up-to-date
-// containers not running — exactly the isNotRunning set the imperative start
-// phase acts on. anyRunning reports whether a replica will be running when
+// containers not running — exactly the set a start acts on. anyRunning
+// reports whether a replica will be running when
 // the start phase looks: running at observation and left untouched by the
 // plan, or brought to running by the create phase itself (the bare restart
-// of exceptional states). Both gate pre_start and take no start node — the
-// imperative engine neither re-starts nor injects into a running container.
+// of exceptional states). Both gate pre_start and take no start node — a
+// running container is neither re-started nor injected into.
 func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas []startReplica, anyRunning bool) {
 	planned := r.containerNodes[service.Name]
 	seen := map[int]bool{}
@@ -1271,7 +1270,7 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 		resID := serviceReplicaID(service.Name, oc.Number)
 		if r.removedByPlan[resID] {
 			// condemned by the create phase (scale-down): gone by the time
-			// the imperative start phase would look, so it neither starts
+			// the start phase would look, so it neither starts
 			// nor counts as running for the pre_start gating
 			seen[oc.Number] = true
 			continue
@@ -1291,10 +1290,9 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 			if stopNode, stopped := r.stoppedByPlan[oc.ID]; stopped {
 				// the create phase stops this container WITHOUT recreating
 				// it (network recreate): it will be down when the start
-				// phase looks, and the imperative engine restarts it from
-				// its second snapshot — so does the plan, ordered after the
+				// phase looks, so the plan restarts it, ordered after the
 				// container's last reconnect (else its stop). Not running
-				// for the pre_start gating, like in the imperative engine.
+				// for the pre_start gating.
 				after := stopNode
 				if reconnects := r.connectNodes[oc.ID]; len(reconnects) > 0 {
 					after = reconnects[len(reconnects)-1]
@@ -1324,9 +1322,9 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 // prerequisites: a service_started condition is a plain edge to the
 // dependency's chain end, any other condition a deduplicated OpWaitCondition
 // node re-evaluated at execution time. Which dependencies need a wait node
-// is delegated to shouldWaitForDependency — the imperative engine's own
-// gate — errors included: a dependency that is neither declared nor
-// disabled is the same hard failure it is today.
+// is delegated to shouldWaitForDependency — the gate waitDependencies shares
+// — errors included: a dependency that is neither declared nor disabled is a
+// hard failure.
 func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*PlanNode, error) {
 	var depNodes []*PlanNode
 	for _, dep := range sortedKeys(service.DependsOn) {
@@ -1386,8 +1384,8 @@ func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, 
 }
 
 // planProviderStart is the start-phase visit of a provider service: no
-// container to start, but its own depends_on still applies — the imperative
-// startService waits on it for every service, providers included. Its chain
+// container to start, but its own depends_on still applies, as for every
+// service, providers included. Its chain
 // end is its create-phase RunProvider node (the deployment itself), plus
 // those dependency prerequisites when it has any -- a consumer must wait for
 // both: the provider's own dependencies satisfied AND the provider actually
@@ -1431,8 +1429,8 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 
 // planProviderRelayRestart plans the start of the provider's own observed,
 // not-running containers when the create phase didn't already converge them
-// (see planProviderStart's caller). The imperative engine decided
-// bare-vs-enriched PER CONTAINER (isRelayContainer), never from the service's
+// (see planProviderStart's caller). Bare-vs-enriched is decided
+// PER CONTAINER (isRelayContainer), never from the service's
 // currently declared type: a provider: declaration can change without an
 // intervening `up`/create, so under pure ScopeStart the observed container
 // can be the real relay (bare start) or a stale non-relay replica left over
@@ -1467,7 +1465,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if service.Provider != nil {
 		return r.planProviderStart(service)
 	}
-	// imperative parity (startService): deploy.replicas: 0 is an unconditional
+	// deploy.replicas: 0 is an unconditional
 	// no-op, but a service with scale: 0 is still visited -- its depends_on
 	// conditions are evaluated and its dependents ordered after them -- and
 	// whatever replicas it already owns are started (scope Start only: the
@@ -1479,7 +1477,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 
 	replicas, anyRunning := r.startPhaseReplicas(service)
 	// dependency conditions are evaluated even when nothing has to start:
-	// the imperative engine calls waitDependencies for every visited service
+	// every visited service evaluates its dependencies
 	// BEFORE looking at what to start, so an up with everything running
 	// still fails on an unhealthy required dependency — and a dependency
 	// error wins over "no container to start", in that same order
@@ -1488,8 +1486,8 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 		return err
 	}
 	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart && service.GetScale() > 0 && !r.observedAnyContainer() {
-		// imperative parity (startService): the "no container to start" check
-		// is project-wide -- it receives the whole project's container list,
+		// the "no container to start" check
+		// is project-wide -- it looks at the whole project's container list,
 		// so a service without a container next to existing ones is a no-op
 		// and only a project with no container at all fails. Only reachable
 		// under scope Start, since CreateStart would have planned the
@@ -1519,7 +1517,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 		// no entry otherwise (ScopeStart, all running, no depends_on): the
 		// visit had no effect, so dependents have nothing to order after —
 		// a service_started condition on a running dependency is already
-		// satisfied, exactly like the imperative engine's empty visit
+		// satisfied, as after an empty visit
 		return nil
 	}
 
@@ -1538,7 +1536,7 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 	}
 
 	// pre_start runs once per service, only when no replica was running at
-	// observation — the imperative gating (initial up, force-recreate, or
+	// observation (initial up, force-recreate, or
 	// spec change), decided at plan time. Never against a stale relay left
 	// over from before the service's provider: declaration was removed
 	// (isReplicaRelay) -- it has no shell/process for the hook's VolumesFrom

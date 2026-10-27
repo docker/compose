@@ -33,13 +33,10 @@ func (s *composeService) Start(ctx context.Context, projectName string, options 
 	}, "start", s.events)
 }
 
-// start builds and executes a Start-only plan (epic #14081, lot 2): the
-// semantic switchover from InDependencyOrder's imperative traversal
-// (startService/waitDependencies) to the same reconciler/executor pair every
-// other lifecycle command already uses. ScopeStart's planStartPhase works
-// straight off the observed containers (see TestPlanStart_StartOnlyScope) --
-// it never converges anything, matching start()'s own historical contract of
-// starting what exists, never creating. The Start phase of an interactive up
+// start builds and executes a Start-only plan. ScopeStart's planStartPhase
+// works straight off the observed containers (see
+// TestPlanStart_StartOnlyScope) -- it never converges anything: start()
+// starts what exists, never creating. The Start phase of an interactive up
 // does not go through here: it runs from the up's own plan, and hands its
 // session's listener to runStart (see runInteractiveUp).
 func (s *composeService) start(ctx context.Context, projectName string, options api.StartOptions) error {
@@ -83,19 +80,14 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 	// Unlike upDetached/create, start() never calls emitRunningEvents: a
 	// no-op `compose start` (every container already running) must stay
-	// silent, matching the imperative engine's own contract (see the now
-	// deleted TestStartService_AlreadyRunningIsSilent) -- a Copilot review
-	// finding on the first version of this migration, which had copied
-	// upDetached's call without checking start()'s narrower UX contract.
-	// emitRunningEvents is create-oriented: it exists so `up`/`create`'s full
+	// silent. emitRunningEvents is create-oriented: it exists so `up`/`create`'s full
 	// project-status display accounts for containers the plan won't touch,
 	// a concern start() has never had.
 
-	// start()'s own dependency waits used to thread WaitTimeout through every
-	// wait unconditionally (InDependencyOrder → startService, regardless of
-	// options.Wait -- --wait-timeout alone, with no --wait, is a legal CLI
-	// combination nothing rejects). exec.waitTimeout reproduces that for the
-	// plan's own OpWaitCondition nodes, each with its own fresh window
+	// WaitTimeout bounds every dependency wait of start() unconditionally,
+	// regardless of options.Wait (--wait-timeout alone, with no --wait, is a
+	// legal CLI combination nothing rejects). exec.waitTimeout applies it to
+	// the plan's own OpWaitCondition nodes, each with its own fresh window
 	// starting when that wait begins -- see upDetached's identical reasoning.
 	exec := s.newPlanExecutor(project, observed)
 	exec.waitTimeout = options.WaitTimeout

@@ -38,12 +38,13 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// This file gathers the per-service container helpers shared by both
-// lifecycle engines: the plan-based reconciler (reconcile.go, entered through
-// create/up) and the imperative dependency-ordered engine (dependencies.go,
-// used by start/stop/restart/down). It covers container naming, resolution of
-// service references (volumes_from, network_mode/ipc/pid, links), dependency
-// waiting, container creation through the Docker API, and service startup.
+// This file gathers the per-service container helpers shared by the
+// plan-based engine (reconcile.go and the executor, entered through
+// create/up/start) and by the commands that still walk the dependency order
+// themselves (dependencies.go: restart, stop, down and the classic build). It
+// covers container naming, resolution of service references (volumes_from,
+// network_mode/ipc/pid, links), dependency waiting and container creation
+// through the Docker API.
 
 const (
 	doubledContainerNameWarning = "WARNING: The %q service is using the custom container name %q. " +
@@ -266,7 +267,7 @@ func (s *composeService) waitDependencyReached(ctx, origCtx context.Context, dep
 			// Every condition this switch doesn't handle explicitly ends up
 			// here: ServiceConditionStarted is filtered out before this
 			// function is ever called (shouldWaitForDependency — "already
-			// managed by InDependencyOrder"), so nothing reaching this
+			// ensured by the dependency order"), so nothing reaching this
 			// branch is ever a value this runtime actually understands.
 			// That covers a compose file with an unrecognized condition
 			// (rejected by schema.Validate before it can even get this far
@@ -371,16 +372,15 @@ func (s *composeService) checkDependencyCompleted(ctx context.Context, dep strin
 	return false, errors.New(msg)
 }
 
-// errNoContainerToStart is shared by the imperative engine (startService)
-// and the plan reconciler (planServiceStart) so the message cannot drift —
-// the plan's fidelity contract is word for word.
+// errNoContainerToStart is the failure of a service the start phase finds no
+// container to start for (see planServiceStart).
 func errNoContainerToStart(service string) error {
 	return fmt.Errorf("service %q has no container to start", service)
 }
 
 func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceDependency, project *types.Project) (bool, error) {
 	if dependencyConfig.Condition == types.ServiceConditionStarted {
-		// already managed by InDependencyOrder
+		// already ensured by the dependency order
 		return false, nil
 	}
 	if service, err := project.GetService(serviceName); err != nil {
@@ -444,7 +444,7 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 // engine allocates published ports from ranges non-atomically, and two
 // concurrent starts can be assigned the same port. Every code path calling
 // ContainerStart on a service container must hold it (the plan executor's
-// execStartContainer and the imperative startServiceContainer both do).
+// execStartContainer does, on both of its paths).
 //
 // It deliberately stays a package-level variable rather than a composeService
 // field: the race lives in the daemon, not in a service instance, so two

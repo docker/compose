@@ -147,9 +147,8 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) b
 // triggersWorking reports whether this node starting should fire the group's
 // Working event. A recreate group fires on its first node; a start group
 // fires specifically on OpStartContainer — pre_start hooks, when planned,
-// run silently before it, matching the imperative engine's startService,
-// which never surfaces a Starting event until the ContainerStart call itself
-// begins.
+// run silently before it: no Starting event is surfaced until the
+// ContainerStart call itself begins.
 func (gs *groupState) triggersWorking(t OperationType) bool {
 	if gs.kind == groupStart {
 		return t == OpStartContainer
