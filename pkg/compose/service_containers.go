@@ -452,8 +452,8 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 // with several random published ports, one on 0.0.0.0 and one on a specific
 // address, could be given the same host port twice. That flaw is fixed since
 // Engine 28.3.0 (moby/moby#50054). A lock around ContainerStart only orders
-// the starts, so it could not help against that flaw, and no other reason to
-// keep the mutex is known.
+// the starts, so it was unlikely to help against that flaw, and no other
+// reason to keep the mutex is known.
 //
 // It is not what starts the replicas of a service one after the other, which
 // docker/compose#8530 (a port range shared by the replicas) required and
@@ -461,8 +461,9 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 // (each replica's start waits for the previous one's), and does not depend on
 // this mutex.
 //
-// Only this path takes it: restart, run, the relay and the hook runners start
-// their containers without it.
+// Only the plan executor takes it (a relay restarted by a start plan
+// included): restart, run, the deployment of the relay and the hook runners
+// start their containers without it.
 //
 // TODO: remove startMx, and the locking around it, once Engine 28.x is out of
 // support.

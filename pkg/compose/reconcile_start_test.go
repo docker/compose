@@ -992,10 +992,9 @@ func TestPlanStart_OrdinaryPathBareStartsAStaleRelay(t *testing.T) {
 // test for the second Copilot review finding on #14296, the symmetric gap:
 // a service declared provider: whose observed container is NOT a relay (a
 // stale normal replica left over from before the service became
-// provider-backed) must still be started: an existing non-relay container of
-// a provider-backed service is started like any ordinary replica, post_start
-// hooks included, the bare-vs-enriched choice being made per container and
-// not from the service's declared type. planProviderRelayRestart's first version
+// provider-backed) must still be started like any ordinary replica,
+// post_start hooks included: bare-vs-enriched is decided per container, not
+// from the service's declared type. planProviderRelayRestart's first version
 // silently dropped this case (filtered on isRelayContainer), returning
 // success without starting anything.
 func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
@@ -1034,7 +1033,7 @@ func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
 		"a stale non-relay container must get an enriched start (injection applies), like any ordinary replica:\n%s", plan)
 	// A Copilot review finding on the post_start-only version of this fix:
 	// pre_start must also run for this path, gated on the lowest-numbered
-	// container to start and on isRelayContainer.
+	// container to start and on isReplicaRelay.
 	if pre == nil {
 		t.Fatalf("expected pre_start hooks to run before starting prov's stale non-relay container:\n%s", plan)
 	}
