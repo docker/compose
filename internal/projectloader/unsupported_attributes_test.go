@@ -656,7 +656,7 @@ func TestPresenceUnsupportedAttributes_AreKnownSchemaPaths(t *testing.T) {
 // the compose-spec schema declares it as a closed enum of the 3 values this
 // runtime understands, so an unrecognized value never reaches
 // valueConditionalAttributes — it fails to load at all. waitDependency's
-// own runtime fallback in service_containers.go covers the cases that
+// own runtime fallback in dependency_wait.go covers the cases that
 // bypass schema validation entirely (a project rebuilt from container
 // labels, or one written by a different Compose version).
 func TestDependsOnUnknownConditionIsRejectedBySchema(t *testing.T) {

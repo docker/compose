@@ -138,7 +138,7 @@ func isUnderAnyOf(path tree.Path, removed map[tree.Path]string) bool {
 // load — already rejects anything else. There is no unsupported value left
 // for a real compose file to reach this check with (see
 // TestDependsOnUnknownConditionIsRejectedBySchema). waitDependency's own
-// runtime fallback (service_containers.go) still needs to warn about an
+// runtime fallback (dependency_wait.go) still needs to warn about an
 // unrecognized condition, for the two situations that never go through
 // schema validation at all: a project rebuilt from container labels, or an
 // older/newer Compose version's output.
