@@ -244,7 +244,7 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: ServiceConditionRunningOrHealthy},
 			"redis": {Condition: ServiceConditionRunningOrHealthy},
 		}
-		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil))
 	})
 	t.Run("should skip zero-replica dependencies after service hashing", func(t *testing.T) {
 		replicas := 0
@@ -267,7 +267,7 @@ func TestWaitDependencies(t *testing.T) {
 		assert.NilError(t, err)
 
 		assert.NilError(t, tested.(*composeService).waitDependencies(
-			t.Context(), &project, "app", project.Services["app"].DependsOn, nil, 0,
+			t.Context(), &project, "app", project.Services["app"].DependsOn, nil,
 		))
 	})
 	t.Run("should skip dependencies with condition service_started", func(t *testing.T) {
@@ -281,7 +281,7 @@ func TestWaitDependencies(t *testing.T) {
 			"db":    {Condition: types.ServiceConditionStarted, Required: true},
 			"redis": {Condition: types.ServiceConditionStarted, Required: true},
 		}
-		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "", dependencies, nil))
 	})
 	t.Run("missing required dependency is an error", func(t *testing.T) {
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
@@ -290,7 +290,7 @@ func TestWaitDependencies(t *testing.T) {
 		dependencies := types.DependsOnConfig{
 			"db": {Condition: ServiceConditionRunningOrHealthy, Required: true},
 		}
-		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil, 0)
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil)
 		assert.Error(t, err, "app is missing dependency db")
 	})
 	t.Run("a dependency's pre_start hook runner does not count as the dependency being present", func(t *testing.T) {
@@ -308,7 +308,7 @@ func TestWaitDependencies(t *testing.T) {
 			Names:  []string{"/db-hook-runner"},
 			Labels: map[string]string{api.ServiceLabel: "db", api.HookLabel: "pre_start"},
 		}}
-		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0)
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers)
 		assert.Error(t, err, "app is missing dependency db")
 	})
 	t.Run("missing optional dependency is only a warning", func(t *testing.T) {
@@ -318,7 +318,7 @@ func TestWaitDependencies(t *testing.T) {
 		dependencies := types.DependsOnConfig{
 			"db": {Condition: ServiceConditionRunningOrHealthy, Required: false},
 		}
-		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, nil))
 	})
 	t.Run("failing optional dependency is skipped, not an error", func(t *testing.T) {
 		project := types.Project{Name: strings.ToLower(testProject), Services: types.Services{
@@ -341,7 +341,7 @@ func TestWaitDependencies(t *testing.T) {
 				State: &container.State{Status: container.StateExited, ExitCode: 1},
 			},
 		}, nil)
-		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers))
 	})
 	t.Run("dry-run completes service_completed_successfully immediately", func(t *testing.T) {
 		tested.(*composeService).dryRun = true
@@ -359,7 +359,7 @@ func TestWaitDependencies(t *testing.T) {
 		}}
 		// no ContainerInspect expectation: dry-run must not inspect a
 		// container that was never created.
-		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0))
+		assert.NilError(t, tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers))
 	})
 }
 
@@ -819,6 +819,26 @@ var startingDBInspect = client.ContainerInspectResult{
 	},
 }
 
+// waitWithOwnTimeout runs one depends_on wait the way the plan's
+// OpWaitCondition nodes do under --wait-timeout: bounded by a timeout of its
+// own (planExecutor.waitTimeout), the only way a wait gets one. A watchdog
+// ends a wait that would ignore that timeout.
+func waitWithOwnTimeout(t *testing.T, svc *composeService, project *types.Project, containers Containers, condition string, required bool, timeout time.Duration) error {
+	t.Helper()
+	exec := svc.newPlanExecutor(project, emptyObservedState(project.Name))
+	exec.containersByService["db"] = containers
+	exec.waitTimeout = timeout
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	return exec.execBoundedWaitCondition(ctx, Operation{
+		Type:       OpWaitCondition,
+		ResourceID: "wait:db:" + condition,
+		Name:       "db",
+		Condition:  condition,
+		BestEffort: !required,
+	})
+}
+
 // TestWaitDependencyDeadline locks the timeout semantics of the dependency
 // wait: an expired deadline surfaces as "timeout waiting for dependencies",
 // while a plain user cancellation is not a wait failure.
@@ -849,31 +869,39 @@ func TestWaitDependencyDeadline(t *testing.T) {
 	}
 
 	t.Run("expired deadline is an error", func(t *testing.T) {
-		// The deadline fires between two checks and must not be swallowed.
+		// The caller's deadline (--wait-timeout of up/start --wait) fires
+		// between two checks and must not be swallowed.
 		stillStarting()
-		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 50*time.Millisecond)
+		ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+		defer cancel()
+		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers)
 		assert.Error(t, err, "timeout waiting for dependencies")
 	})
 
-	// Regression guard: an optional dependency's deadline expiring (new as of
-	// planExecutor.waitTimeout giving execWaitCondition a real timeout for
-	// the first time -- see waitDependency's ctx.Done() branch) must be
-	// tolerated exactly like any other definitive failure of an optional
-	// dependency, not surfaced as "timeout waiting for dependencies".
-	t.Run("expired deadline on an optional dependency is skipped, not an error", func(t *testing.T) {
-		optionalDeps := types.DependsOnConfig{
-			"db": {Condition: types.ServiceConditionHealthy, Required: false},
-		}
+	t.Run("expired own timeout of a plan wait is an error", func(t *testing.T) {
+		// The same, for the timeout of the plan's own wait node.
 		stillStarting()
-		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", optionalDeps, containers, 50*time.Millisecond)
+		err := waitWithOwnTimeout(t, tested.(*composeService), &project, containers, types.ServiceConditionHealthy, true, 50*time.Millisecond)
+		assert.Assert(t, errors.Is(err, errWaitTimeout), "got %v", err)
+		assert.ErrorIs(t, err, context.DeadlineExceeded)
+	})
+
+	// Regression guard: an optional dependency's deadline expiring (the
+	// timeout of the plan's own wait node, planExecutor.waitTimeout -- see
+	// waitDependency's ctx.Done() branch) must be tolerated exactly like any
+	// other definitive failure of an optional dependency, not surfaced as
+	// "timeout waiting for dependencies".
+	t.Run("expired own timeout on an optional dependency is skipped, not an error", func(t *testing.T) {
+		stillStarting()
+		err := waitWithOwnTimeout(t, tested.(*composeService), &project, containers, types.ServiceConditionHealthy, false, 50*time.Millisecond)
 		assert.NilError(t, err)
 	})
 
 	// Regression guard: the tolerance above must apply only to a deadline
-	// THIS call's own timeout parameter is responsible for -- an unrelated,
-	// already-expired deadline the caller brought in (timeout == 0, so this
-	// call set no deadline of its own) is a different, real failure that
-	// must still propagate even for an optional dependency.
+	// THIS wait's own timeout is responsible for -- an unrelated,
+	// already-expired deadline the caller brought in (waitDependencies sets
+	// none of its own) is a different, real failure that must still
+	// propagate even for an optional dependency.
 	t.Run("an inherited parent deadline is not swallowed for an optional dependency", func(t *testing.T) {
 		optionalDeps := types.DependsOnConfig{
 			"db": {Condition: types.ServiceConditionHealthy, Required: false},
@@ -881,14 +909,14 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		parentCtx, cancel := context.WithTimeout(t.Context(), time.Millisecond)
 		defer cancel()
 		time.Sleep(10 * time.Millisecond) // let the parent's own deadline actually expire first
-		err := tested.(*composeService).waitDependencies(parentCtx, &project, "app", optionalDeps, containers, 0)
+		err := tested.(*composeService).waitDependencies(parentCtx, &project, "app", optionalDeps, containers)
 		assert.Error(t, err, "timeout waiting for dependencies")
 	})
 
 	t.Run("user cancellation is not a wait failure", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(t.Context())
 		cancel()
-		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers, 0)
+		err := tested.(*composeService).waitDependencies(ctx, &project, "app", dependencies, containers)
 		assert.NilError(t, err)
 	})
 
@@ -899,7 +927,7 @@ func TestWaitDependencyDeadline(t *testing.T) {
 		unsupportedDeps := types.DependsOnConfig{
 			"db": {Condition: "some_future_condition", Required: true},
 		}
-		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", unsupportedDeps, containers, 2*time.Second)
+		err := tested.(*composeService).waitDependencies(t.Context(), &project, "app", unsupportedDeps, containers)
 		assert.NilError(t, err)
 
 		var messages []string
@@ -968,7 +996,7 @@ func TestWaitDependencyFirstCheck(t *testing.T) {
 
 				dependencies := types.DependsOnConfig{"db": {Condition: condition, Required: true}}
 				start := time.Now()
-				err = tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers, 0)
+				err = tested.(*composeService).waitDependencies(t.Context(), &project, "app", dependencies, containers)
 				assert.NilError(t, err)
 				assert.Equal(t, time.Since(start), tc.wait)
 			})
@@ -1039,7 +1067,7 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 				tested, apiClient, events := newTested(t)
 				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
 					Return(client.ContainerInspectResult{}, errors.New("Error response from daemon: No such container: db-ctr"))
-				err := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, false), dbContainers, 0)
+				err := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, false), dbContainers)
 				assert.NilError(t, err)
 				assert.Assert(t, wasSkipped(events))
 			})
@@ -1049,7 +1077,7 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 				tested, apiClient, events := newTested(t)
 				apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).
 					Return(client.ContainerInspectResult{}, errors.New("Error response from daemon: No such container: db-ctr"))
-				err := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, true), dbContainers, 0)
+				err := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, true), dbContainers)
 				assert.ErrorContains(t, err, "No such container: db-ctr")
 				assert.Assert(t, !wasSkipped(events))
 			})
@@ -1066,7 +1094,7 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 					}).MinTimes(1) // a pending poll tick may win the select once more
 				// a plain cancellation is not a wait failure (see
 				// TestWaitDependencyDeadline), but it is no skip either
-				err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, false), dbContainers, 0)
+				err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, false), dbContainers)
 				assert.NilError(t, err)
 				assert.Assert(t, !wasSkipped(events))
 			})
@@ -1081,7 +1109,7 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 						cancel()
 						return client.ContainerInspectResult{}, fmt.Errorf("inspect db-ctr: %w", context.Canceled)
 					})
-				err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, true), dbContainers, 0)
+				err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, true), dbContainers)
 				assert.Assert(t, errors.Is(err, context.Canceled), "got %v", err)
 			})
 
@@ -1094,7 +1122,7 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 					// with the deadline
 					ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 					defer cancel()
-					err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, required), dbContainers, 0)
+					err := tested.waitDependencies(ctx, &project, "app", dependenciesOn(condition, required), dbContainers)
 					assert.Error(t, err, "timeout waiting for dependencies")
 					assert.Assert(t, !wasSkipped(events))
 				})
@@ -1109,16 +1137,21 @@ func TestOptionalDependencyInspectFailure(t *testing.T) {
 					t.Parallel()
 					tested, apiClient, _ := newTested(t)
 					inspectFailsWithContext(apiClient)
-					duringInspect := tested.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, time.Second)
+					duringInspect := waitWithOwnTimeout(t, tested, &project, dbContainers, condition, required, time.Second)
 
 					// no check in flight when the timeout expires: at most the one on entry
 					polled, polledClient, _ := newTested(t)
 					polledClient.EXPECT().ContainerInspect(gomock.Any(), "db-ctr", gomock.Any()).Return(startingDBInspect, nil).MaxTimes(1)
-					betweenPolls := polled.waitDependencies(t.Context(), &project, "app", dependenciesOn(condition, required), dbContainers, 50*time.Millisecond)
+					betweenPolls := waitWithOwnTimeout(t, polled, &project, dbContainers, condition, required, 50*time.Millisecond)
 
-					assert.Equal(t, fmt.Sprint(duringInspect), fmt.Sprint(betweenPolls))
+					// the same end, whatever the instant the timeout expired at
+					assert.Equal(t, duringInspect == nil, betweenPolls == nil)
+					assert.Equal(t, errors.Is(duringInspect, errWaitTimeout), errors.Is(betweenPolls, errWaitTimeout))
 					if required {
-						assert.Error(t, duringInspect, "timeout waiting for dependencies")
+						assert.Assert(t, errors.Is(duringInspect, errWaitTimeout), "got %v", duringInspect)
+						assert.ErrorIs(t, duringInspect, context.DeadlineExceeded)
+					} else {
+						assert.NilError(t, duringInspect)
 					}
 				})
 			}

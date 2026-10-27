@@ -55,7 +55,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		config := project.Services[service]
-		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers, 0)
+		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers)
 		if err != nil {
 			return err
 		}
