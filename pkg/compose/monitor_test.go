@@ -266,6 +266,14 @@ func monitorDieEvent(exitCode int) events.Message {
 // goroutine-leak guard and the standard initial ContainerList expectation.
 func newMonitorTestFixture(t *testing.T) (*monitor, *mocks.MockAPIClient) {
 	t.Helper()
+	return newMonitorTestFixtureListing(t, []container.Summary{testContainer("service1", "123", false)}, nil)
+}
+
+// newMonitorTestFixtureListing is newMonitorTestFixture for given containers
+// in the initial listing, whose request it records in listed when it is not
+// nil.
+func newMonitorTestFixtureListing(t *testing.T, initial []container.Summary, listed *client.ContainerListOptions) (*monitor, *mocks.MockAPIClient) {
+	t.Helper()
 	ignoreExisting := goleak.IgnoreCurrent()
 	t.Cleanup(func() {
 		goleak.VerifyNone(t, ignoreExisting)
@@ -276,7 +284,12 @@ func newMonitorTestFixture(t *testing.T) (*monitor, *mocks.MockAPIClient) {
 
 	expectNowAsDaemonTime(apiMock)
 	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{Items: []container.Summary{testContainer("service1", "123", false)}}, nil)
+		DoAndReturn(func(_ context.Context, opts client.ContainerListOptions) (client.ContainerListResult, error) {
+			if listed != nil {
+				*listed = opts
+			}
+			return client.ContainerListResult{Items: initial}, nil
+		})
 
 	m := newMonitor(apiMock, strings.ToLower(testProject))
 	return m, apiMock
@@ -952,4 +965,69 @@ func TestMonitorReadDaemonTimeOnce(t *testing.T) {
 	startWithin(t, m)
 
 	assert.DeepEqual(t, log.since, []string{"981153306.789012345"})
+}
+
+// TestMonitorFollowsTheContainersOfTheApplicationOnly pins which containers
+// the monitor follows: the project's containers that are not one-off, and, in
+// the initial listing, that carry a config hash, running or not. The hook
+// runners of pre_start carry none: a runner's exit is not the end of the
+// application.
+func TestMonitorFollowsTheContainersOfTheApplicationOnly(t *testing.T) {
+	var listed client.ContainerListOptions
+	m, apiMock := newMonitorTestFixtureListing(t, []container.Summary{testContainer("service1", "123", false)}, &listed)
+	var subscribed client.EventsListOptions
+	messages := make(chan events.Message, 1)
+	messages <- monitorEvent(events.ActionDestroy)
+	apiMock.EXPECT().Events(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.EventsListOptions) client.EventsResult {
+			subscribed = opts
+			return client.EventsResult{Messages: messages, Err: make(chan error)}
+		})
+
+	_, err := runMonitor(t, m)
+
+	assert.NilError(t, err)
+	project := labelFilter(api.ProjectLabel, strings.ToLower(testProject))
+	assert.Assert(t, listed.All, "stopped containers are part of the application")
+	labels := listed.Filters["label"]
+	assert.Assert(t, labels[project], "listing filters: %v", listed.Filters)
+	assert.Assert(t, labels[oneOffFilter(false)], "one-off containers are not part of the application: %v", listed.Filters)
+	assert.Assert(t, labels[api.ConfigHashLabel], "a container without a config hash (a hook runner) is not: %v", listed.Filters)
+	labels = subscribed.Filters["label"]
+	assert.Assert(t, subscribed.Filters["type"]["container"], "events filters: %v", subscribed.Filters)
+	assert.Assert(t, labels[project], "events filters: %v", subscribed.Filters)
+	assert.Assert(t, labels[oneOffFilter(false)], "the events of one-off containers are not wanted: %v", subscribed.Filters)
+}
+
+// TestMonitorDoesNotWaitForARelay pins that the relay container a provider
+// service may leave in the project -- it never terminates on its own -- is not
+// part of the application the monitor follows, whether it is there at the
+// start or created later: the monitor ends with the application's own
+// containers, instead of waiting forever for the relay.
+func TestMonitorDoesNotWaitForARelay(t *testing.T) {
+	relayLabels := func() map[string]string {
+		labels := containerLabels("provider", false)
+		labels[api.RelayLabel] = "relay-identity"
+		return labels
+	}
+
+	t.Run("already there at the start", func(t *testing.T) {
+		relay := container.Summary{ID: "relay", Labels: relayLabels()}
+		m, apiMock := newMonitorTestFixtureListing(t, []container.Summary{testContainer("service1", "123", false), relay}, nil)
+		expectEvents(apiMock, monitorEvent(events.ActionDestroy))
+
+		_, err := runMonitor(t, m)
+
+		assert.NilError(t, err)
+	})
+
+	t.Run("created while the application runs", func(t *testing.T) {
+		m, apiMock := newMonitorTestFixture(t)
+		relayCreated := containerMessage(events.ActionCreate, "relay", "testproject-provider-1", "provider", map[string]string{api.RelayLabel: "relay-identity"})
+		expectEvents(apiMock, relayCreated, monitorEvent(events.ActionDestroy))
+
+		_, err := runMonitor(t, m)
+
+		assert.NilError(t, err)
+	})
 }
