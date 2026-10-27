@@ -794,3 +794,235 @@ func TestCheckDependencyDoneContext(t *testing.T) {
 		assert.Assert(t, !done)
 	})
 }
+
+// TestShouldWaitForDependency pins which depends_on entries are worth a wait,
+// the gate the plan's wait nodes and the waits outside a plan (restart, run,
+// --wait) share: only a condition other than service_started, on a declared
+// service that really runs containers of its own.
+func TestShouldWaitForDependency(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db":       {Name: "db"},
+			"idle":     {Name: "idle", Scale: intPtr(0)},
+			"provider": {Name: "provider", Provider: &types.ServiceProviderConfig{Type: "test"}},
+		},
+		DisabledServices: types.Services{"cache": {Name: "cache"}},
+	}
+	healthy := types.ServiceDependency{Condition: types.ServiceConditionHealthy, Required: true}
+
+	tests := []struct {
+		name       string
+		dependency string
+		config     types.ServiceDependency
+		wait       bool
+		err        string
+	}{
+		{name: "a started condition is the dependency order itself", dependency: "db", config: types.ServiceDependency{Condition: types.ServiceConditionStarted, Required: true}},
+		{name: "a healthy dependency is waited for", dependency: "db", config: healthy, wait: true},
+		{name: "a service completing is waited for", dependency: "db", config: types.ServiceDependency{Condition: types.ServiceConditionCompletedSuccessfully, Required: true}, wait: true},
+		{name: "a dependency with no container (scale 0) is not", dependency: "idle", config: healthy},
+		{name: "a provider service is not", dependency: "provider", config: healthy},
+		{name: "a disabled service (--no-deps) is not", dependency: "cache", config: healthy},
+		{name: "an undeclared service is an error", dependency: "ghost", config: healthy, err: "ghost"},
+		{name: "an undeclared service with a started condition is not even looked up", dependency: "ghost", config: types.ServiceDependency{Condition: types.ServiceConditionStarted}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			wait, err := shouldWaitForDependency(tt.dependency, tt.config, project)
+			if tt.err != "" {
+				assert.ErrorContains(t, err, tt.err)
+				return
+			}
+			assert.NilError(t, err)
+			assert.Equal(t, wait, tt.wait)
+		})
+	}
+}
+
+func inspectOf(status container.ContainerState, health *container.Health, healthcheck *container.HealthConfig, exitCode int) client.ContainerInspectResult {
+	return client.ContainerInspectResult{Container: container.InspectResponse{
+		ID:     "db-id",
+		Name:   "/test-db-1",
+		Config: &container.Config{Healthcheck: healthcheck},
+		State:  &container.State{Status: status, Health: health, ExitCode: exitCode},
+	}}
+}
+
+// TestIsServiceHealthyStatuses pins how each state of a container with a
+// healthcheck reads for service_healthy: healthy is the only way to satisfy
+// the condition, starting means keep polling, and anything else -- exited,
+// unhealthy, no health state at all, a status the daemon should not report --
+// is a definitive failure naming the container.
+func TestIsServiceHealthyStatuses(t *testing.T) {
+	check := &container.HealthConfig{Test: []string{"CMD", "true"}}
+	tests := []struct {
+		name    string
+		inspect client.ContainerInspectResult
+		healthy bool
+		err     string
+	}{
+		{name: "healthy", inspect: inspectOf(container.StateRunning, &container.Health{Status: container.Healthy}, check, 0), healthy: true},
+		{name: "still starting", inspect: inspectOf(container.StateRunning, &container.Health{Status: container.Starting}, check, 0)},
+		{name: "unhealthy", inspect: inspectOf(container.StateRunning, &container.Health{Status: container.Unhealthy}, check, 0), err: "container test-db-1 is unhealthy"},
+		{name: "exited", inspect: inspectOf(container.StateExited, nil, check, 3), err: "container test-db-1 exited (3)"},
+		{name: "no health state", inspect: inspectOf(container.StateRunning, nil, check, 0), err: "container test-db-1 has no healthcheck configured"},
+		{name: "unexpected status", inspect: inspectOf(container.StateRunning, &container.Health{Status: "weird"}, check, 0), err: `container test-db-1 had unexpected health status "weird"`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient, _ := newStartPhaseTestService(t)
+			apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(tt.inspect, nil)
+
+			healthy, err := svc.isServiceHealthy(t.Context(), Containers{{ID: "db-id"}}, false)
+
+			if tt.err != "" {
+				assert.ErrorContains(t, err, tt.err)
+			} else {
+				assert.NilError(t, err)
+			}
+			assert.Equal(t, healthy, tt.healthy)
+		})
+	}
+
+	t.Run("every container of the service has to be healthy", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectOf(container.StateRunning, &container.Health{Status: container.Healthy}, check, 0), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectOf(container.StateRunning, &container.Health{Status: container.Starting}, check, 0), nil)
+
+		healthy, err := svc.isServiceHealthy(t.Context(), Containers{{ID: "db-1"}, {ID: "db-2"}}, false)
+		assert.NilError(t, err)
+		assert.Assert(t, !healthy)
+	})
+}
+
+// TestCheckDependencyCompleted pins service_completed_successfully: a
+// dependency that exited with 0 satisfies it, one still running does not yet,
+// one that exited with another code fails a required dependency -- naming the
+// service and the code, and marking its rows in error -- and is skipped, with a warning,
+// when the dependency is optional.
+func TestCheckDependencyCompleted(t *testing.T) {
+	waitingFor := Containers{{ID: "db-id", Names: []string{"/test-db-1"}, Labels: map[string]string{api.ServiceLabel: "db"}}}
+	const row = "Container test-db-1"
+
+	tests := []struct {
+		name     string
+		inspect  client.ContainerInspectResult
+		required bool
+		done     bool
+		err      string
+		events   []string
+	}{
+		{
+			name: "exited with 0", inspect: inspectOf(container.StateExited, nil, nil, 0), required: true,
+			done: true, events: []string{api.StatusExited},
+		},
+		{
+			name: "still running", inspect: inspectOf(container.StateRunning, nil, nil, 0), required: true,
+		},
+		{
+			name: "required, exited with an error code", inspect: inspectOf(container.StateExited, nil, nil, 3), required: true,
+			err:    `service "db" didn't complete successfully: exit 3`,
+			events: []string{api.StatusError},
+		},
+		{
+			name: "optional, exited with an error code", inspect: inspectOf(container.StateExited, nil, nil, 3),
+			done:   true,
+			events: []string{`Skipped: optional dependency "db" didn't complete successfully: exit 3`},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient, recorder := newStartPhaseTestService(t)
+			apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Return(tt.inspect, nil)
+
+			done, err := svc.checkDependencyCompleted(t.Context(), "db", types.ServiceDependency{Required: tt.required}, waitingFor)
+
+			if tt.err != "" {
+				assert.ErrorContains(t, err, tt.err)
+			} else {
+				assert.NilError(t, err)
+			}
+			assert.Equal(t, done, tt.done)
+			assert.DeepEqual(t, recorder.byID[row], tt.events)
+		})
+	}
+
+	t.Run("a dry run never sees a dependency exit: it is taken as completed", func(t *testing.T) {
+		svc, _, _ := newStartPhaseTestService(t)
+		svc.dryRun = true
+
+		done, err := svc.checkDependencyCompleted(t.Context(), "db", types.ServiceDependency{Required: true}, waitingFor)
+		assert.NilError(t, err)
+		assert.Assert(t, done)
+	})
+}
+
+// TestWaitDependenciesReportsTheWait pins what a wait outside a plan (restart,
+// run, the --wait verification) shows of a dependency's containers: Waiting
+// first, then Healthy once the condition holds -- the progression a plan's wait
+// node gives the same rows -- and only the dependency's own containers, never
+// a one-off or a hook runner of the service.
+func TestWaitDependenciesReportsTheWait(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+	project := &types.Project{Name: "test", Services: types.Services{"db": {Name: "db"}}}
+	labels := func(oneOff string) map[string]string {
+		return map[string]string{api.ServiceLabel: "db", api.OneoffLabel: oneOff}
+	}
+	containers := Containers{
+		{ID: "db-id", Names: []string{"/test-db-1"}, Labels: labels("False")},
+		{ID: "run-id", Names: []string{"/test-db-run-1"}, Labels: labels("True")},
+	}
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
+		Return(inspectOf(container.StateRunning, &container.Health{Status: container.Healthy}, &container.HealthConfig{Test: []string{"CMD", "true"}}, 0), nil)
+
+	dependencies := types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}}
+	assert.NilError(t, svc.waitDependencies(t.Context(), project, "web", dependencies, containers))
+
+	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting, api.StatusHealthy})
+	assert.Equal(t, len(recorder.byID["Container test-db-run-1"]), 0, "a one-off container is not waited for")
+}
+
+// TestWaitDependencyEndOfContextWinsOverATick pins that a wait whose context
+// ended is never run through one more check because a tick happened to be
+// ready as well: select picks at random between the two, so the wait looks at
+// its context after it, and the end of the context wins. Here a check is in
+// flight while the context ends and a tick is pending; the scenario is run
+// repeatedly, as a wait that let the tick win would only miss it one time in
+// two. The one check allowed is the first, on entry.
+func TestWaitDependencyEndOfContextWinsOverATick(t *testing.T) {
+	waitingFor := Containers{{ID: "db-id", Names: []string{"/test-db-1"}, Labels: map[string]string{api.ServiceLabel: "db"}}}
+	dependency := types.ServiceDependency{Condition: types.ServiceConditionHealthy, Required: true}
+
+	for range 40 {
+		synctest.Test(t, func(t *testing.T) {
+			svc, apiClient, _ := newStartPhaseTestService(t)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			entered, release := make(chan struct{}), make(chan struct{})
+			apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).Times(1).
+				DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+					close(entered)
+					<-release
+					return inspectOf(container.StateRunning, &container.Health{Status: container.Starting}, &container.HealthConfig{Test: []string{"CMD", "true"}}, 0), nil
+				})
+			result := make(chan error, 1)
+			go func() {
+				reached, err := svc.waitDependencyReached(ctx, ctx, "web", "db", dependency, waitingFor)
+				if err == nil && reached {
+					err = errors.New("the wait reported the dependency as reached")
+				}
+				result <- err
+			}()
+
+			<-entered
+			time.Sleep(time.Second) // the ticker fires while the check is in flight
+			cancel()
+			close(release)
+
+			assert.NilError(t, <-result)
+		})
+	}
+}
