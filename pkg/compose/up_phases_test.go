@@ -295,7 +295,9 @@ func (d *interactiveUpDaemon) containerStart(t *testing.T, labels map[string]str
 		}
 	}
 	d.record("start")
-	defer d.startedOnce.Do(func() { close(d.started) })
+	// before the start event: whoever reacts to it (the session stopping a
+	// late starter) finds the container started
+	d.startedOnce.Do(func() { close(d.started) })
 	d.eventLog.emit(containerMessage(events.ActionStart, "c1", "test-web-1", "web", labels))
 	if d.neverExits {
 		return nil
@@ -726,6 +728,10 @@ func TestUpInteractiveShowsTheHookLogsInTheSession(t *testing.T) {
 	ctr := webContainerSummary()
 
 	serverConn, clientConn := net.Pipe()
+	t.Cleanup(func() {
+		serverConn.Close() //nolint:errcheck
+		clientConn.Close() //nolint:errcheck
+	})
 	go func() {
 		if err := writeStdcopyFrame(serverConn, 1, "hook says hello\n"); err != nil {
 			t.Error(err)
