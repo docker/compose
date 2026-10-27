@@ -732,10 +732,11 @@ func TestUpInteractiveShowsTheHookLogsInTheSession(t *testing.T) {
 		serverConn.Close() //nolint:errcheck
 		clientConn.Close() //nolint:errcheck
 	})
+	// The write error is handed back to the test goroutine: reporting it from
+	// here could hit a test that has already finished.
+	writeErr := make(chan error, 1)
 	go func() {
-		if err := writeStdcopyFrame(serverConn, 1, "hook says hello\n"); err != nil {
-			t.Error(err)
-		}
+		writeErr <- writeStdcopyFrame(serverConn, 1, "hook says hello\n")
 		serverConn.Close() //nolint:errcheck
 	}()
 	h.api.EXPECT().ExecCreate(gomock.Any(), "c1", gomock.Any()).Return(client.ExecCreateResult{ID: "exec1"}, nil)
@@ -763,6 +764,7 @@ func TestUpInteractiveShowsTheHookLogsInTheSession(t *testing.T) {
 	case <-time.After(10 * time.Second):
 		t.Fatalf("the session did not return; calls so far: %v", h.daemon.recorded())
 	}
+	assert.NilError(t, <-writeErr)
 
 	var logged []string
 	for _, lines := range consumer.logs {
