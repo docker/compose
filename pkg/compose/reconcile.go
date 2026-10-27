@@ -961,8 +961,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 // here; it never creates one itself.
 //
 // Purges are best-effort (a failed removal only warns) but the creates depend
-// on them: runner names are deterministic,
-// so a genuinely stuck old runner surfaces as a name conflict on the create.
+// on them: runner names are deterministic, so a genuinely stuck old runner
+// surfaces as a name conflict on the create.
 // The creates also depend on every replica node and on the infrastructure, so
 // the executor resolves the target replica (VolumesFrom) against a final live
 // view with networks in place. When a running replica survives the plan, the
@@ -1385,8 +1385,8 @@ func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, 
 
 // planProviderStart is the start-phase visit of a provider service: no
 // container to start, but its own depends_on still applies, as for every
-// service, providers included. Its chain
-// end is its create-phase RunProvider node (the deployment itself), plus
+// service, providers included. Its chain end is its create-phase
+// RunProvider node (the deployment itself), plus
 // those dependency prerequisites when it has any -- a consumer must wait for
 // both: the provider's own dependencies satisfied AND the provider actually
 // deployed, not either in isolation. Before this ordering was corrected, a
@@ -1465,8 +1465,8 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 	if service.Provider != nil {
 		return r.planProviderStart(service)
 	}
-	// deploy.replicas: 0 is an unconditional
-	// no-op, but a service with scale: 0 is still visited -- its depends_on
+	// deploy.replicas: 0 is an unconditional no-op, but a service with
+	// scale: 0 is still visited -- its depends_on
 	// conditions are evaluated and its dependents ordered after them -- and
 	// whatever replicas it already owns are started (scope Start only: the
 	// create phase removes them all under CreateStart). It is just never an
@@ -1477,17 +1477,17 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 
 	replicas, anyRunning := r.startPhaseReplicas(service)
 	// dependency conditions are evaluated even when nothing has to start:
-	// every visited service evaluates its dependencies
-	// BEFORE looking at what to start, so an up with everything running
-	// still fails on an unhealthy required dependency — and a dependency
+	// every visited service evaluates its dependencies (the plan's wait
+	// nodes) BEFORE looking at what to start, so an up with everything
+	// running still fails on an unhealthy required dependency — and a dependency
 	// error wins over "no container to start", in that same order
 	depNodes, err := r.startPhaseDependencies(service)
 	if err != nil {
 		return err
 	}
 	if len(replicas) == 0 && !anyRunning && r.options.Scope == ScopeStart && service.GetScale() > 0 && !r.observedAnyContainer() {
-		// the "no container to start" check
-		// is project-wide -- it looks at the whole project's container list,
+		// the "no container to start" check is project-wide -- it looks at
+		// the whole project's container list,
 		// so a service without a container next to existing ones is a no-op
 		// and only a project with no container at all fails. Only reachable
 		// under scope Start, since CreateStart would have planned the
@@ -1517,7 +1517,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 		// no entry otherwise (ScopeStart, all running, no depends_on): the
 		// visit had no effect, so dependents have nothing to order after —
 		// a service_started condition on a running dependency is already
-		// satisfied, as after an empty visit
+		// satisfied, as when nothing needs starting
 		return nil
 	}
 

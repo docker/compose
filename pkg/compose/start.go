@@ -80,7 +80,8 @@ func (s *composeService) start(ctx context.Context, projectName string, options 
 
 	// Unlike upDetached/create, start() never calls emitRunningEvents: a
 	// no-op `compose start` (every container already running) must stay
-	// silent. emitRunningEvents is create-oriented: it exists so `up`/`create`'s full
+	// silent. emitRunningEvents is create-oriented: it exists so
+	// `up`/`create`'s full
 	// project-status display accounts for containers the plan won't touch,
 	// a concern start() has never had.
 
