@@ -215,8 +215,8 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	// phase's own RunPreStart never reads observed.HookContainers, it
 	// executes a runner the create phase already prepared or fails outright
 	// if none exists. Skipping this for ScopeStart matches the
-	// network/volume guard below: one more unconditional daemon call the old
-	// imperative engine never made, which could otherwise fail a no-op
+	// network/volume guard below: one more unconditional daemon call a start
+	// never made, which could otherwise fail a no-op
 	// `compose start` on a service with pre_start hooks declared (second
 	// Copilot review finding in the same vein as the first).
 	if scope.plansCreatePhase() {
@@ -265,8 +265,8 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	// reconcileNetworks/reconcileVolumes, which ScopeStart never runs, do).
 	// Skipping these calls for ScopeStart isn't just an optimization -- a
 	// Copilot review finding on #14296 noted that querying them unconditionally
-	// gives `compose start` new daemon dependencies the old imperative engine
-	// never had (only ever called getContainers): an authorization plugin
+	// gives `compose start` new daemon dependencies it never had (it only ever
+	// called getContainers): an authorization plugin
 	// permitting container list/start but denying network or volume listing
 	// would now make `compose start` fail before starting anything.
 	if scope.plansCreatePhase() {

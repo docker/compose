@@ -113,18 +113,15 @@ func (s *composeService) prepareUp(ctx context.Context, project *types.Project, 
 
 	// The plan's own OpWaitCondition nodes (service_healthy /
 	// service_completed_successfully dependency waits) block with no timeout
-	// of their own -- unlike start()'s per-dependency waitDependencies call,
-	// which already threads WaitTimeout through every wait unconditionally
-	// (InDependencyOrder passes it to startService regardless of
-	// options.Wait -- --wait-timeout alone, with no --wait, is a legal CLI
-	// combination nothing rejects). exec.waitTimeout bounds exactly those
-	// nodes (see executeNode), each with its OWN fresh window starting when
-	// that wait begins -- not a single shared budget counted down from
+	// of their own: WaitTimeout bounds every dependency wait unconditionally,
+	// regardless of options.Wait (--wait-timeout alone, with no --wait, is a
+	// legal CLI combination nothing rejects). exec.waitTimeout bounds exactly
+	// those nodes (see executeNode), each with its OWN fresh window starting
+	// when that wait begins -- not a single shared budget counted down from
 	// before the plan even started. Sharing one absolute deadline across
 	// create/start/hook work and every wait would let slow, unrelated work
 	// alone exhaust it, failing an otherwise healthy deployment as "not
-	// healthy" with no wait ever actually timing out -- start()'s real,
-	// per-wait-independent behavior never had that failure mode.
+	// healthy" with no wait ever actually timing out.
 	exec := s.newPlanExecutor(project, observed)
 	exec.waitTimeout = options.Start.WaitTimeout
 	return project, exec, plan, nil

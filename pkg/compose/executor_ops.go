@@ -133,7 +133,7 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 // today only the create phase's exceptional-state restart of a paused/dead
 // container) is a plain ContainerStart. A start-phase operation (Service set)
 // performs the full service start — secret/config injection right before
-// ContainerStart — mirroring startServiceContainer; its target resolves
+// ContainerStart; its target resolves
 // either from the observed container or, for a replica the plan itself
 // creates, from the CreateContainer node's result (the same mechanism
 // OpRenameContainer already uses).
@@ -213,9 +213,9 @@ func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summa
 // execWaitCondition polls the dependency service named by the operation
 // until it satisfies the declared depends_on condition or the context ends —
 // the plan-side equivalent of one waitDependencies edge, reusing the exact
-// same polling primitive (waitDependency) and per-condition checks the
-// imperative engine uses, so events and error messages cannot drift between
-// the two. required: false dependencies are marked BestEffort by the
+// same polling primitive (waitDependency) and per-condition checks as
+// waitDependencies, so events and error messages cannot drift between the
+// two. required: false dependencies are marked BestEffort by the
 // reconciler: a missing dependency or a failed/timed-out condition is then a
 // warning, not a plan failure — matching waitDependencies' own
 // optional-dependency handling.

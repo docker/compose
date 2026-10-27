@@ -39,8 +39,7 @@ type planExecutor struct {
 	project *types.Project
 	pctx    *reconciliationContext
 
-	// listener streams pre_start/post_start hook logs, exactly like the
-	// imperative start path. It is set once, when the Start phase is entered
+	// listener streams pre_start/post_start hook logs. It is set once, when the Start phase is entered
 	// (planRun.runStart): an attached caller only has one by then, its printer
 	// not existing before the Create phase is done. nil leaves hook execution
 	// silent, matching detached behavior.
@@ -379,8 +378,9 @@ func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *gr
 // latter needs a dependency that is already running, hence with no start
 // node for the wait to depend on, whose health relies on a sibling the plan
 // has yet to start: with a bounded --parallel the wait could take the slot
-// that sibling's start needs and only end at its timeout. The imperative
-// waitDependencies stays outside the cap for the same reason.
+// that sibling's start needs and only end at its timeout. The waits
+// waitDependencies runs outside any plan stay outside the cap for the same
+// reason.
 func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *PlanNode) (func(), error) {
 	if node.Operation.Type == OpWaitCondition {
 		return func() {}, nil
@@ -550,8 +550,8 @@ func (e *waitInterrupted) Error() string { return "wait interrupted" }
 
 // translateWaitTimeout turns a plan failure caused by a wait node's own
 // --wait-timeout window (see errWaitTimeout) into the "timeout waiting for
-// dependencies" message the imperative start path always reported for a
-// depends_on wait timing out, with or without --wait, and leaves any other
+// dependencies" message a depends_on wait timing out has always reported,
+// with or without --wait, and leaves any other
 // error as is. It is deliberately not the "application not healthy" message:
 // that one belongs to the final --wait readiness check that runs after the
 // plan, which has its own translation.
