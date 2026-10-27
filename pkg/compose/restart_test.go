@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -209,4 +210,68 @@ func TestRestart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
 	err := svc.restart(t.Context(), "prj", api.RestartOptions{Project: project})
 	assert.NilError(t, err)
 	assert.Equal(t, tracker.Peak(), 1, "restart must never run more than maxConcurrency ContainerRestart calls at once")
+}
+
+// TestRestart_WaitsForADependencyBeforeRestartingItsDependent pins the order
+// restart gives a depends_on relation declaring restart:true: the dependency
+// is restarted first, and its dependent waits for the condition to hold again
+// -- here healthy -- before being restarted itself.
+func TestRestart_WaitsForADependencyBeforeRestartingItsDependent(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	db := types.ServiceConfig{Name: "db"}
+	web := types.ServiceConfig{Name: "web"}
+	web.DependsOn = types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Restart: true, Required: true}}
+	project := &types.Project{Name: "prj", Services: types.Services{"db": db, "web": web}}
+	dbCtr := stoppedServiceContainer("db", 1, container.StateRunning)
+	webCtr := stoppedServiceContainer("web", 1, container.StateRunning)
+
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{dbCtr, webCtr}}, nil)
+	dbRestart := apiClient.EXPECT().ContainerRestart(gomock.Any(), dbCtr.ID, gomock.Any()).
+		Return(client.ContainerRestartResult{}, nil)
+	dbHealthy := apiClient.EXPECT().ContainerInspect(gomock.Any(), dbCtr.ID, gomock.Any()).
+		Return(inspectResultOf(dbCtr.ID, "prj-db-1", container.StateRunning, 0, &container.Health{Status: container.Healthy}), nil).
+		After(dbRestart)
+	apiClient.EXPECT().ContainerRestart(gomock.Any(), webCtr.ID, gomock.Any()).
+		Return(client.ContainerRestartResult{}, nil).After(dbHealthy)
+
+	err := svc.restart(t.Context(), "prj", api.RestartOptions{Project: project})
+
+	assert.NilError(t, err)
+}
+
+// TestRestartContainer_PassesTheTimeoutInWholeSeconds pins how the timeout
+// given to restart reaches the daemon: in whole seconds, the unit the engine's
+// API knows, and not at all when none was given, so that the container's own
+// stop timeout applies.
+func TestRestartContainer_PassesTheTimeoutInWholeSeconds(t *testing.T) {
+	seconds := func(d time.Duration) *time.Duration { return &d }
+	tests := []struct {
+		name    string
+		timeout *time.Duration
+		want    *int
+	}{
+		{name: "none given", timeout: nil, want: nil},
+		{name: "whole seconds", timeout: seconds(5 * time.Second), want: intPtr(5)},
+		{name: "zero is a timeout too", timeout: seconds(0), want: intPtr(0)},
+		{name: "a fraction of a second is dropped", timeout: seconds(2500 * time.Millisecond), want: intPtr(2)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient, _ := newStartTestService(t)
+			ctr := serviceContainer("web")
+			var got client.ContainerRestartOptions
+			apiClient.EXPECT().ContainerRestart(gomock.Any(), ctr.ID, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, opts client.ContainerRestartOptions) (client.ContainerRestartResult, error) {
+					got = opts
+					return client.ContainerRestartResult{}, nil
+				})
+
+			err := svc.restartContainer(t.Context(), types.ServiceConfig{Name: "web"}, ctr, api.RestartOptions{Timeout: tt.timeout})
+
+			assert.NilError(t, err)
+			assert.DeepEqual(t, got.Timeout, tt.want)
+		})
+	}
 }
