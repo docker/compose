@@ -29,6 +29,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -1551,61 +1552,76 @@ func TestGroupTrackerOnNodeAborted(t *testing.T) {
 // (Ctrl-C) gets as it was: the plan ends, and no row is rewritten as the
 // victim of a failure there was none of.
 func TestExecutePlanCanceledCallerReportsNothingMore(t *testing.T) {
-	svc, apiClient, recorder := newStartPhaseTestService(t)
+	synctest.Test(t, func(t *testing.T) {
+		svc, apiClient, recorder := newStartPhaseTestService(t)
 
-	project := &types.Project{Name: "test", Services: types.Services{"db": {Name: "db"}, "api": {Name: "api"}}}
-	dbSummary := container.Summary{
-		ID:     "db-id",
-		Names:  []string{"/test-db-1"},
-		Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
-	}
-	apiSummary := container.Summary{
-		ID:     "api-id",
-		Names:  []string{"/test-api-1"},
-		Labels: map[string]string{api.ServiceLabel: "api", api.OneoffLabel: "False"},
-	}
-	ctx, cancel := context.WithCancel(t.Context())
-	defer cancel()
-	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
-			cancel()
-			return client.ContainerInspectResult{Container: container.InspectResponse{
-				ID:   "db-id",
-				Name: "/test-db-1",
-				State: &container.State{
-					Status: container.StateRunning,
-					Health: &container.Health{Status: container.Starting},
-				},
-				Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
-			}}, nil
-		}).AnyTimes()
+		project := &types.Project{Name: "test", Services: types.Services{"db": {Name: "db"}, "api": {Name: "api"}}}
+		dbSummary := container.Summary{
+			ID:     "db-id",
+			Names:  []string{"/test-db-1"},
+			Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False"},
+		}
+		apiSummary := container.Summary{
+			ID:     "api-id",
+			Names:  []string{"/test-api-1"},
+			Labels: map[string]string{api.ServiceLabel: "api", api.OneoffLabel: "False"},
+		}
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+		release := make(chan struct{})
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
+			DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+				<-release
+				return client.ContainerInspectResult{Container: container.InspectResponse{
+					ID:   "db-id",
+					Name: "/test-db-1",
+					State: &container.State{
+						Status: container.StateRunning,
+						Health: &container.Health{Status: container.Starting},
+					},
+					Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+				}}, nil
+			}).AnyTimes()
 
-	apiSvc := project.Services["api"]
-	plan := &Plan{}
-	wait := plan.addNode(Operation{
-		Type:       OpWaitCondition,
-		ResourceID: "wait:db:service_healthy",
-		Name:       "db",
-		Condition:  types.ServiceConditionHealthy,
-	}, "")
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
-		ResourceID: "service:api:1",
-		Service:    &apiSvc,
-		Container:  &apiSummary,
-	}, "start:api:1", wait)
-	for _, n := range plan.Nodes {
-		n.Phase = PhaseStart
-	}
+		apiSvc := project.Services["api"]
+		plan := &Plan{}
+		wait := plan.addNode(Operation{
+			Type:       OpWaitCondition,
+			ResourceID: "wait:db:service_healthy",
+			Name:       "db",
+			Condition:  types.ServiceConditionHealthy,
+		}, "")
+		plan.addNode(Operation{
+			Type:       OpStartContainer,
+			ResourceID: "service:api:1",
+			Service:    &apiSvc,
+			Container:  &apiSummary,
+		}, "start:api:1", wait)
+		for _, n := range plan.Nodes {
+			n.Phase = PhaseStart
+		}
 
-	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
-	exec.containersByService["db"] = Containers{dbSummary}
-	_ = exec.run(ctx, plan)
+		exec := svc.newPlanExecutor(project, emptyObservedState("test"))
+		exec.containersByService["db"] = Containers{dbSummary}
+		ran := make(chan struct{})
+		go func() {
+			defer close(ran)
+			_ = exec.run(ctx, plan)
+		}()
 
-	recorder.mu.Lock()
-	defer recorder.mu.Unlock()
-	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting})
-	assert.Equal(t, len(recorder.byID["Container test-api-1"]), 0, "api: %v", recorder.byID["Container test-api-1"])
+		// the inspection is in flight and api waits on its dependency: cancel
+		// then, and let api see it before the inspection ends
+		synctest.Wait()
+		cancel()
+		synctest.Wait()
+		close(release)
+		<-ran
+
+		recorder.mu.Lock()
+		defer recorder.mu.Unlock()
+		assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting})
+		assert.Equal(t, len(recorder.byID["Container test-api-1"]), 0, "api: %v", recorder.byID["Container test-api-1"])
+	})
 }
 
 // TestExecutePlanStartFailureClosesAnInterruptedInspection is the same start
