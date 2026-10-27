@@ -39,10 +39,10 @@ type planExecutor struct {
 	project *types.Project
 	pctx    *reconciliationContext
 
-	// listener streams pre_start/post_start hook logs. It is set once, when the Start phase is entered
-	// (planRun.runStart): an attached caller only has one by then, its printer
-	// not existing before the Create phase is done. nil leaves hook execution
-	// silent, matching detached behavior.
+	// listener streams pre_start/post_start hook logs. It is set once, when
+	// the Start phase is entered (planRun.runStart): an attached caller only
+	// has one by then, its printer not existing before the Create phase is
+	// done. nil leaves hook execution silent, matching detached behavior.
 	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
@@ -551,8 +551,8 @@ func (e *waitInterrupted) Error() string { return "wait interrupted" }
 // translateWaitTimeout turns a plan failure caused by a wait node's own
 // --wait-timeout window (see errWaitTimeout) into the "timeout waiting for
 // dependencies" message a depends_on wait timing out has always reported,
-// with or without --wait, and leaves any other
-// error as is. It is deliberately not the "application not healthy" message:
+// with or without --wait, and leaves any other error as is. It is
+// deliberately not the "application not healthy" message:
 // that one belongs to the final --wait readiness check that runs after the
 // plan, which has its own translation.
 func translateWaitTimeout(err error) error {

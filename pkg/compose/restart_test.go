@@ -33,11 +33,11 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// These tests characterize the restart path before the lifecycle engines
-// converge (#14081): which depends_on relations survive project preparation,
-// and the per-container sequence (pre_stop → ContainerRestart → post_start)
-// with its events. restart stays on the imperative engine but shares the
-// hook/wait primitives with the plan.
+// These tests characterize the restart path: which depends_on relations
+// survive project preparation, and the per-container sequence (pre_stop →
+// ContainerRestart → post_start) with its events. restart still walks the
+// dependency order itself (InDependencyOrder) but shares the hook/wait
+// primitives with the plan.
 
 // TestPrepareRestartProject locks the selection semantics: only depends_on
 // relations declaring restart:true are kept, and naming services includes
