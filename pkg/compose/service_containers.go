@@ -160,13 +160,8 @@ func containerReasonEvents(containers Containers, eventFunc func(string, string)
 // ServiceConditionRunningOrHealthy is a service condition on status running or healthy
 const ServiceConditionRunningOrHealthy = "running_or_healthy"
 
-func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers, timeout time.Duration) error {
+func (s *composeService) waitDependencies(ctx context.Context, project *types.Project, dependant string, dependencies types.DependsOnConfig, containers Containers) error {
 	origCtx := ctx
-	if timeout > 0 {
-		withTimeout, cancelFunc := context.WithTimeout(ctx, timeout)
-		defer cancelFunc()
-		ctx = withTimeout
-	}
 	eg, ctx := errgroup.WithContext(ctx)
 	for dep, config := range dependencies {
 		if shouldWait, err := shouldWaitForDependency(dep, config, project); err != nil {

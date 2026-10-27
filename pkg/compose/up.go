@@ -184,7 +184,7 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 			Required:  true,
 		}
 	}
-	if err := s.waitDependencies(ctx, project, project.Name, depends, containers, 0); err != nil {
+	if err := s.waitDependencies(ctx, project, project.Name, depends, containers); err != nil {
 		if options.Start.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
 		}

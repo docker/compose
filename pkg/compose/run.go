@@ -182,7 +182,7 @@ func (s *composeService) doPrepareRun(ctx context.Context, project *types.Projec
 	}
 
 	if !options.NoDeps {
-		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState, 0); err != nil {
+		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState); err != nil {
 			return prepareRunResult{}, err
 		}
 	}
