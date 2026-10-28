@@ -36,7 +36,8 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 	services := options.Services
 
 	var containers Containers
-	containers, err := s.getContainers(ctx, projectName, oneOffInclude, options.All, services...)
+	includeStopped := options.All || options.IncludeStopped //nolint:staticcheck // All is the deprecated alias of IncludeStopped, honored until it is removed
+	containers, err := s.getContainers(ctx, projectName, oneOffInclude, includeStopped, services...)
 	if err != nil {
 		return err
 	}

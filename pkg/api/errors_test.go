@@ -51,3 +51,17 @@ func TestIsUnknown(t *testing.T) {
 
 	assert.Assert(t, !IsUnknownError(errors.New("another error")))
 }
+
+func TestServiceNotRunningError(t *testing.T) {
+	err := fmt.Errorf("exec: %w", &ServiceNotRunningError{Service: "web"})
+	assert.Assert(t, IsErrNotRunning(err))
+	assert.Assert(t, !IsNotFoundError(err))
+	assert.ErrorContains(t, err, `service "web" is not running`)
+
+	var notRunning *ServiceNotRunningError
+	assert.Assert(t, errors.As(err, &notRunning))
+	assert.Equal(t, notRunning.Service, "web")
+
+	assert.Error(t, &ServiceNotRunningError{Service: "web", Index: 3}, `service "web" is not running container #3`)
+	assert.Assert(t, !IsErrNotRunning(errors.New("another error")))
+}

@@ -48,6 +48,9 @@ import (
 )
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	return Run(ctx, func(ctx context.Context) error {
 		return s.publish(ctx, project, repository, options)
 	}, "publish", s.events)

@@ -18,7 +18,6 @@ package compose
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"sort"
 	"strconv"
@@ -117,10 +116,7 @@ func (s *composeService) getSpecifiedContainer(ctx context.Context, projectName 
 	}
 	containers := res.Items
 	if len(containers) < 1 {
-		if containerIndex > 0 {
-			return container.Summary{}, fmt.Errorf("service %q is not running container #%d", serviceName, containerIndex)
-		}
-		return container.Summary{}, fmt.Errorf("service %q is not running", serviceName)
+		return container.Summary{}, &api.ServiceNotRunningError{Service: serviceName, Index: containerIndex}
 	}
 
 	// Sort by container number first, then put one-off containers at the end

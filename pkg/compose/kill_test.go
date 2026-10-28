@@ -154,3 +154,38 @@ func projectFilterListOpt(withOneOff bool) client.ContainerListOptions {
 		All:     true,
 	}
 }
+
+// IncludeStopped, like the deprecated All it replaces, lists the containers
+// that are not running as well.
+func TestKillIncludeStopped(t *testing.T) {
+	tests := []struct {
+		name    string
+		options compose.KillOptions
+	}{
+		{name: "IncludeStopped", options: compose.KillOptions{IncludeStopped: true}},
+		{name: "deprecated All", options: compose.KillOptions{All: true}}, //nolint:staticcheck // the deprecated All still lists the stopped containers
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			api, cli := prepareMocks(mockCtrl)
+			tested, err := NewComposeService(cli)
+			assert.NilError(t, err)
+
+			name := strings.ToLower(testProject)
+			api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
+				Filters: projectFilter(name).Add("label", compose.ConfigHashLabel),
+				All:     true,
+			}).Return(client.ContainerListResult{
+				Items: []container.Summary{testContainer("service1", "123", false)},
+			}, nil)
+			api.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil).AnyTimes()
+			api.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil).AnyTimes()
+			api.EXPECT().ContainerKill(anyCancellableContext(), "123", client.ContainerKillOptions{}).Return(client.ContainerKillResult{}, nil)
+
+			assert.NilError(t, tested.Kill(t.Context(), name, tt.options))
+		})
+	}
+}

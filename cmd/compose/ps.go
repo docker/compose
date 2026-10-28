@@ -116,10 +116,12 @@ func runPs(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOp
 	if err != nil {
 		return err
 	}
+	includeAll := opts.All || len(opts.Status) != 0
 	containers, err := backend.Ps(ctx, name, api.PsOptions{
-		Project:  project,
-		All:      opts.All || len(opts.Status) != 0,
-		Services: services,
+		Project:        project,
+		IncludeStopped: includeAll,
+		IncludeOneOff:  includeAll,
+		Services:       services,
 	})
 	if err != nil {
 		return err

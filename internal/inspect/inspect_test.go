@@ -68,7 +68,7 @@ func TestPsOneOffContainersOnlyWithAll(t *testing.T) {
 		apiClient.EXPECT().ContainerInspect(gomock.Any(), "web1", gomock.Any()).Return(client.ContainerInspectResult{}, nil)
 		backend := &fakeBackend{apiClient: apiClient, listed: []container.Summary{summary("web", "web1")}}
 
-		got, err := New(backend).Ps(t.Context(), "proj", api.PsOptions{All: all})
+		got, err := New(backend).Ps(t.Context(), "proj", api.PsOptions{All: all}) //nolint:staticcheck // the deprecated All still sets both switches
 
 		assert.NilError(t, err)
 		assert.Equal(t, len(got), 1)
@@ -105,4 +105,34 @@ func TestPortsAsksForTheReplica(t *testing.T) {
 	assert.Equal(t, backend.index, 2)
 	assert.Equal(t, backend.oneOff, OneOffInclude)
 	assert.Equal(t, backend.all, false)
+}
+
+// IncludeStopped and IncludeOneOff are independent: the stopped containers can
+// be listed without the one-off ones, and the other way round.
+func TestPsIncludeStoppedAndIncludeOneOff(t *testing.T) {
+	tests := []struct {
+		name           string
+		options        api.PsOptions
+		expectedAll    bool
+		expectedOneOff OneOff
+	}{
+		{name: "defaults", options: api.PsOptions{}, expectedAll: false, expectedOneOff: OneOffExclude},
+		{name: "stopped only", options: api.PsOptions{IncludeStopped: true}, expectedAll: true, expectedOneOff: OneOffExclude},
+		{name: "one-off only", options: api.PsOptions{IncludeOneOff: true}, expectedAll: false, expectedOneOff: OneOffInclude},
+		{name: "both", options: api.PsOptions{IncludeStopped: true, IncludeOneOff: true}, expectedAll: true, expectedOneOff: OneOffInclude},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			apiClient := mocks.NewMockAPIClient(ctrl)
+			apiClient.EXPECT().ContainerInspect(gomock.Any(), "web1", gomock.Any()).Return(client.ContainerInspectResult{}, nil)
+			backend := &fakeBackend{apiClient: apiClient, listed: []container.Summary{summary("web", "web1")}}
+
+			_, err := New(backend).Ps(t.Context(), "proj", tt.options)
+
+			assert.NilError(t, err)
+			assert.Equal(t, backend.all, tt.expectedAll)
+			assert.Equal(t, backend.oneOff, tt.expectedOneOff)
+		})
+	}
 }

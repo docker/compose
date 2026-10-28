@@ -41,6 +41,9 @@ func (s *composeService) Logs(
 	consumer api.LogConsumer,
 	options api.LogOptions,
 ) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	containers, err := s.selectLogsContainers(ctx, projectName, &options)
 	if err != nil {
 		return err

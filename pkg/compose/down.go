@@ -48,8 +48,8 @@ func (s *composeService) Down(ctx context.Context, projectName string, options a
 func (s *composeService) down(ctx context.Context, projectName string, options api.DownOptions) error {
 	// validate before touching anything: failing on a bad image prune mode
 	// after containers are already removed would leave the teardown half done
-	if !options.Images.Valid() {
-		return fmt.Errorf("invalid image prune mode %q: legal values are %q, %q", options.Images, api.ImagePruneLocal, api.ImagePruneAll)
+	if err := options.Validate(); err != nil {
+		return err
 	}
 
 	resourceToRemove := false
