@@ -68,14 +68,21 @@
 //
 // # The word All
 //
-// The boolean All field has a different meaning in each options struct, and
-// is always documented there:
+// The boolean All field of the options below is deprecated, because it has a
+// different meaning in each of them. Each meaning has its own field, whose
+// zero value is the default of the CLI:
 //
-//   - [ListOptions]: takes stopped containers into account, so that a
-//     project whose containers are all stopped is listed;
-//   - [PsOptions]: includes the stopped containers and the one-off ones;
-//   - [KillOptions]: also targets the containers that are not running (the
-//     one-off ones are targeted either way);
-//   - [CopyOptions]: includes the one-off containers of the service;
-//   - [ProjectLoadOptions]: includes the resources no service uses.
+//   - [ListOptions].IncludeStopped: takes stopped containers into account, so
+//     that a project whose containers are all stopped is listed;
+//   - [PsOptions].IncludeStopped and IncludeOneOff: include the stopped
+//     containers and the one-off ones (All sets both);
+//   - [KillOptions].IncludeStopped: also targets the containers that are not
+//     running (the one-off ones are targeted either way);
+//   - [CopyOptions].IncludeOneOff: includes the one-off containers of the
+//     service;
+//   - [ProjectLoadOptions].IncludeUnused: includes the resources no service
+//     uses.
+//
+// Setting both a new field and the All it replaces is the same as setting
+// either of them.
 package api

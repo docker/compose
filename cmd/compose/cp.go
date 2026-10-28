@@ -85,11 +85,11 @@ func runCopy(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		return err
 	}
 	return backend.Copy(ctx, name, api.CopyOptions{
-		Source:      opts.source,
-		Destination: opts.destination,
-		All:         opts.all,
-		Index:       opts.index,
-		FollowLink:  opts.followLink,
-		CopyUIDGID:  opts.copyUIDGID,
+		Source:        opts.source,
+		Destination:   opts.destination,
+		IncludeOneOff: opts.all,
+		Index:         opts.index,
+		FollowLink:    opts.followLink,
+		CopyUIDGID:    opts.copyUIDGID,
 	})
 }

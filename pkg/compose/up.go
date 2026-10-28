@@ -501,9 +501,9 @@ func (u *upSession) stopApplication() {
 func (u *upSession) killApplication() {
 	u.eg.Go(func() error {
 		err := u.kill(context.WithoutCancel(u.globalCtx), u.project.Name, api.KillOptions{
-			Services: u.options.Create.Services,
-			Project:  u.project,
-			All:      true,
+			Services:       u.options.Create.Services,
+			Project:        u.project,
+			IncludeStopped: true,
 		})
 		// Ignore errors indicating that some of the containers were already stopped or removed.
 		if errdefs.IsNotFound(err) || errdefs.IsConflict(err) || errors.Is(err, api.ErrNoResources) {

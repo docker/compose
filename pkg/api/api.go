@@ -61,7 +61,12 @@ type ProjectLoadOptions struct {
 	Services []string
 	// Offline mode disables remote resource loading
 	Offline bool
+	// IncludeUnused keeps the resources no service uses (networks, volumes,
+	// secrets, configs), which are dropped by default
+	IncludeUnused bool
 	// All includes all resources (not just those used by services)
+	//
+	// Deprecated: use IncludeUnused, which means the same.
 	All bool
 	// Compatibility enables v1 compatibility mode
 	Compatibility bool
@@ -528,7 +533,12 @@ type KillOptions struct {
 	Services []string
 	// Signal to send to containers
 	Signal string
+	// IncludeStopped also targets the containers that are not running, instead
+	// of only the running ones. The one-off containers are targeted either way.
+	IncludeStopped bool
 	// All can be set to true to try to kill all found containers, independently of their state
+	//
+	// Deprecated: use IncludeStopped, which means the same.
 	All bool
 }
 
@@ -650,16 +660,29 @@ func (e Event) String() string {
 
 // ListOptions group options of the ls API
 type ListOptions struct {
+	// IncludeStopped takes stopped containers into account, so that a project
+	// whose containers are all stopped is listed
+	IncludeStopped bool
 	// All takes stopped containers into account, so that a project whose
 	// containers are all stopped is listed
+	//
+	// Deprecated: use IncludeStopped, which means the same.
 	All bool
 }
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
 	Project *types.Project
+	// IncludeStopped includes the stopped containers, which are left out by
+	// default
+	IncludeStopped bool
+	// IncludeOneOff includes the one-off containers (`compose run`), which are
+	// left out by default
+	IncludeOneOff bool
 	// All includes the stopped containers and the one-off containers, which
 	// are both left out by default
+	//
+	// Deprecated: use IncludeStopped and IncludeOneOff, which All sets together.
 	All      bool
 	Services []string
 }
@@ -668,7 +691,12 @@ type PsOptions struct {
 type CopyOptions struct {
 	Source      string
 	Destination string
+	// IncludeOneOff includes the one-off containers (`compose run`) of the
+	// service, which are left out by default. It only applies when Index is 0.
+	IncludeOneOff bool
 	// All includes the one-off containers of the service
+	//
+	// Deprecated: use IncludeOneOff, which means the same.
 	All        bool
 	Index      int
 	FollowLink bool
