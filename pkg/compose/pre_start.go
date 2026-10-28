@@ -208,7 +208,7 @@ func (s *composeService) execPreStartHook(
 		// Drain waitRes so the client's wait goroutine exits without having to
 		// wait for the parent context to be canceled.
 		select {
-		case <-waitRes.Error:
+		case <-waitRes.Error: //nolint:errcheck // only draining: the error that matters is the one being returned
 		case <-waitRes.Result:
 		case <-ctx.Done():
 		}

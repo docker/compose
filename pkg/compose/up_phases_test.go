@@ -289,7 +289,7 @@ func (h *interactiveUpHarness) upWith(t *testing.T, ctx context.Context, cancel 
 	case <-time.After(10 * time.Second):
 		cancel()
 		select {
-		case <-done:
+		case <-done: //nolint:errcheck // only waiting for up to return, the test fails right below
 		case <-time.After(5 * time.Second):
 		}
 		t.Fatalf("up did not return; calls so far: %v", h.daemon.recorded())
