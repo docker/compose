@@ -18,6 +18,7 @@ package api
 
 import (
 	"errors"
+	"fmt"
 )
 
 const (
@@ -48,6 +49,9 @@ var (
 	// ErrIncompatibleOptions is returned when a set of options that cannot be
 	// honored together is requested. See IncompatibleOptionsError.
 	ErrIncompatibleOptions = errors.New("incompatible options")
+	// ErrNotRunning is returned when an operation targets a service, or a
+	// replica of it, that has no running container. See ServiceNotRunningError.
+	ErrNotRunning = errors.New("not running")
 	// ErrInvalidOption is returned when an option is set to a value it does
 	// not accept. See InvalidOptionError.
 	ErrInvalidOption = errors.New("invalid option")
@@ -96,6 +100,35 @@ func IsErrCanceled(err error) bool {
 // IsErrIncompatibleOptions returns true if the unwrapped error is ErrIncompatibleOptions
 func IsErrIncompatibleOptions(err error) bool {
 	return errors.Is(err, ErrIncompatibleOptions)
+}
+
+// ServiceNotRunningError reports that an operation which acts on one container
+// of a service (exec, port, export, commit, attach…) found no matching
+// container, that is no running one for most of them. It
+// matches ErrNotRunning with errors.Is, and callers needing the details can
+// retrieve it with errors.As.
+type ServiceNotRunningError struct {
+	// Service is the name of the service that was targeted.
+	Service string
+	// Index is the replica that was asked for, 0 when none in particular was.
+	Index int
+}
+
+func (e *ServiceNotRunningError) Error() string {
+	if e.Index > 0 {
+		return fmt.Sprintf("service %q is not running container #%d", e.Service, e.Index)
+	}
+	return fmt.Sprintf("service %q is not running", e.Service)
+}
+
+// Unwrap makes errors.Is(err, ErrNotRunning) hold.
+func (e *ServiceNotRunningError) Unwrap() error {
+	return ErrNotRunning
+}
+
+// IsErrNotRunning returns true if the unwrapped error is ErrNotRunning
+func IsErrNotRunning(err error) bool {
+	return errors.Is(err, ErrNotRunning)
 }
 
 // IsErrInvalidOption returns true if the unwrapped error is ErrInvalidOption
