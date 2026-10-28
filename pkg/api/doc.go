@@ -30,8 +30,8 @@
 //     CLI default is to retrieve their data from the previous container
 //     (Inherit: true).
 //   - [CreateOptions].Recreate and RecreateDependencies: the empty string
-//     means [RecreateDiverged], and so does any value that is not one of the
-//     Recreate* constants.
+//     means [RecreateDiverged]. Any value other than the Recreate* constants
+//     is rejected by [CreateOptions.Validate] before anything is changed.
 //   - [CreateOptions].RemoveOrphans and IgnoreOrphans: when both are false,
 //     orphan containers are kept and a warning is logged. IgnoreOrphans
 //     silences that warning, RemoveOrphans removes the containers.
