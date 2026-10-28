@@ -42,6 +42,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/docker/compose/v5/internal/depgraph"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -80,7 +81,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		return -1
 	}
 
-	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	err = depgraph.InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "classic"))
 		service, ok := serviceToBuild[name]
 		if !ok {
@@ -104,9 +105,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 			return s.push(ctx, project, api.PushOptions{})
 		}
 		return nil
-	}, func(traversal *graphTraversal) {
-		traversal.maxConcurrency = s.maxConcurrency
-	})
+	}, depgraph.WithMaxConcurrency(s.maxConcurrency))
 	if err != nil {
 		return nil, err
 	}

@@ -32,6 +32,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/depgraph"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -123,7 +124,7 @@ type reconciler struct {
 	// walk within one reconcile() call. Safe to share — visitInDependencyOrder
 	// tracks visited state locally per call and never mutates the graph, and
 	// r.project is never reassigned between the two calls.
-	dependencyGraph *Graph
+	dependencyGraph *depgraph.Graph
 	// removedByPlan records replicas the create phase condemns (scale-down
 	// stop+remove): the start phase must never plan a start for them — only
 	// what survives the convergence is started.
@@ -712,9 +713,9 @@ func (r *reconciler) reconcileContainers() error {
 // serviceGraph memoizes NewGraph(r.project, ServiceStopped):
 // reconcileContainers and planStartPhase both need it within one
 // reconcile() call.
-func (r *reconciler) serviceGraph() (*Graph, error) {
+func (r *reconciler) serviceGraph() (*depgraph.Graph, error) {
 	if r.dependencyGraph == nil {
-		graph, err := NewGraph(r.project, ServiceStopped)
+		graph, err := depgraph.NewGraph(r.project, depgraph.ServiceStopped)
 		if err != nil {
 			return nil, err
 		}
@@ -725,13 +726,13 @@ func (r *reconciler) serviceGraph() (*Graph, error) {
 
 // visitInDependencyOrder processes services from leaves to roots so that
 // dependencies are reconciled before the services that depend on them.
-func (r *reconciler) visitInDependencyOrder(g *Graph, visit func(types.ServiceConfig) error) error {
+func (r *reconciler) visitInDependencyOrder(g *depgraph.Graph, visit func(types.ServiceConfig) error) error {
 	visited := map[string]bool{}
 	// Sort vertex keys for deterministic plan output in tests
 	keys := slices.Sorted(maps.Keys(g.Vertices))
 	for {
 		// Find a vertex whose all children are visited
-		var next *Vertex
+		var next *depgraph.Vertex
 		for _, k := range keys {
 			v := g.Vertices[k]
 			if visited[v.Key] {
