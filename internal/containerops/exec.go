@@ -30,7 +30,8 @@ import (
 )
 
 // Exec runs a command in a running container of a service and returns its exit code.
-func (s *Service) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+func (s *Service) Exec(ctx context.Context, projectName string, provider api.ExecOptionsProvider) (int, error) {
+	options := provider.ToExecOptions()
 	projectName = strings.ToLower(projectName)
 	target, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {

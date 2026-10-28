@@ -114,7 +114,7 @@ func runExec(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 		v, ok := projectOptions.Environment[k]
 		return v, ok
 	}
-	execOpts := api.RunOptions{
+	execOpts := api.ExecOptions{
 		Service:     opts.service,
 		Command:     opts.command,
 		Environment: compose.ToMobyEnv(types.NewMappingWithEquals(opts.environment).Resolve(lookupFn)),
