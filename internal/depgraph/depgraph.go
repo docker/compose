@@ -14,7 +14,9 @@
    limitations under the License.
 */
 
-package compose
+// Package depgraph builds the dependency graph of a project's services and
+// walks it in (reverse) dependency order, optionally in parallel.
+package depgraph
 
 import (
 	"context"
@@ -83,7 +85,7 @@ func downDirectionTraversal(visitorFn func(context.Context, string) error) *grap
 }
 
 // InDependencyOrder applies the function to the services of the project taking in account the dependency order
-func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
+func InDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...Option) error {
 	graph, err := NewGraph(project, ServiceStopped)
 	if err != nil {
 		return err
@@ -96,7 +98,7 @@ func InDependencyOrder(ctx context.Context, project *types.Project, fn func(cont
 }
 
 // InReverseDependencyOrder applies the function to the services of the project in reverse order of dependencies
-func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...func(*graphTraversal)) error {
+func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn func(context.Context, string) error, options ...Option) error {
 	graph, err := NewGraph(project, ServiceStarted)
 	if err != nil {
 		return err
@@ -108,7 +110,20 @@ func InReverseDependencyOrder(ctx context.Context, project *types.Project, fn fu
 	return t.visit(ctx, graph)
 }
 
-func WithRootNodesAndDown(nodes []string) func(*graphTraversal) {
+// Option customizes a dependency-order traversal.
+type Option func(*graphTraversal)
+
+// WithMaxConcurrency bounds the number of services visited concurrently
+// (<=0 means unbounded).
+func WithMaxConcurrency(maxConcurrency int) Option {
+	return func(t *graphTraversal) {
+		t.maxConcurrency = maxConcurrency
+	}
+}
+
+// WithRootNodesAndDown restricts a reverse-order traversal to the given
+// services and the services depending on them.
+func WithRootNodesAndDown(nodes []string) Option {
 	return func(t *graphTraversal) {
 		if len(nodes) == 0 {
 			return
@@ -142,6 +157,9 @@ func (t *graphTraversal) visit(ctx context.Context, g *Graph) error {
 		return nil
 	}
 
+	// the errgroup also runs the goroutine that reads nodeCh below, which
+	// holds one slot for the whole traversal: add one so that maxConcurrency
+	// node visits can still run at once. 0 leaves the errgroup unlimited.
 	limit := 0
 	if t.maxConcurrency > 0 {
 		limit = t.maxConcurrency + 1

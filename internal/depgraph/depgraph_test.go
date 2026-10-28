@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package depgraph
 
 import (
 	"context"

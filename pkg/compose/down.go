@@ -34,6 +34,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/depgraph"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
@@ -119,9 +120,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	// for why a per-service limiter alone isn't enough.
 	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
-	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	err = depgraph.InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		return s.downService(ctx, project, containers, options, service, limiter)
-	}, WithRootNodesAndDown(options.Services))
+	}, depgraph.WithRootNodesAndDown(options.Services))
 	if err != nil {
 		return err
 	}
