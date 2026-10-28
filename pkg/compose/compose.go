@@ -467,7 +467,17 @@ func getContainerNameWithoutProject(c container.Summary) string {
 	return name[len(project)+1:]
 }
 
-// projectFromName builds a types.Project based on actual resources with compose labels set
+func dependencyLabel(dependencies types.DependsOnConfig) string {
+	if len(dependencies) == 0 {
+		return ""
+	}
+	labels := make([]string, 0, len(dependencies))
+	for dep, d := range dependencies {
+		labels = append(labels, fmt.Sprintf("%s:%s:%t:%t", dep, d.Condition, d.Restart, d.Required))
+	}
+	return strings.Join(labels, ",")
+}
+
 func (s *composeService) projectFromName(containers Containers, projectName string, services ...string) (*types.Project, error) {
 	project := &types.Project{
 		Name:     projectName,
@@ -512,6 +522,9 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 					condition = dcArr[1]
 					if len(dcArr) > 2 {
 						restart, _ = strconv.ParseBool(dcArr[2])
+					}
+					if len(dcArr) > 3 {
+						required, _ = strconv.ParseBool(dcArr[3])
 					}
 				}
 				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart, Required: required}

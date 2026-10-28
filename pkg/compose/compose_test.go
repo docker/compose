@@ -21,11 +21,46 @@ import (
 	"testing"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 )
+
+func TestDependencyLabelPreservesRequiredAndReadsLegacyLabels(t *testing.T) {
+	got := dependencyLabel(types.DependsOnConfig{
+		"init": {
+			Condition: types.ServiceConditionCompletedSuccessfully,
+			Restart:   false,
+			Required:  false,
+		},
+	})
+	assert.Equal(t, got, "init:service_completed_successfully:false:false")
+
+	svc := &composeService{}
+	project, err := svc.projectFromName(Containers{{
+		Labels: map[string]string{
+			api.ServiceLabel:      "web",
+			api.DependenciesLabel: got,
+		},
+	}}, "project")
+	assert.NilError(t, err)
+	dependency := project.Services["web"].DependsOn["init"]
+	assert.Equal(t, dependency.Condition, types.ServiceConditionCompletedSuccessfully)
+	assert.Assert(t, !dependency.Restart)
+	assert.Assert(t, !dependency.Required)
+
+	legacy, err := svc.projectFromName(Containers{{
+		Labels: map[string]string{
+			api.ServiceLabel:      "web",
+			api.DependenciesLabel: "init:service_completed_successfully:false",
+		},
+	}}, "project")
+	assert.NilError(t, err)
+	assert.Assert(t, legacy.Services["web"].DependsOn["init"].Required)
+}
 
 // TestNewLimitedErrgroup_NonPositiveIsUnlimited guards against the bug this
 // helper exists to fix: errgroup.SetLimit(0) means "allow zero goroutines",
