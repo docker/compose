@@ -24,6 +24,8 @@ import (
 const (
 	// ExitCodeLoginRequired exit code when command cannot execute because it requires cloud login
 	// This will be used by VSCode to detect when creating context if the user needs to login first
+	//
+	// Deprecated: Compose has no cloud login anymore and never exits with this code, it will be removed.
 	ExitCodeLoginRequired = 5
 )
 
@@ -31,14 +33,22 @@ var (
 	// ErrNotFound is returned when an object is not found
 	ErrNotFound = errors.New("not found")
 	// ErrAlreadyExists is returned when an object already exists
+	//
+	// Deprecated: Compose never returns it, it will be removed.
 	ErrAlreadyExists = errors.New("already exists")
 	// ErrForbidden is returned when an operation is not permitted
+	//
+	// Deprecated: Compose never returns it, it will be removed.
 	ErrForbidden = errors.New("forbidden")
 	// ErrUnknown is returned when the error type is unmapped
+	//
+	// Deprecated: Compose never returns it, it will be removed.
 	ErrUnknown = errors.New("unknown")
 	// ErrNotImplemented is returned when a backend doesn't implement an action
 	ErrNotImplemented = errors.New("not implemented")
 	// ErrUnsupportedFlag is returned when a backend doesn't support a flag
+	//
+	// Deprecated: Compose never returns it, it will be removed.
 	ErrUnsupportedFlag = errors.New("unsupported flag")
 	// ErrCanceled is returned when the command was canceled by user
 	ErrCanceled = errors.New("canceled")
@@ -63,21 +73,29 @@ func IsNotFoundError(err error) bool {
 }
 
 // IsAlreadyExistsError returns true if the unwrapped error is ErrAlreadyExists
+//
+// Deprecated: ErrAlreadyExists is never returned, it will be removed.
 func IsAlreadyExistsError(err error) bool {
 	return errors.Is(err, ErrAlreadyExists)
 }
 
 // IsForbiddenError returns true if the unwrapped error is ErrForbidden
+//
+// Deprecated: ErrForbidden is never returned, it will be removed.
 func IsForbiddenError(err error) bool {
 	return errors.Is(err, ErrForbidden)
 }
 
 // IsUnknownError returns true if the unwrapped error is ErrUnknown
+//
+// Deprecated: ErrUnknown is never returned, it will be removed.
 func IsUnknownError(err error) bool {
 	return errors.Is(err, ErrUnknown)
 }
 
 // IsErrUnsupportedFlag returns true if the unwrapped error is ErrUnsupportedFlag
+//
+// Deprecated: ErrUnsupportedFlag is never returned, it will be removed.
 func IsErrUnsupportedFlag(err error) bool {
 	return errors.Is(err, ErrUnsupportedFlag)
 }
