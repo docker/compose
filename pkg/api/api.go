@@ -586,7 +586,8 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
-	// Index selects the replica to target; only used by Exec, which now takes ExecOptions.
+	// Index selects the replica to target. It is only read by Exec, through
+	// ToExecOptions; prefer ExecOptions when calling Exec.
 	Index int
 }
 

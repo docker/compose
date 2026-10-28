@@ -31,6 +31,9 @@ import (
 
 // Exec runs a command in a running container of a service and returns its exit code.
 func (s *Service) Exec(ctx context.Context, projectName string, provider api.ExecOptionsProvider) (int, error) {
+	if provider == nil {
+		return 0, &api.InvalidOptionError{Option: "options", Reason: "required"}
+	}
 	options := provider.ToExecOptions()
 	projectName = strings.ToLower(projectName)
 	target, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
