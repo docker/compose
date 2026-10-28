@@ -486,6 +486,8 @@ type DownOptions struct {
 }
 
 // ConfigOptions group options of the Config API
+//
+// Deprecated: no operation of Compose takes these options, they will be removed.
 type ConfigOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
@@ -764,6 +766,8 @@ type ImageSummary struct {
 }
 
 // ServiceStatus hold status about a service
+//
+// Deprecated: no operation of Compose returns it, it will be removed.
 type ServiceStatus struct {
 	ID         string
 	Name       string
@@ -822,16 +826,28 @@ type GenerateOptions struct {
 
 const (
 	// STARTING indicates that stack is being deployed
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	STARTING string = "Starting"
 	// RUNNING indicates that stack is deployed and services are running
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	RUNNING string = "Running"
 	// UPDATING indicates that some stack resources are being recreated
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	UPDATING string = "Updating"
 	// REMOVING indicates that stack is being deleted
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	REMOVING string = "Removing"
 	// UNKNOWN indicates unknown stack state
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	UNKNOWN string = "Unknown"
 	// FAILED indicates that stack deployment failed
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	FAILED string = "Failed"
 )
 
