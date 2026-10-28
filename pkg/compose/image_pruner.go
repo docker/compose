@@ -18,22 +18,13 @@ package compose
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"maps"
-	"slices"
-	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/containerd/errdefs"
-	"github.com/distribution/reference"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
-	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 
-	"github.com/docker/compose/v5/internal/concurrency"
-	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/images"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -53,268 +44,34 @@ const (
 	ImagePruneAll = api.ImagePruneAll
 )
 
-// ImagePruneOptions controls the behavior of image pruning.
-type ImagePruneOptions struct {
-	Mode ImagePruneMode
+// The pruning of images lives in internal/images. ImagePruneOptions and
+// ImagePruner stay exported from this package as aliases, so the SDK surface
+// does not change.
 
-	// RemoveOrphans will result in the removal of images that were built for
-	// the project regardless of whether they are for a known service if true.
-	RemoveOrphans bool
-}
+// ImagePruneOptions controls the behavior of image pruning.
+type ImagePruneOptions = images.PruneOptions
 
 // ImagePruner handles image removal during Compose `down` operations.
-type ImagePruner struct {
-	client  client.ImageAPIClient
-	project *types.Project
-	// limiter bounds concurrent engine calls, shared with the rest of the
-	// down op set so tagged- and dangling-image removal (which run as two
-	// independent, concurrently-dispatched ops) don't each spend their own
-	// full budget on top of one another.
-	limiter *semaphore.Weighted
-}
+type ImagePruner = images.Pruner
 
 // NewImagePruner creates an ImagePruner object for a project. limiter may be
 // nil, meaning unbounded.
 func NewImagePruner(imageClient client.ImageAPIClient, project *types.Project, limiter *semaphore.Weighted) *ImagePruner {
-	return &ImagePruner{
-		client:  imageClient,
-		project: project,
-		limiter: limiter,
-	}
+	return images.NewPruner(imageClient, project, limiter)
 }
 
-// imageBelongsToKnownService reports whether img should be pruned: either
-// removeOrphans is set (indiscriminately prune all project images even if
-// they're not referenced by the current Compose state, e.g. the service was
-// removed from YAML), or the image belongs to a service still declared in
-// project. Shared by ImagesToPrune (tagged images) and down's own
-// dangling-image keep check, so the two can't drift on what counts as
-// orphaned — the image-side analog of containers.go's isOrphaned.
 func imageBelongsToKnownService(project *types.Project, removeOrphans bool, img image.Summary) bool {
-	if removeOrphans {
-		return true
-	}
-	_, err := project.GetService(img.Labels[api.ServiceLabel])
-	return err == nil
+	return images.ImageBelongsToKnownService(project, removeOrphans, img)
 }
 
-// ImagesToPrune returns the set of images that should be removed.
-func (p *ImagePruner) ImagesToPrune(ctx context.Context, opts ImagePruneOptions) ([]string, error) {
-	if opts.Mode == ImagePruneNone {
-		return nil, nil
-	} else if !opts.Mode.Valid() {
-		return nil, fmt.Errorf("unsupported image prune mode: %s", opts.Mode)
-	}
-	var images []string
-
-	if opts.Mode == ImagePruneAll {
-		namedImages, err := p.namedImages(ctx)
-		if err != nil {
-			return nil, err
-		}
-		images = append(images, namedImages...)
-	}
-
-	projectImages, err := p.labeledLocalImages(ctx)
-	if err != nil {
-		return nil, err
-	}
-	for _, img := range projectImages {
-		if len(img.RepoTags) == 0 {
-			// currently, we're only pruning the tagged references, but
-			// if we start removing the dangling images and grouping by
-			// service, we can remove this (and should rely on `Image::ID`)
-			continue
-		}
-
-		if imageBelongsToKnownService(p.project, opts.RemoveOrphans, img) {
-			images = append(images, img.RepoTags[0])
-		}
-	}
-
-	fallbackImages, err := p.unlabeledLocalImages(ctx)
-	if err != nil {
-		return nil, err
-	}
-	images = append(images, fallbackImages...)
-
-	images = normalizeAndDedupeImages(images)
-	return images, nil
+func (s *composeService) removeImages(ctx context.Context, imgs []image.Summary, limiter *semaphore.Weighted) (removed, stillInUse []string, err error) {
+	return s.images().RemoveImages(ctx, imgs, limiter)
 }
 
-// namedImages are those that are explicitly named in the service config.
-//
-// These could be registry-only images (no local build), hybrid (support build
-// as a fallback if cannot pull), or local-only (image does not exist in a
-// registry).
-func (p *ImagePruner) namedImages(ctx context.Context) ([]string, error) {
-	var images []string
-	for _, service := range p.project.Services {
-		if service.Image == "" {
-			continue
-		}
-		images = append(images, service.Image)
-	}
-	return p.filterImagesByExistence(ctx, images)
-}
-
-// labeledLocalImages are images that were locally-built by a current version of
-// Compose (it did not always label built images).
-//
-// The image name could either have been defined by the user or implicitly
-// created from the project + service name.
-func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error) {
-	res, err := p.client.ImageList(ctx, client.ImageListOptions{
-		Filters: naming.ProjectFilter(p.project.Name).Add("dangling", "false"),
-	})
-	if err != nil {
-		return nil, err
-	}
-	return res.Items, nil
-}
-
-// removeImages removes the given images in parallel, tolerating individual
-// failures so one bad image doesn't abort the rest. An image already gone
-// (a benign race with something else removing it concurrently) or still in
-// use is never joined into err — same tolerance removeResource already
-// gives a tagged image in either situation (its own distinct, correctly
-// worded event, not an error). "Still in use" is returned in its own bucket,
-// not folded into removed, since a caller aggregating several images (see
-// removeDanglingImagesOp) needs that distinction to report the batch
-// honestly; an already-gone image reached the goal the same as an actual
-// removal, so it's simply not counted against either bucket. Any other
-// removal error is joined into err so callers reporting failures to the
-// user keep the actual daemon error instead of just an image ID.
-func (s *composeService) removeImages(ctx context.Context, images []image.Summary, limiter *semaphore.Weighted) (removed, stillInUse []string, err error) {
-	var mu sync.Mutex
-	var errs []error
-	// as in removeTaggedImagesOp, a single image failure must not cancel the
-	// shared errgroup ctx, so fn always returns nil and collects into the
-	// buckets below instead.
-	_ = concurrency.ForEach(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
-		if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
-			mu.Lock()
-			defer mu.Unlock()
-			imgStillInUse, alreadyGone := classifyRemovalError(err)
-			switch {
-			case alreadyGone:
-				// e.g. removed concurrently by something else
-				logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
-			case imgStillInUse:
-				// the same benign skip the tagged-image path reports via
-				// removeResource's conflict branch
-				logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
-				stillInUse = append(stillInUse, img.ID)
-			default:
-				errs = append(errs, fmt.Errorf("image %s: %w", img.ID, err))
-			}
-			return nil
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		removed = append(removed, img.ID)
-		return nil
-	})
-	return removed, stillInUse, errors.Join(errs...)
-}
-
-// eligibleDanglingImages lists a project's dangling images and filters out
-// those spared by keep. Shared by down --rmi (which also needs the list
-// itself, to decide whether there's anything to report) and watch --prune,
-// so the two don't drift apart.
-func (s *composeService) eligibleDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]image.Summary, error) {
-	res, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
-		Filters: naming.ProjectFilter(projectName).Add("dangling", "true"),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	var eligible []image.Summary
-	for _, img := range res.Items {
-		if !keep(img) {
-			eligible = append(eligible, img)
-		}
-	}
-	return eligible, nil
-}
-
-// removeDanglingImages lists a project's dangling images and removes those
-// not spared by keep. Shared by down --rmi and watch --prune, which differ
-// only in what keep spares.
 func (s *composeService) removeDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]string, error) {
-	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
-	if err != nil {
-		return nil, err
-	}
-	removed, _, err := s.removeImages(ctx, eligible, concurrency.NewLimiter(s.maxConcurrency))
-	return removed, err
+	return s.images().RemoveDanglingImages(ctx, projectName, keep)
 }
 
-// unlabeledLocalImages are images that match the implicit naming convention
-// for locally-built images but did not get labeled, presumably because they
-// were produced by an older version of Compose.
-//
-// This is transitional to ensure `down` continues to work as expected on
-// projects built/launched by previous versions of Compose. It can safely
-// be removed after some time.
-func (p *ImagePruner) unlabeledLocalImages(ctx context.Context) ([]string, error) {
-	var images []string
-	for _, service := range p.project.Services {
-		if service.Image != "" {
-			continue
-		}
-		img := api.GetImageNameOrDefault(service, p.project.Name)
-		images = append(images, img)
-	}
-	return p.filterImagesByExistence(ctx, images)
-}
-
-// filterImagesByExistence returns the subset of images that exist in the
-// engine store.
-//
-// NOTE: Any transient errors communicating with the API will result in an
-// image being returned as "existing", as this method is exclusively used to
-// find images to remove, so the worst case of being conservative here is an
-// attempt to remove an image that doesn't exist, which will cause a warning
-// but is otherwise harmless.
-func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []string) ([]string, error) {
-	var mu sync.Mutex
-	var ret []string
-
-	err := concurrency.ForEach(ctx, p.limiter, imageNames, func(ctx context.Context, img string) error {
-		_, err := p.client.ImageInspect(ctx, img)
-		if errdefs.IsNotFound(err) {
-			// err on the side of caution: only skip if we successfully
-			// queried the API and got back a definitive "not exists"
-			return nil
-		}
-		mu.Lock()
-		defer mu.Unlock()
-		ret = append(ret, img)
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return ret, nil
-}
-
-// normalizeAndDedupeImages returns the unique set of images after normalization.
-func normalizeAndDedupeImages(images []string) []string {
-	seen := make(map[string]struct{}, len(images))
-	for _, img := range images {
-		// since some references come from user input (service.image) and some
-		// come from the engine API, we standardize them, opting for the
-		// familiar name format since they'll also be displayed in the CLI
-		ref, err := reference.ParseNormalizedNamed(img)
-		if err == nil {
-			ref = reference.TagNameOnly(ref)
-			img = reference.FamiliarString(ref)
-		}
-		seen[img] = struct{}{}
-	}
-	// ensure a deterministic return result - the actual ordering is not useful
-	return slices.Sorted(maps.Keys(seen))
+func (s *composeService) eligibleDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]image.Summary, error) {
+	return s.images().EligibleDanglingImages(ctx, projectName, keep)
 }
