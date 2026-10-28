@@ -348,11 +348,16 @@ type CreateOptions struct {
 	RemoveOrphans bool
 	// Ignore legacy containers for services that are not defined in the project
 	IgnoreOrphans bool
-	// Recreate define the strategy to apply on existing containers
+	// Recreate define the strategy to apply on existing containers: one of
+	// RecreateDiverged (the default, also used for ""), RecreateForce or
+	// RecreateNever.
 	Recreate string
-	// RecreateDependencies define the strategy to apply on dependencies services
+	// RecreateDependencies define the strategy to apply on dependencies
+	// services, with the same values as Recreate.
 	RecreateDependencies string
-	// Inherit reuse anonymous volumes from previous container
+	// Inherit reuse anonymous volumes from previous container. Beware that
+	// the zero value (false) recreates them, like `up --renew-anon-volumes`:
+	// set it to true to get what the CLI does by default.
 	Inherit bool
 	// Timeout set delay to wait for container to gracefully stop before sending SIGKILL
 	Timeout *time.Duration
@@ -643,12 +648,16 @@ func (e Event) String() string {
 
 // ListOptions group options of the ls API
 type ListOptions struct {
+	// All takes stopped containers into account, so that a project whose
+	// containers are all stopped is listed
 	All bool
 }
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
-	Project  *types.Project
+	Project *types.Project
+	// All includes the stopped containers and the one-off containers, which
+	// are both left out by default
 	All      bool
 	Services []string
 }
@@ -657,10 +666,11 @@ type PsOptions struct {
 type CopyOptions struct {
 	Source      string
 	Destination string
-	All         bool
-	Index       int
-	FollowLink  bool
-	CopyUIDGID  bool
+	// All includes the one-off containers of the service
+	All        bool
+	Index      int
+	FollowLink bool
+	CopyUIDGID bool
 }
 
 // PortPublisher hold status about published port
