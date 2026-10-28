@@ -14,11 +14,19 @@
    limitations under the License.
 */
 
-package compose
+// Package confighash computes the configuration hashes that Compose stamps on
+// the containers, networks and volumes it creates, and compares against on
+// the next run to detect a configuration change.
+//
+// The hashes are persisted in labels of existing resources: the byte layout
+// they are computed from is frozen, any change recreates users' resources.
+package confighash
 
 import (
 	"bytes"
 	"encoding/json"
+	"maps"
+	"slices"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/opencontainers/go-digest"
@@ -212,7 +220,7 @@ func pinRootKeyOrder(raw []byte, order []string) ([]byte, error) {
 			delete(root, key)
 		}
 	}
-	for _, key := range sortedKeys(root) {
+	for _, key := range slices.Sorted(maps.Keys(root)) {
 		write(key, root[key])
 	}
 	buf.WriteByte('}')

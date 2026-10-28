@@ -29,6 +29,7 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -95,7 +96,7 @@ func TestReconcileNetworks_CreateMissing(t *testing.T) {
 
 func TestReconcileNetworks_ExistingMatch(t *testing.T) {
 	nw := types.NetworkConfig{Name: "myproject_frontend"}
-	hash, err := NetworkHash(&nw)
+	hash, err := confighash.NetworkHash(&nw)
 	assert.NilError(t, err)
 
 	project := &types.Project{
@@ -447,7 +448,7 @@ func TestReconcileVolumes_CreateMissing(t *testing.T) {
 
 func TestReconcileVolumes_ExistingMatch(t *testing.T) {
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
-	hash, err := VolumeHash(vol)
+	hash, err := confighash.VolumeHash(vol)
 	assert.NilError(t, err)
 
 	project := &types.Project{
@@ -2002,21 +2003,21 @@ func TestReconcileContainers_RegularDependsOn_NoCascade(t *testing.T) {
 
 func mustServiceHash(t *testing.T, svc types.ServiceConfig) string {
 	t.Helper()
-	h, err := ServiceHash(svc)
+	h, err := confighash.ServiceHash(svc)
 	assert.NilError(t, err)
 	return h
 }
 
 func mustVolumeHash(t *testing.T, vol types.VolumeConfig) string {
 	t.Helper()
-	h, err := VolumeHash(vol)
+	h, err := confighash.VolumeHash(vol)
 	assert.NilError(t, err)
 	return h
 }
 
 func mustNetworkHash(t *testing.T, nw types.NetworkConfig) string {
 	t.Helper()
-	h, err := NetworkHash(&nw)
+	h, err := confighash.NetworkHash(&nw)
 	assert.NilError(t, err)
 	return h
 }
