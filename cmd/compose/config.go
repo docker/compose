@@ -36,6 +36,7 @@ import (
 	"go.yaml.in/yaml/v4"
 
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -672,7 +673,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 			return err
 		}
 
-		hash, err := compose.ServiceHash(s)
+		hash, err := confighash.ServiceHash(s)
 		if err != nil {
 			return err
 		}

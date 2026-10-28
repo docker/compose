@@ -30,6 +30,7 @@ import (
 	mmount "github.com/moby/moby/api/types/mount"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -255,7 +256,7 @@ func (r *reconciler) resolveObserved() {
 // recreation. Unlike volumes, recreating a network is not destructive, so no
 // user confirmation is required.
 //
-// Divergence is detected by comparing NetworkHash(desired) with the config-hash
+// Divergence is detected by comparing confighash.NetworkHash(desired) with the config-hash
 // persisted on the live network (observed.ConfigHash). A network with no
 // recorded hash (e.g. created by an older Compose or manually) is left
 // untouched: without a recorded hash there is no reliable way to tell
@@ -278,7 +279,7 @@ func (r *reconciler) reconcileNetworks() error {
 			r.planCreateNetwork(key, &desired, "not found")
 			continue
 		}
-		expected, err := NetworkHash(&desired)
+		expected, err := confighash.NetworkHash(&desired)
 		if err != nil {
 			return err
 		}
@@ -421,7 +422,7 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 // for volumes whose configuration has diverged from the live resource,
 // recreation — gated on user confirmation because it destroys the volume's data.
 //
-// Divergence is detected by comparing VolumeHash(desired) with the config-hash
+// Divergence is detected by comparing confighash.VolumeHash(desired) with the config-hash
 // persisted on the live volume (observed.ConfigHash). A volume with no recorded
 // hash (e.g. created by an older Compose) is left untouched: without a
 // recorded hash there is no reliable way to tell configuration drift apart
@@ -438,7 +439,7 @@ func (r *reconciler) reconcileVolumes() error {
 			r.planCreateVolume(key, &desired, "not found")
 			continue
 		}
-		expected, err := VolumeHash(desired)
+		expected, err := confighash.VolumeHash(desired)
 		if err != nil {
 			return err
 		}
@@ -1083,7 +1084,7 @@ func serviceHashWithResolvedRefs(service types.ServiceConfig, containers map[str
 	resolved := service
 	resolved.VolumesFrom = slices.Clone(service.VolumesFrom)
 	_ = resolveServiceReferences(&resolved, containers)
-	return ServiceHash(resolved)
+	return confighash.ServiceHash(resolved)
 }
 
 // hasNetworkMismatch checks if the container is not connected to all expected networks.

@@ -21,6 +21,8 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/internal/confighash"
 )
 
 func TestUmaskOption(t *testing.T) {
@@ -87,7 +89,7 @@ func TestGetCreateConfigsUmask(t *testing.T) {
 func TestServiceHashTracksUmask(t *testing.T) {
 	zero, mask := uint32(0), uint32(0o77)
 	hash := func(umask *uint32) string {
-		h, err := ServiceHash(types.ServiceConfig{Name: "app", ContainerSpec: types.ContainerSpec{Image: "alpine", Umask: umask}})
+		h, err := confighash.ServiceHash(types.ServiceConfig{Name: "app", ContainerSpec: types.ContainerSpec{Image: "alpine", Umask: umask}})
 		assert.NilError(t, err)
 		return h
 	}

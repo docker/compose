@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package confighash
 
 import (
 	"encoding/json"

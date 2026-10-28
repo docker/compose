@@ -32,6 +32,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -76,7 +77,7 @@ func TestWaitDependencies(t *testing.T) {
 			},
 		}}
 
-		_, err := ServiceHash(project.Services["disabled"])
+		_, err := confighash.ServiceHash(project.Services["disabled"])
 		assert.NilError(t, err)
 
 		assert.NilError(t, tested.(*composeService).waitDependencies(

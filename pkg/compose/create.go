@@ -42,6 +42,7 @@ import (
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
+	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -305,7 +306,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 ) (createConfigs, error) {
 	labels := options.Labels
 	if !options.NoConfigHash {
-		hash, err := ServiceHash(service)
+		hash, err := confighash.ServiceHash(service)
 		if err != nil {
 			return createConfigs{}, err
 		}
@@ -1501,7 +1502,7 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 			Options: n.Ipam.Options,
 		}
 	}
-	hash, err := NetworkHash(n)
+	hash, err := confighash.NetworkHash(n)
 	if err != nil {
 		return err
 	}
@@ -1590,7 +1591,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
 	eventName := "Volume " + volume.Name
 	s.events.On(creatingEvent(eventName))
-	hash, err := VolumeHash(volume)
+	hash, err := confighash.VolumeHash(volume)
 	if err != nil {
 		return err
 	}
