@@ -21,15 +21,12 @@ package e2e
 import (
 	"testing"
 	"time"
-
-	"gotest.tools/v3/icmd"
 )
 
 func TestEventsUnknownService(t *testing.T) {
-	c := NewParallelCLI(t)
-
-	cmd := c.NewDockerComposeCmd(t, "-f", "./fixtures/simple-composefile/compose.yaml", "events", "not-a-service")
-	cmd.Timeout = 10 * time.Second
-	res := icmd.RunCmd(cmd)
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "no such service: not-a-service"})
+	NewScenario(t, "events must refuse a service that is not in the project").
+		Step("events on an unknown service fails and names it",
+			ComposeCmd("events", "not-a-service").MayFail().Within(10*time.Second),
+			ExitCode(1),
+			StderrContains("no such service: not-a-service"))
 }

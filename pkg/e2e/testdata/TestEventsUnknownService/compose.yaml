@@ -1,0 +1,7 @@
+services:
+  simple:
+    image: alpine
+    command: top
+  another:
+    image: alpine
+    command: top
