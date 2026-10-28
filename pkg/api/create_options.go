@@ -35,11 +35,18 @@ type InvalidOptionError struct {
 	Option string
 	// Value is the value that was set.
 	Value string
-	// Allowed lists the values the option accepts.
+	// Allowed lists the values the option accepts, when it is a closed set.
 	Allowed []string
+	// Reason explains what is wrong when there is no value to blame, for
+	// instance a required option left unset. It replaces Value and Allowed in
+	// the message.
+	Reason string
 }
 
 func (e *InvalidOptionError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("%s (%s): %s", ErrInvalidOption, e.Option, e.Reason)
+	}
 	return fmt.Sprintf("%s (%s): %q is not one of %s", ErrInvalidOption, e.Option, e.Value, strings.Join(e.Allowed, ", "))
 }
 
