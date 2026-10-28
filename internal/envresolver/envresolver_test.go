@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package envresolver
 
 import (
 	"testing"
@@ -117,7 +117,7 @@ func Test_EnvResolverWithCase(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			f := envResolverWithCase(test.environment, test.caseInsensitive)
+			f := NewWithCase(test.environment, test.caseInsensitive)
 			v, ok := f(test.search)
 			assert.Equal(t, v, test.expectedValue)
 			assert.Equal(t, ok, test.expectedOk)
@@ -128,7 +128,7 @@ func Test_EnvResolverWithCase(t *testing.T) {
 	// to is documented as indefinite, so pin only the shape of the result
 	// (resolves, to one of the folded values) rather than a specific value.
 	t.Run("case insensitive/folded keys conflict is indefinite", func(t *testing.T) {
-		f := envResolverWithCase(map[string]string{"FOO": "upper", "foo": "lower"}, true)
+		f := NewWithCase(map[string]string{"FOO": "upper", "foo": "lower"}, true)
 		v, ok := f("Foo")
 		assert.Assert(t, ok)
 		assert.Assert(t, v == "upper" || v == "lower", "got %q", v)
