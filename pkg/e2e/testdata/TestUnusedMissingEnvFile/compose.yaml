@@ -6,9 +6,3 @@ services:
     image: nginx:latest
     env_file:
       - /doesnotexist/.env
-
-  serviceC:
-    profiles: ["test"]
-    image: alpine
-    env_file: test.env
-

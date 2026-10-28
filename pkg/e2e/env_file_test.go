@@ -18,11 +18,7 @@
 
 package e2e
 
-import (
-	"testing"
-
-	"gotest.tools/v3/icmd"
-)
+import "testing"
 
 func TestRawEnvFile(t *testing.T) {
 	NewScenario(t, "an env_file in raw format must reach the container without interpolation").
@@ -32,49 +28,44 @@ func TestRawEnvFile(t *testing.T) {
 }
 
 func TestUnusedMissingEnvFile(t *testing.T) {
-	c := NewParallelCLI(t)
-	defer c.cleanupWithDown(t, "unused_dotenv")
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "up", "-d", "serviceA")
-
-	// Runtime operations should work even with missing env file
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "ps")
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "logs")
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "exec", "serviceA", "echo", "hello")
-
-	// scale should work even with missing env file on a service not being scaled
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "scale", "serviceA=2")
-
-	// but scaling the service with the missing env file must still fail
-	res := c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "scale", "serviceB=1")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
-
-	// config --hash should work for services not referencing the missing env file
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--hash", "serviceA")
-
-	// but hashing the service with the missing env file must fail, as up would
-	res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--hash", "serviceB")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
-
-	// unless env_file resolution is explicitly disabled
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--no-env-resolution", "--hash", "serviceB")
-
-	// and so must the wildcard, as it includes serviceB
-	res = c.RunDockerComposeCmdNoCheck(t, "-f", "./fixtures/env_file/compose.yaml", "config", "--hash", "*")
-	res.Assert(t, icmd.Expected{ExitCode: 1, Err: "env file /doesnotexist/.env not found"})
-
-	// shell completion should list services even with missing env file.
-	// ComposeStandalonePath fails the test outside standalone mode, so only the
-	// plugin form can be the default here.
-	completeCmd := []string{DockerExecutableName, "__complete", "compose"}
-	if composeStandaloneMode {
-		completeCmd = []string{ComposeStandalonePath(t), "__complete"}
-	}
-	res = c.RunCmd(t, append(completeCmd, "-f", "./fixtures/env_file/compose.yaml", "exec", "")...)
-	res.Assert(t, icmd.Expected{Out: "serviceA"})
-	res.Assert(t, icmd.Expected{Out: "serviceB"})
-
-	c.RunDockerComposeCmd(t, "-f", "./fixtures/env_file/compose.yaml", "down")
+	const missing = "env file /doesnotexist/.env not found"
+	NewScenario(t, "a missing env_file must only break the commands that need the service referencing it").
+		Step("up starts the service that does not reference the missing env_file",
+			ComposeCmd("up", "-d", "serviceA"),
+			ServiceState("serviceA", "running"),
+			ServiceNotCreated("serviceB")).
+		Step("ps still works",
+			ComposeCmd("ps"),
+			StdoutContains("serviceA")).
+		Step("logs still works",
+			ComposeCmd("logs")).
+		Step("exec still works",
+			ComposeCmd("exec", "serviceA", "echo", "hello"),
+			StdoutContains("hello")).
+		Step("scale works on a service that does not reference the missing env_file",
+			ComposeCmd("scale", "serviceA=2"),
+			ServiceScale("serviceA", 2)).
+		Step("scaling the service with the missing env_file still fails",
+			ComposeCmd("scale", "serviceB=1").MayFail(),
+			ExitCode(1),
+			StderrContains(missing),
+			ServiceNotCreated("serviceB")).
+		Step("config --hash works for a service that does not reference it",
+			ComposeCmd("config", "--hash", "serviceA")).
+		Step("config --hash fails for the service with the missing env_file, as up would",
+			ComposeCmd("config", "--hash", "serviceB").MayFail(),
+			ExitCode(1),
+			StderrContains(missing)).
+		Step("config --no-env-resolution skips the env_file resolution",
+			ComposeCmd("config", "--no-env-resolution", "--hash", "serviceB")).
+		Step("config --hash on the wildcard fails, as it includes that service",
+			ComposeCmd("config", "--hash", "*").MayFail(),
+			ExitCode(1),
+			StderrContains(missing)).
+		Step("shell completion still lists the services",
+			CompleteCmd("exec", ""),
+			StdoutContains("serviceA"),
+			StdoutContains("serviceB"))
 }
 
 func TestRunEnvFile(t *testing.T) {
