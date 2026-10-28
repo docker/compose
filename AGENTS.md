@@ -10,16 +10,16 @@ rules in [CONTRIBUTING.md](CONTRIBUTING.md#ai-assisted-contributions).
 - Test unit: `go test ./pkg/...` — needs no Docker daemon; the e2e suite is
   gated behind the `e2e` build tag and is not picked up
 - Test single: `go test ./pkg/compose/ -run TestFunctionName`
-- E2E tests: `go test -tags e2e ./pkg/e2e/ -run TestName` — requires a Docker
+- E2E tests: `go test -tags e2e ./internal/e2e/ -run TestName` — requires a Docker
   daemon and the locally built binary (`make build`)
 
 ## E2E tests
 
 - **New e2e tests use the declarative `Scenario` DSL** (`NewScenario` in
-  `pkg/e2e/scenario.go`): intent, inline compose model, steps as
-  `(command → expected observables)`. Read `pkg/e2e/SCENARIO.md` before
+  `internal/e2e/scenario.go`): intent, inline compose model, steps as
+  `(command → expected observables)`. Read `internal/e2e/SCENARIO.md` before
   writing or debugging one — it codifies the rules (state-based checks first,
-  `OutputContains` as last resort, new checks go in `pkg/e2e/checks.go`) and
+  `OutputContains` as last resort, new checks go in `internal/e2e/checks.go`) and
   how to exploit failure artifacts and `E2E_KEEP_FAILED=1`.
 
 ## Lint
