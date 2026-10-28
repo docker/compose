@@ -122,7 +122,7 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 		// Close the connection to unblock the blocked Read in the copy goroutine,
 		// then wait for it to exit before returning so there is no goroutine leak.
 		attach.Close()
-		<-copyDone
+		<-copyDone //nolint:errcheck // the copy error is irrelevant: the context error is returned
 		return ctx.Err()
 	}
 
