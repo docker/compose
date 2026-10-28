@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/depgraph"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -50,7 +51,7 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 	// for why a per-service limiter alone isn't enough.
 	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return depgraph.InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		if !slices.Contains(options.Services, service) {
 			return nil
 		}

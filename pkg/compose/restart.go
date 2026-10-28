@@ -25,6 +25,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/depgraph"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -55,7 +56,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	// its own maxConcurrency budget
 	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
-	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return depgraph.InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		config := project.Services[service]
 		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers)
 		if err != nil {
