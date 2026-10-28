@@ -16,7 +16,8 @@
 
 // Package api is the contract between the Compose engine and the programs
 // that drive it: the compose CLI, and any third-party software using Compose
-// as a library (see [Compose]).
+// as a library (see [Compose]). The terms it uses are defined in
+// docs/api-vocabulary.md.
 //
 // # Zero values
 //

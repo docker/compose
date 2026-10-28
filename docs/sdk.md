@@ -17,6 +17,9 @@ methods for all core Compose operations including creating, starting, stopping, 
 loading and validating Compose files. The service handles the underlying Docker API interactions and resource
 management, allowing you to focus on your application logic.
 
+The terms used by the options and results of the API (`Services`, `Index`, the `Include…` switches, the events…) are
+defined in the [API vocabulary](api-vocabulary.md).
+
 ## Example usage
 
 Here's a basic example demonstrating how to load a Compose project and start the services:
