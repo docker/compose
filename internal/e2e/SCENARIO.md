@@ -104,5 +104,5 @@ The report opens with everything needed to diagnose without re-running:
 Run a single scenario with:
 
 ```sh
-go test -tags e2e ./pkg/e2e/ -run TestRestart -v
+go test -tags e2e ./internal/e2e/ -run TestRestart -v
 ```

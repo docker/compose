@@ -62,7 +62,7 @@ linters:
           files:
             - "**/pkg/**"
             - "**/internal/**"
-            - "!**/pkg/e2e/**"
+            - "!**/internal/e2e/**"
           deny:
             - pkg: github.com/docker/compose/v5/cmd
               desc: the library must not depend on the CLI, inject an implementation instead.
