@@ -14,27 +14,32 @@
    limitations under the License.
 */
 
-package compose
+package logstream
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
-func (s *composeService) attach(ctx context.Context, project *types.Project, listener api.ContainerEventListener, selectedServices []string) (Containers, error) {
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true, selectedServices...)
+// AttachContainers attaches to the containers of the selected services of the
+// project, reporting their output to listener, and returns them.
+func (s *Service) AttachContainers(ctx context.Context, project *types.Project, listener api.ContainerEventListener, selectedServices []string) ([]container.Summary, error) {
+	containers, err := s.backend.Containers(ctx, project.Name, engine.OneOffExclude, true, selectedServices...)
 	if err != nil {
 		return nil, err
 	}
@@ -42,21 +47,24 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 		return containers, nil
 	}
 
-	containers.sorted() // This enforces predictable colors assignment
+	// This enforces predictable colors assignment
+	sort.Slice(containers, func(i, j int) bool {
+		return naming.CanonicalContainerName(containers[i]) < naming.CanonicalContainerName(containers[j])
+	})
 
 	var names []string
 	for _, ctr := range containers {
 		names = append(names, naming.ContainerNameWithoutProject(ctr))
 	}
 
-	_, err = fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
+	_, err = fmt.Fprintf(s.backend.CLI().Out(), "Attaching to %s\n", strings.Join(names, ", "))
 	if err != nil {
 		logrus.Debugf("failed to write attach message: %v", err)
 	}
 
 	for _, ctr := range containers {
 		service := ctr.Labels[api.ServiceLabel]
-		err := s.doAttachContainer(ctx, service, ctr.ID, naming.ContainerNameWithoutProject(ctr), listener)
+		err := s.AttachContainer(ctx, service, ctr.ID, naming.ContainerNameWithoutProject(ctr), listener)
 		if err != nil {
 			return nil, err
 		}
@@ -64,8 +72,9 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 	return containers, nil
 }
 
-func (s *composeService) doAttachContainer(ctx context.Context, service, id, name string, listener api.ContainerEventListener) error {
-	inspect, err := s.apiClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+// AttachContainer attaches to one container, reporting its output to listener.
+func (s *Service) AttachContainer(ctx context.Context, service, id, name string, listener api.ContainerEventListener) error {
+	inspected, err := s.backend.APIClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -89,7 +98,7 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 		})
 	})
 
-	err = s.attachContainerStreams(ctx, id, inspect.Container.Config.Tty, wOut, wErr)
+	err = s.attachContainerStreams(ctx, id, inspected.Container.Config.Tty, wOut, wErr)
 	if err != nil {
 		return err
 	}
@@ -97,7 +106,7 @@ func (s *composeService) doAttachContainer(ctx context.Context, service, id, nam
 	return nil
 }
 
-func (s *composeService) attachContainerStreams(ctx context.Context, containerID string, tty bool, stdout, stderr io.WriteCloser) error {
+func (s *Service) attachContainerStreams(ctx context.Context, containerID string, tty bool, stdout, stderr io.WriteCloser) error {
 	streamOut, err := s.getContainerStreams(ctx, containerID)
 	if err != nil {
 		return err
@@ -131,8 +140,8 @@ func (s *composeService) attachContainerStreams(ctx context.Context, containerID
 	return nil
 }
 
-func (s *composeService) getContainerStreams(ctx context.Context, containerID string) (io.ReadCloser, error) {
-	attachResponse, err := s.apiClient().ContainerAttach(ctx, containerID, client.ContainerAttachOptions{
+func (s *Service) getContainerStreams(ctx context.Context, containerID string) (io.ReadCloser, error) {
+	attachResponse, err := s.backend.APIClient().ContainerAttach(ctx, containerID, client.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  false,
 		Stdout: true,
@@ -140,12 +149,12 @@ func (s *composeService) getContainerStreams(ctx context.Context, containerID st
 		Logs:   false,
 	})
 	if err == nil {
-		stdout := ContainerStdout{HijackedResponse: attachResponse.HijackedResponse}
+		stdout := hijackedStdout{HijackedResponse: attachResponse.HijackedResponse}
 		return stdout, nil
 	}
 
 	// Fallback to logs API
-	logs, err := s.apiClient().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
+	logs, err := s.backend.APIClient().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,
@@ -154,4 +163,22 @@ func (s *composeService) getContainerStreams(ctx context.Context, containerID st
 		return nil, err
 	}
 	return logs, nil
+}
+
+var _ io.ReadCloser = hijackedStdout{}
+
+// hijackedStdout implements ReadCloser for client.HijackedResponse.
+type hijackedStdout struct {
+	client.HijackedResponse
+}
+
+// Read implements io.ReadCloser.
+func (l hijackedStdout) Read(p []byte) (n int, err error) {
+	return l.Reader.Read(p)
+}
+
+// Close implements io.ReadCloser.
+func (l hijackedStdout) Close() error {
+	l.HijackedResponse.Close()
+	return nil
 }
