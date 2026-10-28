@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package build
 
 import (
 	"bufio"
@@ -53,8 +53,15 @@ import (
 	"github.com/tonistiigi/go-csvvalue"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
+
+// buildxMinVersion is the minimum required version of buildx for compose build
+const buildxMinVersion = "0.17.0"
+
+// buildxJobsMinVersion is the minimum version of buildx supporting `bake --jobs`
+const buildxJobsMinVersion = "0.38.0"
 
 func buildWithBake(dockerCli command.Cli) (bool, error) {
 	enabled, err := dockerCli.BuildKitEnabled()
@@ -135,7 +142,7 @@ type bakeBuild struct {
 	jobs            int // bake `--jobs` limit, 0 for unlimited
 }
 
-func (s *composeService) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
+func (s *Service) doBuildBake(ctx context.Context, project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) (map[string]string, error) {
 	eg := errgroup.Group{}
 	ch := make(chan *client.SolveStatus)
 	displayMode := progressui.DisplayMode(options.Progress)
@@ -144,7 +151,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	}
 	out := options.Out
 	if out == nil {
-		out = s.stdout()
+		out = s.backend.CLI().Out()
 	}
 	display, err := progressui.NewDisplay(makeConsole(out), displayMode)
 	if err != nil {
@@ -162,7 +169,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 		return nil, err
 	}
 	if options.Print {
-		_, err = fmt.Fprintln(s.stdout(), string(cfgJSON))
+		_, err = fmt.Fprintln(s.backend.CLI().Out(), string(cfgJSON))
 		return nil, err
 	}
 	logrus.Debugf("bake build config:\n%s", string(cfgJSON))
@@ -179,20 +186,20 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	if err != nil {
 		return nil, err
 	}
-	bake.jobs = bakeJobs(bake.cfg, s.maxConcurrency, buildx.Version)
+	bake.jobs = bakeJobs(bake.cfg, s.backend.MaxConcurrency(), buildx.Version)
 	args := bakeArgs(bake, metadataFile, options)
 	logrus.Debugf("Executing bake with args: %v", args)
 
-	if s.dryRun {
+	if s.backend.DryRun() {
 		return s.dryRunBake(bake.cfg), nil
 	}
 	cmd := exec.CommandContext(ctx, buildx.Path, args...)
 
-	err = s.prepareShellOut(ctx, types.NewMapping(os.Environ()), cmd)
+	err = s.backend.PrepareShellOut(ctx, types.NewMapping(os.Environ()), cmd)
 	if err != nil {
 		return nil, err
 	}
-	endpoint, cleanup, err := s.propagateDockerEndpoint()
+	endpoint, cleanup, err := s.backend.PropagateDockerEndpoint()
 	if err != nil {
 		return nil, err
 	}
@@ -200,7 +207,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 	cmd.Env = append(cmd.Env, endpoint...)
 	cmd.Env = append(cmd.Env, bake.secretsEnv...)
 
-	cmd.Stdout = s.stdout()
+	cmd.Stdout = s.backend.CLI().Out()
 	cmd.Stdin = bytes.NewBuffer(cfgJSON)
 	pipe, err := cmd.StderrPipe()
 	if err != nil {
@@ -230,7 +237,7 @@ func (s *composeService) doBuildBake(ctx context.Context, project *types.Project
 
 // prepareBakeBuild translates the project's build configuration into a bake
 // file definition and the side-band settings bake takes on its command line.
-func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) *bakeBuild {
+func (s *Service) prepareBakeBuild(project *types.Project, serviceToBeBuild types.Services, options api.BuildOptions) *bakeBuild {
 	bake := &bakeBuild{
 		cfg: bakeConfig{
 			Groups:  map[string]bakeGroup{},
@@ -250,7 +257,7 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 		}
 		buildConfig := *service.Build
 
-		args := resolveAndMergeBuildArgs(s.getProxyConfig(), project, service, options).ToMapping()
+		args := resolveAndMergeBuildArgs(s.backend.ProxyConfig(), project, service, options).ToMapping()
 		for k, v := range args {
 			args[k] = strings.ReplaceAll(v, "${", "$${")
 		}
@@ -278,7 +285,7 @@ func (s *composeService) prepareBakeBuild(project *types.Project, serviceToBeBui
 
 		image := api.GetImageNameOrDefault(service, project.Name)
 		if _, ok := serviceToBeBuild[serviceName]; ok {
-			s.events.On(buildingEvent(image))
+			s.backend.Events().On(progress.Building(image))
 			bake.expectedImages[serviceName] = image
 		}
 
@@ -599,7 +606,7 @@ func forwardBakeStatus(pipe io.Reader, ch chan<- *client.SolveStatus) ([]string,
 
 // collectBakeResults reads bake's metadata file and maps each built image to
 // its canonical digest.
-func (s *composeService) collectBakeResults(ctx context.Context, metadataFile string, serviceToBeBuild types.Services, bake *bakeBuild) (map[string]string, error) {
+func (s *Service) collectBakeResults(ctx context.Context, metadataFile string, serviceToBeBuild types.Services, bake *bakeBuild) (map[string]string, error) {
 	raw, err := os.ReadFile(metadataFile)
 	if err != nil {
 		return nil, err
@@ -623,15 +630,15 @@ func (s *composeService) collectBakeResults(ctx context.Context, metadataFile st
 		if !ok {
 			return nil, fmt.Errorf("build result not found in Bake metadata for service %s", name)
 		}
-		results[image] = s.canonicalBuiltDigest(ctx, image, service.Platform, built.Digest)
-		s.events.On(builtEvent(image))
+		results[image] = s.backend.CanonicalBuiltDigest(ctx, image, service.Platform, built.Digest)
+		s.backend.Events().On(progress.Built(image))
 	}
 
 	return results, nil
 }
 
-func (s *composeService) getBuildxPlugin() (*manager.Plugin, error) {
-	buildx, err := manager.GetPlugin("buildx", s.dockerCli, &cobra.Command{})
+func (s *Service) getBuildxPlugin() (*manager.Plugin, error) {
+	buildx, err := manager.GetPlugin("buildx", s.backend.CLI(), &cobra.Command{})
 	if err != nil {
 		return nil, err
 	}
@@ -802,16 +809,16 @@ func dockerFilePath(ctxName string, dockerfile string) string {
 	return dockerfile
 }
 
-func (s *composeService) dryRunBake(cfg bakeConfig) map[string]string {
+func (s *Service) dryRunBake(cfg bakeConfig) map[string]string {
 	bakeResponse := map[string]string{}
 	for name, target := range cfg.Targets {
 		dryRunUUID := fmt.Sprintf("dryRun-%x", sha1.Sum([]byte(name)))
-		s.events.On(api.Resource{
+		s.backend.Events().On(api.Resource{
 			ID:     name + " ==>",
 			Status: api.Done,
 			Text:   "==> writing image " + dryRunUUID,
 		})
-		s.events.On(api.Resource{
+		s.backend.Events().On(api.Resource{
 			ID:     name + " ==> ==>",
 			Status: api.Done,
 			Text:   "naming to " + target.Tags[0],
@@ -819,7 +826,7 @@ func (s *composeService) dryRunBake(cfg bakeConfig) map[string]string {
 		bakeResponse[name] = dryRunUUID
 	}
 	for name := range bakeResponse {
-		s.events.On(builtEvent(name))
+		s.backend.Events().On(progress.Built(name))
 	}
 	return bakeResponse
 }

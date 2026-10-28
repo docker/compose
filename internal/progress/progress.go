@@ -112,3 +112,13 @@ func (Noop) Done(string, bool) {}
 
 // On does nothing.
 func (Noop) On(...api.Resource) {}
+
+// Building is the event of an image being built.
+func Building(id string) api.Resource {
+	return New("Image "+id, api.Working, api.StatusBuilding)
+}
+
+// Built is the event of an image that was built.
+func Built(id string) api.Resource {
+	return New("Image "+id, api.Done, api.StatusBuilt)
+}
