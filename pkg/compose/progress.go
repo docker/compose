@@ -43,16 +43,6 @@ func errorEventf(id string, msg string, args ...any) api.Resource {
 	return progress.Error(id, fmt.Sprintf(msg, args...))
 }
 
-// buildingEvent creates a new Building in progress Resource
-func buildingEvent(id string) api.Resource {
-	return progress.New("Image "+id, api.Working, api.StatusBuilding)
-}
-
-// builtEvent creates a new built (done) Resource
-func builtEvent(id string) api.Resource {
-	return progress.New("Image "+id, api.Done, api.StatusBuilt)
-}
-
 // decodeProgressStream reads the JSON messages the daemon streams while pulling or
 // pushing an image, handing each of them to onMessage. It stops at the first
 // message carrying an error, which it returns.

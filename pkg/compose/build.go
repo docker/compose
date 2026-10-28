@@ -19,13 +19,16 @@ package compose
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"sort"
 	"strings"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli/command"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/build"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -48,62 +51,10 @@ func (s *composeService) Build(ctx context.Context, project *types.Project, opti
 	}, "build", s.events)
 }
 
+// build serves the build of the project's services, which lives in
+// internal/build: composeService hands that package the engine it acts on.
 func (s *composeService) build(ctx context.Context, project *types.Project, options api.BuildOptions, localImages map[string]api.ImageSummary) (map[string]string, error) {
-	imageIDs := map[string]string{}
-	serviceToBuild := types.Services{}
-
-	var policy types.DependencyOption = types.IgnoreDependencies
-	if options.Deps {
-		policy = types.IncludeDependencies
-	}
-
-	if len(options.Services) == 0 {
-		options.Services = project.ServiceNames()
-	}
-
-	// also include services used as additional_contexts with service: prefix
-	options.Services = addBuildDependencies(options.Services, project)
-
-	// Some build dependencies we just introduced may not be enabled
-	var err error
-	project, err = project.WithServicesEnabled(options.Services...)
-	if err != nil {
-		return nil, err
-	}
-
-	project, err = project.WithSelectedServices(options.Services)
-	if err != nil {
-		return nil, err
-	}
-
-	err = project.ForEachService(options.Services, func(serviceName string, service *types.ServiceConfig) error {
-		if service.Build == nil {
-			return nil
-		}
-		image := api.GetImageNameOrDefault(*service, project.Name)
-		_, localImagePresent := localImages[image]
-		if localImagePresent && service.PullPolicy != types.PullPolicyBuild {
-			return nil
-		}
-		serviceToBuild[serviceName] = *service
-		return nil
-	}, policy)
-	if err != nil {
-		return imageIDs, err
-	}
-
-	if len(serviceToBuild) == 0 {
-		return imageIDs, nil
-	}
-
-	bake, err := buildWithBake(s.dockerCli)
-	if err != nil {
-		return nil, err
-	}
-	if bake {
-		return s.doBuildBake(ctx, project, serviceToBuild, options)
-	}
-	return s.doBuildClassic(ctx, project, serviceToBuild, options)
+	return build.New(buildBackend{s}).Build(ctx, project, options, localImages)
 }
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool, skipProviders bool) error {
@@ -292,63 +243,49 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	return imgs, pinnedDigests, nil
 }
 
-// resolveAndMergeBuildArgs returns the final set of build arguments to use for the service image build.
-//
-// First, args directly defined via `build.args` in YAML are considered.
-// Then, any explicitly passed args in opts (e.g. via `--build-arg` on the CLI) are merged, overwriting any
-// keys that already exist.
-// Next, any keys without a value are resolved using the project environment.
-//
-// Finally, standard proxy variables based on the Docker client configuration are added, but will not overwrite
-// any values if already present.
-func resolveAndMergeBuildArgs(proxyConfig map[string]*string, project *types.Project, service types.ServiceConfig, options api.BuildOptions) types.MappingWithEquals {
-	result := make(types.MappingWithEquals).
-		OverrideBy(service.Build.Args).
-		OverrideBy(options.Args).
-		Resolve(envResolver(project.Environment))
-
-	// proxy arguments do NOT override and should NOT have env resolution applied,
-	// so they're handled last
-	for k, v := range proxyConfig {
-		if _, ok := result[k]; !ok {
-			result[k] = v
-		}
-	}
-	return result
+// buildBackend is the engine of a composeService, as internal/build sees it.
+type buildBackend struct {
+	s *composeService
 }
 
-func getImageBuildLabels(project *types.Project, service types.ServiceConfig) types.Labels {
-	ret := make(types.Labels)
-	if service.Build != nil {
-		for k, v := range service.Build.Labels {
-			ret.Add(k, v)
-		}
-	}
-
-	ret.Add(api.VersionLabel, api.ComposeVersion)
-	ret.Add(api.ProjectLabel, project.Name)
-	ret.Add(api.ServiceLabel, service.Name)
-	return ret
+func (b buildBackend) CLI() command.Cli {
+	return b.s.dockerCli
 }
 
-func addBuildDependencies(services []string, project *types.Project) []string {
-	servicesWithDependencies := utils.NewSet(services...)
-	for _, service := range services {
-		s, ok := project.Services[service]
-		if !ok {
-			s = project.DisabledServices[service]
-		}
-		b := s.Build
-		if b != nil {
-			for _, target := range b.AdditionalContexts {
-				if s, found := strings.CutPrefix(target, types.ServicePrefix); found {
-					servicesWithDependencies.Add(s)
-				}
-			}
-		}
-	}
-	if len(servicesWithDependencies) > len(services) {
-		return addBuildDependencies(servicesWithDependencies.Elements(), project)
-	}
-	return servicesWithDependencies.Elements()
+func (b buildBackend) Events() api.EventProcessor {
+	return b.s.events
+}
+
+func (b buildBackend) DryRun() bool {
+	return b.s.dryRun
+}
+
+func (b buildBackend) ProxyConfig() map[string]*string {
+	return b.s.getProxyConfig()
+}
+
+func (b buildBackend) InDependencyOrder(ctx context.Context, project *types.Project, fn func(ctx context.Context, service string) error) error {
+	return InDependencyOrder(ctx, project, fn, func(traversal *graphTraversal) {
+		traversal.maxConcurrency = b.s.maxConcurrency
+	})
+}
+
+func (b buildBackend) MaxConcurrency() int {
+	return b.s.maxConcurrency
+}
+
+func (b buildBackend) CanonicalBuiltDigest(ctx context.Context, imageRef, platform, builderDigest string) string {
+	return b.s.canonicalBuiltDigest(ctx, imageRef, platform, builderDigest)
+}
+
+func (b buildBackend) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
+	return b.s.push(ctx, project, options)
+}
+
+func (b buildBackend) PrepareShellOut(ctx context.Context, env types.Mapping, cmd *exec.Cmd) error {
+	return b.s.prepareShellOut(ctx, env, cmd)
+}
+
+func (b buildBackend) PropagateDockerEndpoint() ([]string, func(), error) {
+	return b.s.propagateDockerEndpoint()
 }
