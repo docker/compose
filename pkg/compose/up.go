@@ -37,6 +37,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/desktop"
+	"github.com/docker/compose/v5/internal/devwatch"
 	"github.com/docker/compose/v5/internal/logstream"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/tracing"
@@ -207,7 +208,7 @@ type upSession struct {
 	// logStreams counts the in-flight re-attach log streams so shutdown can
 	// drain them before tearing the context down — see the monitor wrapper.
 	logStreams sync.WaitGroup
-	watcher    *Watcher
+	watcher    *devwatch.Watcher
 	menu       NavigationMenu
 	globalCtx  context.Context
 	cancel     context.CancelFunc
@@ -254,7 +255,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		logConsumer = navigationMenu.Decorate(logConsumer)
 	}
 
-	watcher, err := NewWatcher(project, options, s.watch, logConsumer)
+	watcher, err := devwatch.NewWatcher(project, options, s.watch, logConsumer)
 	if err != nil && options.Start.Watch {
 		return err
 	}
