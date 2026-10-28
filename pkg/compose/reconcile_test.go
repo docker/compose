@@ -30,6 +30,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -391,10 +392,10 @@ func TestReconcileNetworks_Renamed(t *testing.T) {
 	var removed, created string
 	for _, n := range plan.Nodes {
 		switch n.Operation.Type {
-		case OpRemoveNetwork:
+		case planning.OpRemoveNetwork:
 			removed = n.Operation.Name
 			assert.Assert(t, n.Operation.BestEffort, "rename removal must be best-effort")
-		case OpCreateNetwork:
+		case planning.OpCreateNetwork:
 			created = n.Operation.Name
 		}
 	}
@@ -886,12 +887,12 @@ func TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume(t *testing.T) {
 		"volumes_from consumer must be removed before RemoveVolume:\n%s", planStr)
 
 	// RemoveVolume must depend on the consumer's RemoveContainer node.
-	var removeConsumer, removeVolume *PlanNode
+	var removeConsumer, removeVolume *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpRemoveContainer && n.Operation.ResourceID == "service:consumer:1" {
+		if n.Operation.Type == planning.OpRemoveContainer && n.Operation.ResourceID == "service:consumer:1" {
 			removeConsumer = n
 		}
-		if n.Operation.Type == OpRemoveVolume {
+		if n.Operation.Type == planning.OpRemoveVolume {
 			removeVolume = n
 		}
 	}
@@ -1373,7 +1374,7 @@ func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
 `)+"\n")
 
 	for _, n := range plan.Nodes {
-		if n.Operation.Type != OpRemoveContainer {
+		if n.Operation.Type != planning.OpRemoveContainer {
 			continue
 		}
 		assert.Assert(t, n.Operation.BestEffort, "purge #%d must not abort the plan on failure", n.ID)
@@ -1413,10 +1414,10 @@ func TestReconcileContainers_HooksRemovedStillPurgesStaleRunners(t *testing.T) {
 
 	purged, created := false, 0
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
+		if n.Operation.Type == planning.OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
 			purged = true
 		}
-		if n.Operation.Type == OpCreateHookContainer && n.Operation.Service.Name == "app" {
+		if n.Operation.Type == planning.OpCreateHookContainer && n.Operation.Service.Name == "app" {
 			created++
 		}
 	}
@@ -1452,10 +1453,10 @@ func TestReconcileContainers_ScaleZeroStillPurgesStaleRunners(t *testing.T) {
 
 	purged, created := false, 0
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
+		if n.Operation.Type == planning.OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
 			purged = true
 		}
-		if n.Operation.Type == OpCreateHookContainer && n.Operation.Service.Name == "app" {
+		if n.Operation.Type == planning.OpCreateHookContainer && n.Operation.Service.Name == "app" {
 			created++
 		}
 	}
@@ -1492,7 +1493,7 @@ func TestReconcileContainers_HookRunnersPlannedOnColdStart(t *testing.T) {
 `)+"\n")
 
 	for _, n := range plan.Nodes {
-		if n.Operation.Type != OpCreateHookContainer {
+		if n.Operation.Type != planning.OpCreateHookContainer {
 			continue
 		}
 		assert.Equal(t, n.Operation.Name, getHookContainerName("myproject", "app", n.Operation.HookIndex))
@@ -1599,9 +1600,9 @@ func TestReconcileContainers_HookRunnersPlannedOnRecreate(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	var hookCreates []*PlanNode
+	var hookCreates []*planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpCreateHookContainer {
+		if n.Operation.Type == planning.OpCreateHookContainer {
 			hookCreates = append(hookCreates, n)
 		}
 	}

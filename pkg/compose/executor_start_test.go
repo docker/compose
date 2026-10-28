@@ -39,6 +39,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -88,7 +89,7 @@ func TestExecWaitCondition_RequiredMissingDependencyFails(t *testing.T) {
 	svc, _, _ := newStartPhaseTestService(t)
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
-	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
+	err := exec.execWaitCondition(t.Context(), t.Context(), planning.Operation{
 		Name:      "db",
 		Condition: types.ServiceConditionHealthy,
 	})
@@ -103,7 +104,7 @@ func TestExecWaitCondition_OptionalMissingDependencyIsTolerated(t *testing.T) {
 	svc, _, recorder := newStartPhaseTestService(t)
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
-	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
+	err := exec.execWaitCondition(t.Context(), t.Context(), planning.Operation{
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 		BestEffort: true,
@@ -145,7 +146,7 @@ func TestExecWaitCondition_HealthyConditionSatisfied(t *testing.T) {
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
 	exec.containersByService["db"] = Containers{dbSummary}
 
-	err := exec.execWaitCondition(t.Context(), t.Context(), Operation{
+	err := exec.execWaitCondition(t.Context(), t.Context(), planning.Operation{
 		Name:      "db",
 		Condition: types.ServiceConditionHealthy,
 	})
@@ -184,9 +185,9 @@ func TestExecutePlanWaitConditionRespectsContextDeadline(t *testing.T) {
 		},
 	}, nil).AnyTimes()
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
@@ -249,15 +250,15 @@ func TestExecutePlanWaitDeadlineOnlyBoundsWaitNodes(t *testing.T) {
 			return client.NetworkCreateResult{ID: "net-id"}, nil
 		})
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
@@ -311,9 +312,9 @@ func TestExecutePlanOptionalWaitDoesNotSwallowInheritedDeadline(t *testing.T) {
 		},
 	}, nil).AnyTimes()
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
@@ -362,9 +363,9 @@ func TestExecutePlanOptionalWaitTimeoutIsToleratedWithoutInheritedDeadline(t *te
 		},
 	}, nil).AnyTimes()
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
@@ -418,19 +419,19 @@ func TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase(t *testing.T) {
 			return client.ContainerStartResult{}, nil
 		})
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
-	start := plan.addNode(Operation{
-		Type:       OpStartContainer,
+	start := plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:db:1",
 		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
 	}, "")
-	start.Phase = PhaseStart
+	start.Phase = planning.PhaseStart
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
@@ -442,7 +443,7 @@ func TestExecutePlanCreatePhaseIsABarrierBeforeStartPhase(t *testing.T) {
 // cancellation didn't weaken the Create phase's own existing fail-fast
 // behavior -- two independent (no DependsOn edge) Create-phase nodes, one
 // failing immediately, must still cancel the other's in-flight work. Both
-// nodes default to Phase: PhaseCreate (addNode's zero value), so they share
+// nodes default to Phase: PhaseCreate (AddNode's zero value), so they share
 // the same runPhase call's phaseCancel.
 func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 	svc, apiClient := newTestService(t)
@@ -463,15 +464,15 @@ func TestExecutePlanCreatePhaseFailureCancelsCreatePhase(t *testing.T) {
 	nw := types.NetworkConfig{Name: "test_default"}
 	vol := types.VolumeConfig{Name: "data", Driver: "local"}
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpCreateVolume,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateVolume,
 		ResourceID: "volume:data",
 		Name:       vol.Name,
 		Volume:     &vol,
@@ -522,10 +523,10 @@ func TestExecutePlanCanceledDependencyIsRecordedAsFailure(t *testing.T) {
 	volB := types.VolumeConfig{Name: "b", Driver: "local"}
 
 	for range 200 {
-		plan := &Plan{}
-		x := plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
-		a := plan.addNode(Operation{Type: OpCreateVolume, ResourceID: "volume:a", Name: volA.Name, Volume: &volA}, "", x)
-		plan.addNode(Operation{Type: OpCreateVolume, ResourceID: "volume:b", Name: volB.Name, Volume: &volB}, "", a)
+		plan := &planning.Plan{}
+		x := plan.AddNode(planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+		a := plan.AddNode(planning.Operation{Type: planning.OpCreateVolume, ResourceID: "volume:a", Name: volA.Name, Volume: &volA}, "", x)
+		plan.AddNode(planning.Operation{Type: planning.OpCreateVolume, ResourceID: "volume:b", Name: volB.Name, Volume: &volB}, "", a)
 
 		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 		assert.ErrorContains(t, exec.run(t.Context(), plan), "boom")
@@ -548,19 +549,19 @@ func TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase(t *testing.T) {
 
 	nw := types.NetworkConfig{Name: "test_default"}
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "")
-	start := plan.addNode(Operation{
-		Type:       OpStartContainer,
+	start := plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:db:1",
 		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
 	}, "")
-	start.Phase = PhaseStart
+	start.Phase = planning.PhaseStart
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
@@ -594,24 +595,24 @@ func TestExecutePlanCreatePhaseFailureNeverDispatchesStartPhase(t *testing.T) {
 func TestExecutePlanConcurrentPhaseFailureKeepsOriginatingError(t *testing.T) {
 	svc, _ := newTestService(t)
 
-	plan := &Plan{}
-	fail := plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	fail := plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:missing:service_healthy",
 		Name:       "missing", // no registered containers under this name -> immediate failure
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
-	fail.Phase = PhaseStart
+	fail.Phase = planning.PhaseStart
 
-	phantom := &PlanNode{ID: -1} // never added to plan.Nodes; its done-channel is never created
+	phantom := &planning.PlanNode{ID: -1} // never added to plan.Nodes; its done-channel is never created
 	const siblings = 30
 	for i := range siblings {
-		blocked := plan.addNode(Operation{
-			Type:       OpWaitCondition,
+		blocked := plan.AddNode(planning.Operation{
+			Type:       planning.OpWaitCondition,
 			ResourceID: fmt.Sprintf("wait:phantom:%d", i),
 			Name:       "phantom",
 		}, "", phantom)
-		blocked.Phase = PhaseStart
+		blocked.Phase = planning.PhaseStart
 	}
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
@@ -643,17 +644,17 @@ func TestExecStartContainer_EnrichedResolvesCreateNodeAndStarts(t *testing.T) {
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "new-id", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
 
-	plan := &Plan{}
-	create := plan.addNode(Operation{
-		Type:       OpCreateContainer,
+	plan := &planning.Plan{}
+	create := plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateContainer,
 		ResourceID: "service:web:1",
 		Cause:      "no existing container",
 		Service:    &service,
 		Name:       "test-web-1",
 		Number:     1,
 	}, "")
-	plan.addNode(Operation{
-		Type:         OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:         planning.OpStartContainer,
 		ResourceID:   "service:web:1",
 		Cause:        "start",
 		Service:      &service,
@@ -699,29 +700,29 @@ func TestExecutePlanRecreateThenStartUsesFinalName(t *testing.T) {
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "new-id", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil)
 
-	plan := &Plan{}
-	create := plan.addNode(Operation{
-		Type:       OpCreateContainer,
+	plan := &planning.Plan{}
+	create := plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateContainer,
 		ResourceID: "service:web:1",
 		Cause:      "config changed (tmpName)",
 		Service:    &service,
 		Name:       tmpName,
 		Number:     1,
 	}, "")
-	rename := plan.addNode(Operation{
-		Type:         OpRenameContainer,
+	rename := plan.AddNode(planning.Operation{
+		Type:         planning.OpRenameContainer,
 		ResourceID:   "service:web:1",
 		Cause:        "finalize recreate",
 		Name:         finalName,
 		CreateNodeID: create.ID,
 	}, "", create)
-	plan.addNode(Operation{
-		Type:         OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:         planning.OpStartContainer,
 		ResourceID:   "service:web:1",
 		Cause:        "start",
 		Service:      &service,
 		CreateNodeID: create.ID,
-	}, "start:web:1", rename).Phase = PhaseStart
+	}, "start:web:1", rename).Phase = planning.PhaseStart
 
 	err := svc.executePlan(t.Context(), project, emptyObservedState("test"), plan)
 	assert.NilError(t, err)
@@ -758,8 +759,8 @@ func TestExecRenameContainer_RefreshesLiveViewName(t *testing.T) {
 	exec.pctx.set(1, operationResult{ContainerID: "new-id", ContainerName: tmpName})
 	exec.containersByService["web"] = Containers{{ID: "new-id", Names: []string{"/" + tmpName}}}
 
-	node := &PlanNode{ID: 2, Operation: Operation{
-		Type:         OpRenameContainer,
+	node := &planning.PlanNode{ID: 2, Operation: planning.Operation{
+		Type:         planning.OpRenameContainer,
 		Name:         finalName,
 		Service:      &service,
 		CreateNodeID: 1,
@@ -789,7 +790,7 @@ func TestExecRunPreStart_SkipsWhenReplicaAlreadyRunning(t *testing.T) {
 	// never happens once the drift guard skips the node.
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
-	err := exec.execRunPreStart(t.Context(), Operation{Service: &service})
+	err := exec.execRunPreStart(t.Context(), planning.Operation{Service: &service})
 	assert.NilError(t, err)
 }
 
@@ -809,7 +810,7 @@ func TestExecRunPreStart_BailsOutWhenContextCanceled(t *testing.T) {
 	cancel()
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
-	err := exec.execRunPreStart(ctx, Operation{Service: &service})
+	err := exec.execRunPreStart(ctx, planning.Operation{Service: &service})
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
@@ -850,7 +851,7 @@ func TestExecRunPostStart_RunsHookAndStreamsToListener(t *testing.T) {
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.listener = listener
-	err := exec.execRunPostStart(t.Context(), Operation{Service: &service, Container: &ctr})
+	err := exec.execRunPostStart(t.Context(), planning.Operation{Service: &service, Container: &ctr})
 	assert.NilError(t, err)
 	assert.DeepEqual(t, lines, []string{"post-start ok"})
 }
@@ -883,9 +884,9 @@ func TestExecutePlanStartInjectsSecretsAndConfigsBeforeContainerStart(t *testing
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "web-id", gomock.Any()).
 		Return(client.ContainerStartResult{}, nil).After(config)
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:web:1",
 		Cause:      "start",
 		Service:    &service,
@@ -919,16 +920,16 @@ func TestExecutePlanFailedPostStartFailsTheStart(t *testing.T) {
 	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
 		Return(client.ExecInspectResult{ExitCode: 3}, nil)
 
-	plan := &Plan{}
-	start := plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan := &planning.Plan{}
+	start := plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:web:1",
 		Cause:      "start",
 		Service:    &service,
 		Container:  &ctr,
 	}, "start:web:1")
-	plan.addNode(Operation{
-		Type:       OpRunPostStart,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpRunPostStart,
 		ResourceID: "service:web:1",
 		Cause:      "post_start hooks",
 		Service:    &service,
@@ -985,16 +986,16 @@ func TestExecutePlanStartPhaseEventContract(t *testing.T) {
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "app-id", gomock.Any()).Return(client.ContainerStartResult{}, nil)
 
 	appSvc := project.Services["app"]
-	plan := &Plan{}
-	wait := plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Cause:      "app depends on db (service_healthy)",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:app:1",
 		Cause:      "start",
 		Service:    &appSvc,
@@ -1063,31 +1064,31 @@ func TestExecutePlanStartPhaseFullChainThroughCreateNode(t *testing.T) {
 	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec1", gomock.Any()).
 		Return(client.ExecInspectResult{ExitCode: 0}, nil)
 
-	plan := &Plan{}
-	create := plan.addNode(Operation{
-		Type:       OpCreateContainer,
+	plan := &planning.Plan{}
+	create := plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateContainer,
 		ResourceID: "service:web:1",
 		Cause:      "no existing container",
 		Service:    &service,
 		Name:       "test-web-1",
 		Number:     1,
 	}, "")
-	preStart := plan.addNode(Operation{
-		Type:         OpRunPreStart,
+	preStart := plan.AddNode(planning.Operation{
+		Type:         planning.OpRunPreStart,
 		ResourceID:   "service:web:1",
 		Cause:        "pre_start hooks",
 		Service:      &service,
 		CreateNodeID: create.ID,
 	}, "start:web:1", create)
-	start := plan.addNode(Operation{
-		Type:         OpStartContainer,
+	start := plan.AddNode(planning.Operation{
+		Type:         planning.OpStartContainer,
 		ResourceID:   "service:web:1",
 		Cause:        "start",
 		Service:      &service,
 		CreateNodeID: create.ID,
 	}, "start:web:1", preStart)
-	plan.addNode(Operation{
-		Type:         OpRunPostStart,
+	plan.AddNode(planning.Operation{
+		Type:         planning.OpRunPostStart,
 		ResourceID:   "service:web:1",
 		Cause:        "post_start hooks",
 		Service:      &service,
@@ -1111,9 +1112,9 @@ func TestExecutePlanStartPhaseFullChainThroughCreateNode(t *testing.T) {
 func TestExecutePlanMissingRequiredDependencyFailsSilently(t *testing.T) {
 	svc, _, recorder := newStartPhaseTestService(t)
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Cause:      "app depends on db (service_healthy)",
 		Name:       "db",
@@ -1168,24 +1169,24 @@ func TestExecutePlanFailedPreStartGatesStart(t *testing.T) {
 	// No ContainerStart expectation: registering one here would hide the
 	// bug by silently accepting the call this test exists to forbid.
 
-	plan := &Plan{}
-	create := plan.addNode(Operation{
-		Type:       OpCreateContainer,
+	plan := &planning.Plan{}
+	create := plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateContainer,
 		ResourceID: "service:web:1",
 		Cause:      "no existing container",
 		Service:    &service,
 		Name:       "test-web-1",
 		Number:     1,
 	}, "")
-	preStart := plan.addNode(Operation{
-		Type:         OpRunPreStart,
+	preStart := plan.AddNode(planning.Operation{
+		Type:         planning.OpRunPreStart,
 		ResourceID:   "service:web:1",
 		Cause:        "pre_start hooks",
 		Service:      &service,
 		CreateNodeID: create.ID,
 	}, "start:web:1", create)
-	plan.addNode(Operation{
-		Type:         OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:         planning.OpStartContainer,
 		ResourceID:   "service:web:1",
 		Cause:        "start",
 		Service:      &service,
@@ -1235,9 +1236,9 @@ func TestExecutePlanWaitTimeoutIsMarked(t *testing.T) {
 		},
 	}, nil).AnyTimes()
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
@@ -1264,12 +1265,12 @@ func TestExecutePlanOtherDeadlinesAreNotWaitTimeouts(t *testing.T) {
 		apiClient.EXPECT().ContainerStart(gomock.Any(), "db-id", gomock.Any()).
 			Return(client.ContainerStartResult{}, context.DeadlineExceeded)
 
-		plan := &Plan{}
-		plan.addNode(Operation{
-			Type:       OpStartContainer,
+		plan := &planning.Plan{}
+		plan.AddNode(planning.Operation{
+			Type:       planning.OpStartContainer,
 			ResourceID: "service:db:1",
 			Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
-		}, "").Phase = PhaseStart
+		}, "").Phase = planning.PhaseStart
 
 		exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 		exec.waitTimeout = time.Minute
@@ -1298,9 +1299,9 @@ func TestExecutePlanOtherDeadlinesAreNotWaitTimeouts(t *testing.T) {
 			},
 		}, nil).AnyTimes()
 
-		plan := &Plan{}
-		plan.addNode(Operation{
-			Type:       OpWaitCondition,
+		plan := &planning.Plan{}
+		plan.AddNode(planning.Operation{
+			Type:       planning.OpWaitCondition,
 			ResourceID: "wait:db:service_healthy",
 			Name:       "db",
 			Condition:  types.ServiceConditionHealthy,
@@ -1343,21 +1344,21 @@ func TestExecutePlanWaitTimeoutSurvivesDependentSkip(t *testing.T) {
 	}, nil).AnyTimes()
 	// no ContainerStart expectation: the dependent must never run
 
-	plan := &Plan{}
-	wait := plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
 	// both in the Start phase, like the reconciler plans them: the skipped
 	// dependent only exists if the wait that fails is in its own phase
-	wait.Phase = PhaseStart
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	wait.Phase = planning.PhaseStart
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:app:1",
 		Container:  &container.Summary{ID: "app-id", Names: []string{"/test-app-1"}},
-	}, "", wait).Phase = PhaseStart
+	}, "", wait).Phase = planning.PhaseStart
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	exec.containersByService["db"] = Containers{dbSummary}
@@ -1386,7 +1387,7 @@ func TestTranslateWaitTimeout(t *testing.T) {
 // startFailureOptions varies startFailureFixture.
 type startFailureOptions struct {
 	// phase is the phase every node of the plan belongs to
-	phase PlanPhase
+	phase planning.PlanPhase
 	// inspectBlocks makes the inspection of db wait for the end of its context
 	// and fail with it, as one cut short by the cancellation does
 	inspectBlocks bool
@@ -1395,7 +1396,7 @@ type startFailureOptions struct {
 // startFailureFixture builds a project where web fails to start while api,
 // which depends on db being healthy, is still held by that wait. db's health
 // never changes, so only web's failure can end the phase.
-func startFailureFixture(t *testing.T, opts startFailureOptions) (*recordingEvents, *planExecutor, *Plan) {
+func startFailureFixture(t *testing.T, opts startFailureOptions) (*recordingEvents, *planExecutor, *planning.Plan) {
 	t.Helper()
 	svc, apiClient, recorder := newStartPhaseTestService(t)
 
@@ -1449,23 +1450,23 @@ func startFailureFixture(t *testing.T, opts startFailureOptions) (*recordingEven
 	// no ContainerStart for api: it must never be reached
 
 	apiSvc, webSvc := project.Services["api"], project.Services["web"]
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:web:1",
 		Cause:      "start",
 		Service:    &webSvc,
 		Container:  &webSummary,
 	}, "start:web:1")
-	wait := plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	wait := plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Cause:      "api depends on db (service_healthy)",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:api:1",
 		Cause:      "start",
 		Service:    &apiSvc,
@@ -1487,7 +1488,7 @@ func startFailureFixture(t *testing.T, opts startFailureOptions) (*recordingEven
 // A service recreated by the same command would otherwise be left on
 // "Recreated" while it is never started.
 func TestExecutePlanStartFailureReportsTheServicesItInterrupts(t *testing.T) {
-	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: PhaseStart})
+	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: planning.PhaseStart})
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -1511,9 +1512,9 @@ func TestExecutePlanStartFailureReportsTheServicesItInterrupts(t *testing.T) {
 // before or after.
 func TestGroupTrackerOnNodeAborted(t *testing.T) {
 	summary := container.Summary{ID: "api-id", Names: []string{"/test-api-1"}}
-	newTracker := func() (*groupTracker, *PlanNode, *capturingEvents) {
-		plan := &Plan{}
-		node := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
+	newTracker := func() (*groupTracker, *planning.PlanNode, *capturingEvents) {
+		plan := &planning.Plan{}
+		node := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
 		return (&planExecutor{}).buildGroupTracker(plan), node, &capturingEvents{}
 	}
 	const row = "Container test-api-1"
@@ -1581,21 +1582,21 @@ func TestExecutePlanCanceledCallerReportsNothingMore(t *testing.T) {
 			}).AnyTimes()
 
 		apiSvc := project.Services["api"]
-		plan := &Plan{}
-		wait := plan.addNode(Operation{
-			Type:       OpWaitCondition,
+		plan := &planning.Plan{}
+		wait := plan.AddNode(planning.Operation{
+			Type:       planning.OpWaitCondition,
 			ResourceID: "wait:db:service_healthy",
 			Name:       "db",
 			Condition:  types.ServiceConditionHealthy,
 		}, "")
-		plan.addNode(Operation{
-			Type:       OpStartContainer,
+		plan.AddNode(planning.Operation{
+			Type:       planning.OpStartContainer,
 			ResourceID: "service:api:1",
 			Service:    &apiSvc,
 			Container:  &apiSummary,
 		}, "start:api:1", wait)
 		for _, n := range plan.Nodes {
-			n.Phase = PhaseStart
+			n.Phase = planning.PhaseStart
 		}
 
 		exec := svc.newPlanExecutor(project, emptyObservedState("test"))
@@ -1626,7 +1627,7 @@ func TestExecutePlanCanceledCallerReportsNothingMore(t *testing.T) {
 // ends with the cancellation, which is the interruption, not a failure of the
 // healthy dependency.
 func TestExecutePlanStartFailureClosesAnInterruptedInspection(t *testing.T) {
-	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: PhaseStart, inspectBlocks: true})
+	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: planning.PhaseStart, inspectBlocks: true})
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -1644,7 +1645,7 @@ func TestExecutePlanStartFailureClosesAnInterruptedInspection(t *testing.T) {
 // phase as it was: the nodes it gives up are not reported, only the failing
 // one is.
 func TestExecutePlanCreatePhaseFailureReportsNothingOnItsSiblings(t *testing.T) {
-	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: PhaseCreate})
+	recorder, exec, plan := startFailureFixture(t, startFailureOptions{phase: planning.PhaseCreate})
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
@@ -1678,21 +1679,21 @@ func TestExecutePlanFailedWaitNamesTheConditionNotMet(t *testing.T) {
 		}}, nil).AnyTimes()
 
 	apiSvc := project.Services["api"]
-	plan := &Plan{}
-	wait := plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:service_healthy",
 		Name:       "db",
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:api:1",
 		Service:    &apiSvc,
 		Container:  &apiSummary,
 	}, "start:api:1", wait)
 	for _, n := range plan.Nodes {
-		n.Phase = PhaseStart
+		n.Phase = planning.PhaseStart
 	}
 
 	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
@@ -1732,7 +1733,7 @@ func concurrentFailure(t *testing.T, fail func(ctx context.Context, network stri
 	svc, apiClient, recorder := newStartPhaseTestService(t)
 
 	inFlight := map[string]chan struct{}{"a": make(chan struct{}), "b": make(chan struct{})}
-	plan := &Plan{}
+	plan := &planning.Plan{}
 	for _, name := range []string{"a", "b"} {
 		nw := types.NetworkConfig{Name: "test_" + name}
 		apiClient.EXPECT().NetworkCreate(gomock.Any(), nw.Name, gomock.Any()).
@@ -1747,8 +1748,8 @@ func concurrentFailure(t *testing.T, fail func(ctx context.Context, network stri
 				}
 				return client.NetworkCreateResult{}, fail(ctx, name)
 			})
-		plan.addNode(Operation{
-			Type:       OpCreateNetwork,
+		plan.AddNode(planning.Operation{
+			Type:       planning.OpCreateNetwork,
 			ResourceID: "network:" + name,
 			Name:       nw.Name,
 			Network:    &nw,
@@ -1801,10 +1802,10 @@ func TestExecutePlanFailingOnItsOwnWhileCanceledSaysSo(t *testing.T) {
 // short.
 func TestAbortReasonOfPostStart(t *testing.T) {
 	web, apiCtr := startTestSummary("web"), startTestSummary("api")
-	plan := &Plan{}
-	failed := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &web}, "start:web:1")
-	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1")
-	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
+	plan := &planning.Plan{}
+	failed := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Container: &web}, "start:web:1")
+	start := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1")
+	postStart := plan.AddNode(planning.Operation{Type: planning.OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
 
 	exec := &planExecutor{}
 	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return true }}
@@ -1817,11 +1818,11 @@ func TestAbortReasonOfPostStart(t *testing.T) {
 // dependency did not meet the condition; any other node was interrupted by it.
 func TestAbortReasonOfAFailedWait(t *testing.T) {
 	apiCtr, webCtr := startTestSummary("api"), startTestSummary("web")
-	plan := &Plan{}
-	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
-	held := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
-	other := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
-	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:web:1", Container: &webCtr}, "start:web:1", other)
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{Type: planning.OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	held := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
+	other := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
+	postStart := plan.AddNode(planning.Operation{Type: planning.OpRunPostStart, ResourceID: "post_start:web:1", Container: &webCtr}, "start:web:1", other)
 
 	exec := &planExecutor{}
 	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return false }}
@@ -1849,11 +1850,11 @@ func TestExecutePlanCanceledCallerMidInspectionKeepsItsError(t *testing.T) {
 		}).AnyTimes()
 
 	apiSvc := project.Services["api"]
-	plan := &Plan{}
-	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
-	plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Service: &apiSvc, Container: &apiCtr}, "start:api:1", wait)
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{Type: planning.OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:api:1", Service: &apiSvc, Container: &apiCtr}, "start:api:1", wait)
 	for _, n := range plan.Nodes {
-		n.Phase = PhaseStart
+		n.Phase = planning.PhaseStart
 	}
 
 	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
@@ -1873,11 +1874,11 @@ func TestExecutePlanCanceledCallerMidInspectionKeepsItsError(t *testing.T) {
 // only "started" once its start has succeeded.
 func TestAbortReasonFollowsTheChainOfPrerequisites(t *testing.T) {
 	apiCtr, webCtr := startTestSummary("api"), startTestSummary("web")
-	plan := &Plan{}
-	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
-	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
-	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
-	failed := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{Type: planning.OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	start := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:api:1", Container: &apiCtr}, "start:api:1", wait)
+	postStart := plan.AddNode(planning.Operation{Type: planning.OpRunPostStart, ResourceID: "post_start:api:1", Container: &apiCtr}, "start:api:1", start)
+	failed := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
 
 	exec := &planExecutor{}
 	succeeded := map[int]bool{}
@@ -1896,9 +1897,9 @@ func TestAbortReasonFollowsTheChainOfPrerequisites(t *testing.T) {
 // its way to start: the final event stays the last one.
 func TestGroupTrackerNothingStartsAfterTheFinalEvent(t *testing.T) {
 	summary := container.Summary{ID: "api-id", Names: []string{"/test-api-1"}}
-	plan := &Plan{}
-	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
-	postStart := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "post_start:api:1", Container: &summary}, "start:api:1", start)
+	plan := &planning.Plan{}
+	start := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:api:1", Container: &summary}, "start:api:1")
+	postStart := plan.AddNode(planning.Operation{Type: planning.OpRunPostStart, ResourceID: "post_start:api:1", Container: &summary}, "start:api:1", start)
 	gt := (&planExecutor{}).buildGroupTracker(plan)
 	rec := &capturingEvents{}
 
@@ -1929,13 +1930,13 @@ func TestPlanRunDrivesPhasesSeparately(t *testing.T) {
 			return client.ContainerStartResult{}, nil
 		})
 
-	plan := &Plan{}
-	network := plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan := &planning.Plan{}
+	network := plan.AddNode(planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:db:1",
 		Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
-	}, "", network).Phase = PhaseStart
+	}, "", network).Phase = planning.PhaseStart
 
 	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 	pr, err := exec.begin(plan)
@@ -1971,7 +1972,7 @@ func (h *hookLogs) got() []string {
 // postStartHookPlan mocks the exec round trip of a post_start hook printing
 // "post-start ok", and returns the service running it and the plan of its
 // Start phase.
-func postStartHookPlan(t *testing.T) (*composeService, *Plan) {
+func postStartHookPlan(t *testing.T) (*composeService, *planning.Plan) {
 	svc, apiClient, _ := newStartPhaseTestService(t)
 
 	serverConn, clientConn := net.Pipe()
@@ -1990,13 +1991,13 @@ func postStartHookPlan(t *testing.T) (*composeService, *Plan) {
 		Name:      "web",
 		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"/notify.sh"}}},
 	}
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpRunPostStart,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpRunPostStart,
 		ResourceID: "service:web:1",
 		Service:    &service,
 		Container:  &container.Summary{ID: "c1", Names: []string{"/test-web-1"}},
-	}, "").Phase = PhaseStart
+	}, "").Phase = planning.PhaseStart
 	return svc, plan
 }
 
@@ -2065,13 +2066,13 @@ func TestPlanRunRefusesAnIllegalPhaseSequence(t *testing.T) {
 			apiClient.EXPECT().ContainerStart(gomock.Any(), "db-id", gomock.Any()).
 				Return(client.ContainerStartResult{}, nil).Times(starts)
 		}
-		plan := &Plan{}
-		network := plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
-		plan.addNode(Operation{
-			Type:       OpStartContainer,
+		plan := &planning.Plan{}
+		network := plan.AddNode(planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+		plan.AddNode(planning.Operation{
+			Type:       planning.OpStartContainer,
 			ResourceID: "service:db:1",
 			Container:  &container.Summary{ID: "db-id", Names: []string{"/test-db-1"}},
-		}, "", network).Phase = PhaseStart
+		}, "", network).Phase = planning.PhaseStart
 		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(plan)
 		assert.NilError(t, err)
 		return pr
@@ -2110,7 +2111,7 @@ func TestPlanRunRefusesAnIllegalPhaseSequence(t *testing.T) {
 func TestPlanRunOfAnEmptyOrSinglePhasePlan(t *testing.T) {
 	t.Run("empty plan", func(t *testing.T) {
 		svc, _ := newTestService(t) // any API call fails the test
-		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(&Plan{})
+		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(&planning.Plan{})
 		assert.NilError(t, err)
 		assert.NilError(t, pr.runCreate(t.Context()))
 		assert.NilError(t, pr.runStart(t.Context(), nil))
@@ -2120,8 +2121,8 @@ func TestPlanRunOfAnEmptyOrSinglePhasePlan(t *testing.T) {
 		apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
 			Return(client.NetworkCreateResult{ID: "net-id"}, nil).Times(1)
 		nw := types.NetworkConfig{Name: "test_default"}
-		plan := &Plan{}
-		plan.addNode(Operation{Type: OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
+		plan := &planning.Plan{}
+		plan.AddNode(planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:default", Name: nw.Name, Network: &nw}, "")
 		pr, err := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")).begin(plan)
 		assert.NilError(t, err)
 		assert.NilError(t, pr.runCreate(t.Context()))
