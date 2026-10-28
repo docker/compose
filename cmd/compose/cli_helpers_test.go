@@ -362,9 +362,10 @@ func TestResolveMaxConcurrency(t *testing.T) {
 		want    int
 		wantErr string
 	}{
-		{name: "flag value without environment", want: 4},
+		{name: "default without environment", want: -1},
+		{name: "flag value without environment", args: []string{"--parallel", "2"}, want: 2},
 		{name: "environment applies without flag", env: ptr("8"), want: 8},
-		{name: "flag wins over environment", args: []string{"--parallel", "2"}, env: ptr("8"), want: 4},
+		{name: "flag wins over environment", args: []string{"--parallel", "2"}, env: ptr("8"), want: 2},
 		{name: "invalid environment", env: ptr("lots"), wantErr: `COMPOSE_PARALLEL_LIMIT must be an integer (found: "lots")`},
 	}
 	for _, tt := range tests {
@@ -377,7 +378,9 @@ func TestResolveMaxConcurrency(t *testing.T) {
 			root := commandWithFlags(t, PluginName, tt.args...)
 			sub := &cobra.Command{Use: "up"}
 			root.AddCommand(sub)
-			got, err := resolveMaxConcurrency(sub, 4)
+			parallel, err := root.Flags().GetInt("parallel")
+			assert.NilError(t, err)
+			got, err := resolveMaxConcurrency(sub, parallel)
 			if tt.wantErr != "" {
 				assert.Error(t, err, tt.wantErr)
 				return
