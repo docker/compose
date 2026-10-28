@@ -151,6 +151,20 @@ func OutputNotContains(sub string) Check {
 	}
 }
 
+// StdoutEmpty expects the command to have written nothing to stdout, for
+// commands that must stay silent on a no-op (progress goes to stderr).
+func StdoutEmpty() Check {
+	return Check{
+		name: "stdout is empty",
+		fn: func(ctx *CheckContext) error {
+			if out := ctx.result.Stdout(); out != "" {
+				return fmt.Errorf("unexpected stdout: %q", out)
+			}
+			return nil
+		},
+	}
+}
+
 // ExitCode expects the step's command to have exited with the given code.
 // Only meaningful on a MayFail action: without MayFail, any non-zero exit
 // already fails the step before checks run.
