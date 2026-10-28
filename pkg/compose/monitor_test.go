@@ -37,6 +37,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/logstream"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
@@ -54,9 +55,9 @@ type recordedEvent struct {
 
 var cmpRecordedEvents = cmp.AllowUnexported(recordedEvent{})
 
-func recordEvents(m *monitor) *[]recordedEvent {
+func recordEvents(m *logstream.Monitor) *[]recordedEvent {
 	var got []recordedEvent
-	m.withListener(func(e api.ContainerEvent) {
+	m.WithListener(func(e api.ContainerEvent) {
 		got = append(got, recordedEvent{
 			eventType:  e.Type,
 			id:         e.ID,
@@ -113,7 +114,7 @@ func expectEventStream(apiClient *mocks.MockAPIClient, initial []container.Summa
 
 func TestMonitorStartLifecycle(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 	got := recordEvents(m)
 
 	messages, _ := expectEventStream(apiClient, []container.Summary{
@@ -164,8 +165,8 @@ func TestMonitorStartLifecycle(t *testing.T) {
 
 func TestMonitorStartServiceFilter(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
-	m.withServices([]string{"web"})
+	m := logstream.NewMonitor(apiClient, "p")
+	m.WithServices([]string{"web"})
 	got := recordEvents(m)
 
 	// the db container is not watched, so it doesn't count towards termination
@@ -190,7 +191,7 @@ func TestMonitorStartServiceFilter(t *testing.T) {
 
 func TestMonitorStartNoContainers(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 
 	expectEventStream(apiClient, nil, 1)
 
@@ -200,7 +201,7 @@ func TestMonitorStartNoContainers(t *testing.T) {
 
 func TestMonitorStartEventsError(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 
 	_, errs := expectEventStream(apiClient, []container.Summary{
 		{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db"}},
@@ -215,7 +216,7 @@ func TestMonitorStartEventsError(t *testing.T) {
 
 func TestMonitorStartContextCancelled(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 
 	expectEventStream(apiClient, []container.Summary{
 		{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db"}},
@@ -230,7 +231,7 @@ func TestMonitorStartContextCancelled(t *testing.T) {
 
 func TestMonitorStartBadExitCode(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 
 	messages, _ := expectEventStream(apiClient, []container.Summary{
 		{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db"}},
@@ -264,7 +265,7 @@ func monitorDieEvent(exitCode int) events.Message {
 
 // newMonitorTestFixture wires a monitor against a mocked API client, with the
 // goroutine-leak guard and the standard initial ContainerList expectation.
-func newMonitorTestFixture(t *testing.T) (*monitor, *mocks.MockAPIClient) {
+func newMonitorTestFixture(t *testing.T) (*logstream.Monitor, *mocks.MockAPIClient) {
 	t.Helper()
 	ignoreExisting := goleak.IgnoreCurrent()
 	t.Cleanup(func() {
@@ -278,7 +279,7 @@ func newMonitorTestFixture(t *testing.T) (*monitor, *mocks.MockAPIClient) {
 	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 		Return(client.ContainerListResult{Items: []container.Summary{testContainer("service1", "123", false)}}, nil)
 
-	m := newMonitor(apiMock, strings.ToLower(testProject))
+	m := logstream.NewMonitor(apiMock, strings.ToLower(testProject))
 	return m, apiMock
 }
 
@@ -310,10 +311,10 @@ func expectInspects(apiMock *mocks.MockAPIClient, states ...container.State) {
 // monitor.Start reacts to stop/destroy events it doesn't know how to process:
 // the tracked containers set never empties, so the loop blocks forever on the
 // events channel.
-func runMonitor(t *testing.T, m *monitor) ([]api.ContainerEvent, error) {
+func runMonitor(t *testing.T, m *logstream.Monitor) ([]api.ContainerEvent, error) {
 	t.Helper()
 	var got []api.ContainerEvent
-	m.withListener(func(e api.ContainerEvent) {
+	m.WithListener(func(e api.ContainerEvent) {
 		got = append(got, e)
 	})
 
@@ -472,7 +473,7 @@ func TestMonitorStopBeforeDiePreservesExitCode(t *testing.T) {
 // entry's effect on target's following start event be observed.
 func TestMonitorDieClearsStaleRestartingEntry(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 	got := recordEvents(m)
 
 	messages, _ := expectEventStream(apiClient, []container.Summary{
@@ -620,7 +621,7 @@ func parseEventsSince(t *testing.T, since string) time.Time {
 // listing returns listed, after running during (the engine-side activity
 // happening between the monitor's snapshot and its subscription), and whose
 // event subscription is served by the returned log, followed by live.
-func monitorWithEventLog(t *testing.T, listed []container.Summary, during func(*fakeEventLog), live ...events.Message) (*monitor, *mocks.MockAPIClient, *fakeEventLog) {
+func monitorWithEventLog(t *testing.T, listed []container.Summary, during func(*fakeEventLog), live ...events.Message) (*logstream.Monitor, *mocks.MockAPIClient, *fakeEventLog) {
 	t.Helper()
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
 	log := &fakeEventLog{}
@@ -639,12 +640,12 @@ func monitorWithEventLog(t *testing.T, listed []container.Summary, during func(*
 		DoAndReturn(func(_ context.Context, opts client.EventsListOptions) client.EventsResult {
 			return log.subscribe(t, opts, live...)
 		})
-	return newMonitor(apiClient, "p"), apiClient, log
+	return logstream.NewMonitor(apiClient, "p"), apiClient, log
 }
 
 // startWithin runs the monitor and fails the test when it doesn't terminate
 // on its own: a monitor which missed the event it waits for blocks forever.
-func startWithin(t *testing.T, m *monitor) {
+func startWithin(t *testing.T, m *logstream.Monitor) {
 	t.Helper()
 	done := make(chan error, 1)
 	go func() { done <- m.Start(t.Context()) }()
@@ -875,7 +876,7 @@ func TestMonitorStartFailsWithoutDaemonTime(t *testing.T) {
 			apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
 			apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(
 				client.SystemInfoResult{Info: system.Info{SystemTime: tt.systemTime}}, nil)
-			m := newMonitor(apiClient, "p")
+			m := logstream.NewMonitor(apiClient, "p")
 
 			err := m.Start(t.Context())
 
@@ -904,7 +905,7 @@ func TestMonitorStartWithoutInfoSubscribesLive(t *testing.T) {
 			hook := logrustest.NewGlobal()
 
 			if readAhead {
-				assert.NilError(t, m.readDaemonTime(t.Context()))
+				assert.NilError(t, m.ReadDaemonTime(t.Context()))
 			}
 			startWithin(t, m)
 
@@ -929,7 +930,7 @@ func TestMonitorStartWithoutInfoSubscribesLive(t *testing.T) {
 func TestMonitorStartCanceledBeforeDaemonTime(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
 	apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, context.Canceled)
-	m := newMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, "p")
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -947,7 +948,7 @@ func TestMonitorReadDaemonTimeOnce(t *testing.T) {
 	log.setSystemTime("2001-02-03T04:05:06.789012345+05:30")
 	apiClient.EXPECT().ContainerInspect(gomock.Any(), "c1", gomock.Any()).Return(inspectResult(false, false), nil)
 
-	assert.NilError(t, m.readDaemonTime(t.Context()))
+	assert.NilError(t, m.ReadDaemonTime(t.Context()))
 	log.setSystemTime("2002-02-03T04:05:06Z") // would be seen by a second reading
 	startWithin(t, m)
 

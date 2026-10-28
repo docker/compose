@@ -37,6 +37,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/desktop"
+	"github.com/docker/compose/v5/internal/logstream"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
@@ -302,26 +303,26 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		}
 	}
 
-	monitor := newMonitor(s.apiClient(), project.Name)
+	monitor := logstream.NewMonitor(s.apiClient(), project.Name)
 	if len(options.Start.Services) > 0 {
-		monitor.withServices(options.Start.Services)
+		monitor.WithServices(options.Start.Services)
 	} else {
 		// Start.AttachTo have been already curated with only the services to monitor
-		monitor.withServices(options.Start.AttachTo)
+		monitor.WithServices(options.Start.AttachTo)
 	}
-	monitor.withListener(u.printer.HandleEvent)
+	monitor.WithListener(u.printer.HandleEvent)
 
 	// Termination -- on-exit cascade or a graceful Ctrl+C/SIGTERM teardown --
 	// stops the application via a one-shot listing (see stopApplication):
 	// registered unconditionally, regardless of the on-exit policy, since a
 	// graceful teardown always runs it and a container whose start was
 	// already in flight when that listing happened comes up after it.
-	monitor.withListener(u.stopLateStarters())
+	monitor.WithListener(u.stopLateStarters())
 	if options.Start.OnExit != api.CascadeIgnore {
-		monitor.withListener(u.stopOnFirstExit())
+		monitor.WithListener(u.stopOnFirstExit())
 	}
 	if options.Start.ExitCodeFrom != "" {
-		monitor.withListener(u.captureExitCodeFrom())
+		monitor.WithListener(u.captureExitCodeFrom())
 	}
 
 	containers, err := s.attach(globalCtx, project, u.printer.HandleEvent, options.Start.AttachTo)
@@ -334,14 +335,14 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 	for i, ctr := range containers {
 		attached[i] = ctr.ID
 	}
-	monitor.withListener(u.followStartedContainers(attached))
+	monitor.WithListener(u.followStartedContainers(attached))
 
 	// The monitor replays events from the daemon's time. Read it now, before
 	// the Start phase: the point precedes the first start, and a daemon that
 	// answers with a time that can't be used fails the command without any
 	// container started. A daemon that can't be asked doesn't (see
-	// readDaemonTime): the monitor then follows live events.
-	if err := monitor.readDaemonTime(globalCtx); err != nil {
+	// ReadDaemonTime): the monitor then follows live events.
+	if err := monitor.ReadDaemonTime(globalCtx); err != nil {
 		cancel()
 		_ = u.eg.Wait()
 		return err
@@ -612,8 +613,8 @@ func (s *composeService) drainTimeout() time.Duration {
 // followStartedContainers streams logs of containers (re)started after `up`,
 // so they are followed like the initially attached ones.
 func (u *upSession) followStartedContainers(attached []string) api.ContainerEventListener {
-	runEnds := newRunEndTracker()
-	cursors := newLogCursors()
+	runEnds := logstream.NewRunEndTracker()
+	cursors := logstream.NewCursors()
 	return func(event api.ContainerEvent) {
 		runEnds.Observe(event)
 		if !shouldFollowStartEvent(event, attached, u.options.Start.AttachTo) {
@@ -624,21 +625,21 @@ func (u *upSession) followStartedContainers(attached []string) api.ContainerEven
 		// window would drop the whole run.
 		since := runEnds.Since(event.ID)
 		// Queued here, in event order, for the same reason.
-		turn := cursors.enter(event.ID)
+		turn := cursors.Enter(event.ID)
 		// counted before the goroutine starts so the shutdown drain can never
 		// miss a stream dispatched but not yet running
 		u.logStreams.Add(1)
 		u.eg.Go(func() error {
 			defer u.logStreams.Done()
-			defer turn.end()
+			defer turn.End()
 			u.appendErr(u.streamContainerLogs(turn, event, since))
 			return nil
 		})
 	}
 }
 
-func (u *upSession) streamContainerLogs(turn *logTurn, event api.ContainerEvent, since string) error {
-	if err := turn.wait(u.globalCtx); err != nil {
+func (u *upSession) streamContainerLogs(turn *logstream.Turn, event api.ContainerEvent, since string) error {
+	if err := turn.Wait(u.globalCtx); err != nil {
 		return err
 	}
 	ctr, err := u.inspectWithSlot(u.globalCtx, u.logOpenLimiter, event.ID)
@@ -646,17 +647,17 @@ func (u *upSession) streamContainerLogs(turn *logTurn, event api.ContainerEvent,
 		return err
 	}
 	if since == "" {
-		since = logsSinceLastRun(ctr)
+		since = logstream.SinceLastRun(ctr)
 	}
 
 	err = u.doLogContainer(u.globalCtx, u.logOpenLimiter, u.options.Start.Attach, event.Source, ctr, api.LogOptions{
 		Follow: true,
 		Since:  since,
-	}, turn.cursor)
+	}, turn.Cursor)
 	if errdefs.IsNotImplemented(err) {
 		// container may be configured with logging_driver: none
 		// as container already started, we might miss the very first logs. But still better than none
-		turn.end() // nothing was relayed, and the attach lasts as long as the run
+		turn.End() // nothing was relayed, and the attach lasts as long as the run
 		return u.doAttachContainer(u.globalCtx, event.Service, event.ID, event.Source, u.printer.HandleEvent)
 	}
 	return err
