@@ -1,0 +1,5 @@
+services:
+  simple:
+    image:  nginx:alpine
+  another:
+    image:  nginx:alpine
