@@ -372,6 +372,21 @@ func (s *Scenario) command(action Action) icmd.Cmd {
 		cmd = s.cli.NewDockerComposeCmd(s.t, args...)
 	case kindDocker:
 		cmd = s.cli.NewDockerCmd(s.t, action.args...)
+	case kindComplete:
+		args := []string{}
+		file := s.file
+		if s.remote != "" {
+			file = s.remote
+		}
+		if file != "" {
+			args = append(args, "-f", file)
+		}
+		args = append(args, action.args...)
+		if composeStandaloneMode {
+			cmd = s.cli.NewCmd(ComposeStandalonePath(s.t), append([]string{"__complete"}, args...)...)
+		} else {
+			cmd = s.cli.NewCmd(DockerExecutableName, append([]string{"__complete", "compose"}, args...)...)
+		}
 	}
 	cmd.Env = append(cmd.Env, s.env...)
 	cmd.Env = append(cmd.Env, action.env...)
@@ -580,10 +595,11 @@ type actionKind int
 const (
 	kindCompose actionKind = iota
 	kindDocker
+	kindComplete
 )
 
 // Action is a command a step executes: a compose command run against the
-// scenario's project, or a raw docker command.
+// scenario's project, a raw docker command, or a completion request.
 type Action struct {
 	kind    actionKind
 	args    []string
@@ -602,6 +618,15 @@ func ComposeCmd(args ...string) Action {
 // DockerCmd runs a raw `docker <args>` command.
 func DockerCmd(args ...string) Action {
 	return Action{kind: kindDocker, args: args}
+}
+
+// CompleteCmd runs the shell-completion entry point of the compose CLI, in
+// plugin or standalone form, for the command line `compose -f <file> <args>`:
+// the last argument is the word being completed, empty to list every candidate.
+// Only the scenario's compose source (its file, or its remote after FromRemote)
+// is passed along, not its root arguments or project name.
+func CompleteCmd(args ...string) Action {
+	return Action{kind: kindComplete, args: args}
 }
 
 // WithEnv adds environment variables to this action only.
