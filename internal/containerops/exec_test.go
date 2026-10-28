@@ -25,8 +25,17 @@ import (
 )
 
 func TestExecRejectsMissingOptions(t *testing.T) {
-	backend := &fakeBackend{}
-	_, err := New(backend).Exec(t.Context(), "demo", nil)
-	assert.ErrorIs(t, err, api.ErrInvalidOption)
-	assert.Equal(t, backend.asked, "", "the backend must not be reached")
+	tests := map[string]api.ExecOptionsProvider{
+		"nil":             nil,
+		"nil ExecOptions": (*api.ExecOptions)(nil),
+		"nil RunOptions":  (*api.RunOptions)(nil),
+	}
+	for name, provider := range tests {
+		t.Run(name, func(t *testing.T) {
+			backend := &fakeBackend{}
+			_, err := New(backend).Exec(t.Context(), "demo", provider)
+			assert.ErrorIs(t, err, api.ErrInvalidOption)
+			assert.Equal(t, backend.asked, "", "the backend must not be reached")
+		})
+	}
 }
