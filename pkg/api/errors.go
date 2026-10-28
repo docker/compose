@@ -48,6 +48,9 @@ var (
 	// ErrIncompatibleOptions is returned when a set of options that cannot be
 	// honored together is requested. See IncompatibleOptionsError.
 	ErrIncompatibleOptions = errors.New("incompatible options")
+	// ErrInvalidOption is returned when an option is set to a value it does
+	// not accept. See InvalidOptionError.
+	ErrInvalidOption = errors.New("invalid option")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound
@@ -93,4 +96,9 @@ func IsErrCanceled(err error) bool {
 // IsErrIncompatibleOptions returns true if the unwrapped error is ErrIncompatibleOptions
 func IsErrIncompatibleOptions(err error) bool {
 	return errors.Is(err, ErrIncompatibleOptions)
+}
+
+// IsErrInvalidOption returns true if the unwrapped error is ErrInvalidOption
+func IsErrInvalidOption(err error) bool {
+	return errors.Is(err, ErrInvalidOption)
 }

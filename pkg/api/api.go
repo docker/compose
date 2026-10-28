@@ -350,7 +350,7 @@ type CreateOptions struct {
 	IgnoreOrphans bool
 	// Recreate define the strategy to apply on existing containers: one of
 	// RecreateDiverged (the default, also used for ""), RecreateForce or
-	// RecreateNever.
+	// RecreateNever. Any other value is rejected by Validate.
 	Recreate string
 	// RecreateDependencies define the strategy to apply on dependencies
 	// services, with the same values as Recreate.
