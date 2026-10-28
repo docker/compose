@@ -19,6 +19,7 @@ package containerops
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 
 	"github.com/docker/cli/cli"
@@ -29,9 +30,19 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
+// isNil reports whether provider is nil, or holds a nil pointer: calling
+// ToExecOptions on the latter would dereference it.
+func isNil(provider api.ExecOptionsProvider) bool {
+	if provider == nil {
+		return true
+	}
+	v := reflect.ValueOf(provider)
+	return v.Kind() == reflect.Pointer && v.IsNil()
+}
+
 // Exec runs a command in a running container of a service and returns its exit code.
 func (s *Service) Exec(ctx context.Context, projectName string, provider api.ExecOptionsProvider) (int, error) {
-	if provider == nil {
+	if isNil(provider) {
 		return 0, &api.InvalidOptionError{Option: "options", Reason: "required"}
 	}
 	options := provider.ToExecOptions()
