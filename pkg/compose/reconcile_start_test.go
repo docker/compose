@@ -26,6 +26,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -212,14 +213,14 @@ func TestPlanStart_RecreatedReplicaTargetsCreateNode(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var create, rename, start *PlanNode
+	var create, rename, start *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpCreateContainer:
+		case n.Operation.Type == planning.OpCreateContainer:
 			create = n
-		case n.Operation.Type == OpRenameContainer:
+		case n.Operation.Type == planning.OpRenameContainer:
 			rename = n
-		case n.Operation.Type == OpStartContainer && n.Phase == PhaseStart:
+		case n.Operation.Type == planning.OpStartContainer && n.Phase == planning.PhaseStart:
 			start = n
 		}
 	}
@@ -256,12 +257,12 @@ func TestPlanStart_ExceptionalStateReplicaCountsAsRunning(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var createPhase *PlanNode
+	var createPhase *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Phase == PhaseStart {
+		if n.Phase == planning.PhaseStart {
 			t.Fatalf("no start-phase node expected for a create-phase-restarted replica, got %s:\n%s", n.Operation.Type, plan)
 		}
-		if n.Operation.Type == OpStartContainer {
+		if n.Operation.Type == planning.OpStartContainer {
 			createPhase = n
 		}
 	}
@@ -293,9 +294,9 @@ func TestPlanStart_AllRunningStillWaitsOnConditions(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var wait *PlanNode
+	var wait *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpWaitCondition {
+		if n.Operation.Type == planning.OpWaitCondition {
 			wait = n
 		}
 	}
@@ -337,10 +338,10 @@ func TestPlanStart_ScaleZeroIsStillVisited(t *testing.T) {
 		waits := 0
 		for _, n := range plan.Nodes {
 			switch n.Operation.Type {
-			case OpWaitCondition:
+			case planning.OpWaitCondition:
 				waits++
 				assert.Equal(t, n.Operation.Name, "db")
-			case OpStartContainer, OpCreateContainer:
+			case planning.OpStartContainer, planning.OpCreateContainer:
 				t.Fatalf("no container expected for scale-zero services, got %s %s:\n%s", n.Operation.Type, n.Operation.ResourceID, plan)
 			}
 		}
@@ -355,7 +356,7 @@ func TestPlanStart_ScaleZeroIsStillVisited(t *testing.T) {
 	assert.NilError(t, err)
 	var started []string
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpStartContainer {
+		if n.Operation.Type == planning.OpStartContainer {
 			started = append(started, n.Operation.ResourceID)
 		}
 	}
@@ -366,7 +367,7 @@ func TestPlanStart_ScaleZeroIsStillVisited(t *testing.T) {
 	plan, err = reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 	for _, n := range plan.Nodes {
-		assert.Assert(t, n.Operation.Type != OpStartContainer, "unexpected start node:\n%s", plan)
+		assert.Assert(t, n.Operation.Type != planning.OpStartContainer, "unexpected start node:\n%s", plan)
 	}
 }
 
@@ -515,9 +516,9 @@ func TestPlanStart_ProviderWaitsOnDependencies(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var wait *PlanNode
+	var wait *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpWaitCondition {
+		if n.Operation.Type == planning.OpWaitCondition {
 			wait = n
 		}
 	}
@@ -561,12 +562,12 @@ func TestPlanStart_ProviderConsumerWaitsForDeployment(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var providerNode, consumerStartNode *PlanNode
+	var providerNode, consumerStartNode *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpRunProvider:
+		case n.Operation.Type == planning.OpRunProvider:
 			providerNode = n
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
 			consumerStartNode = n
 		}
 	}
@@ -618,12 +619,12 @@ func TestPlanStart_ExceptionalStateConsumerWaitsForRestart(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var appRestartNode, consumerStartNode *PlanNode
+	var appRestartNode, consumerStartNode *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:app:1":
 			appRestartNode = n
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
 			consumerStartNode = n
 		}
 	}
@@ -668,14 +669,14 @@ func TestPlanStart_ScaledExceptionalStateConsumerWaitsForEveryRestart(t *testing
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var restart1, restart2, consumerStartNode *PlanNode
+	var restart1, restart2, consumerStartNode *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:app:1":
 			restart1 = n
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:app:2":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:app:2":
 			restart2 = n
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:consumer:1":
 			consumerStartNode = n
 		}
 	}
@@ -718,10 +719,10 @@ func TestPlanStart_ScaleDownTargetIsNeverStarted(t *testing.T) {
 	assert.NilError(t, err)
 
 	for _, n := range plan.Nodes {
-		if n.Phase == PhaseStart {
+		if n.Phase == planning.PhaseStart {
 			t.Fatalf("no start-phase node expected (replica 1 runs, replica 2 is condemned), got %s %s:\n%s", n.Operation.Type, n.Operation.ResourceID, plan)
 		}
-		if n.Operation.Type == OpRemoveContainer {
+		if n.Operation.Type == planning.OpRemoveContainer {
 			assert.Equal(t, n.Operation.ResourceID, "service:app:2")
 		}
 	}
@@ -732,8 +733,8 @@ func TestPlanStart_ScaleDownTargetIsNeverStarted(t *testing.T) {
 // ordered after its last reconnect — and it does not gate pre_start, exactly
 // as the container is down when the start phase looks.
 func TestStartPhaseReplicas_StoppedByPlanRestarts(t *testing.T) {
-	stop := &PlanNode{ID: 1, Operation: Operation{Type: OpStopContainer}}
-	reconnect := &PlanNode{ID: 2, Operation: Operation{Type: OpConnectNetwork}}
+	stop := &planning.PlanNode{ID: 1, Operation: planning.Operation{Type: planning.OpStopContainer}}
+	reconnect := &planning.PlanNode{ID: 2, Operation: planning.Operation{Type: planning.OpConnectNetwork}}
 	observed := emptyObserved()
 	hash, err := serviceHashWithResolvedRefs(types.ServiceConfig{Name: "app"}, nil)
 	assert.NilError(t, err)
@@ -742,10 +743,10 @@ func TestStartPhaseReplicas_StoppedByPlanRestarts(t *testing.T) {
 
 	r := &reconciler{
 		observed:       observed,
-		containerNodes: map[string]map[int]*PlanNode{},
+		containerNodes: map[string]map[int]*planning.PlanNode{},
 		removedByPlan:  map[string]bool{},
-		stoppedByPlan:  map[string]*PlanNode{oc.ID: stop},
-		connectNodes:   map[string][]*PlanNode{oc.ID: {reconnect}},
+		stoppedByPlan:  map[string]*planning.PlanNode{oc.ID: stop},
+		connectNodes:   map[string][]*planning.PlanNode{oc.ID: {reconnect}},
 	}
 
 	replicas, anyRunning := r.startPhaseReplicas(types.ServiceConfig{Name: "app"})
@@ -760,7 +761,7 @@ func TestStartPhaseReplicas_StoppedByPlanRestarts(t *testing.T) {
 // plannedReplica leaves the target unresolved on an unexpected registration,
 // so execution fails with a clean error instead of a plan-time panic.
 func TestPlannedReplicaUnexpectedNodeLeavesTargetUnresolved(t *testing.T) {
-	node := &PlanNode{ID: 7, Operation: Operation{Type: OpConnectNetwork}}
+	node := &planning.PlanNode{ID: 7, Operation: planning.Operation{Type: planning.OpConnectNetwork}}
 	rep := plannedReplica("app", 1, node)
 	assert.Equal(t, rep.resID, "service:app:1")
 	assert.Equal(t, rep.createNodeID, 0)
@@ -784,7 +785,7 @@ func TestPlanStart_ReplicaOrderIsNumeric(t *testing.T) {
 
 	var order []string
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpStartContainer {
+		if n.Operation.Type == planning.OpStartContainer {
 			order = append(order, n.Operation.ResourceID)
 		}
 	}
@@ -931,12 +932,12 @@ func TestPlanStart_ProviderRelayRestartWaitsOnDependencies(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var wait, restart *PlanNode
+	var wait, restart *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpWaitCondition:
+		case n.Operation.Type == planning.OpWaitCondition:
 			wait = n
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:prov:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:prov:1":
 			restart = n
 		}
 	}
@@ -973,12 +974,12 @@ func TestPlanStart_OrdinaryPathBareStartsAStaleRelay(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var start *PlanNode
+	var start *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:web:1" {
+		if n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:web:1" {
 			start = n
 		}
-		assert.Assert(t, n.Operation.Type != OpRunPostStart,
+		assert.Assert(t, n.Operation.Type != planning.OpRunPostStart,
 			"post_start must not run against a stale relay container:\n%s", plan)
 	}
 	if start == nil {
@@ -1015,14 +1016,14 @@ func TestPlanStart_ProviderPathEnrichesStaleNonRelayContainer(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var pre, start, post *PlanNode
+	var pre, start, post *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpRunPreStart:
+		case n.Operation.Type == planning.OpRunPreStart:
 			pre = n
-		case n.Operation.Type == OpStartContainer && n.Operation.ResourceID == "service:prov:1":
+		case n.Operation.Type == planning.OpStartContainer && n.Operation.ResourceID == "service:prov:1":
 			start = n
-		case n.Operation.Type == OpRunPostStart:
+		case n.Operation.Type == planning.OpRunPostStart:
 			post = n
 		}
 	}
@@ -1071,7 +1072,7 @@ func TestPlanStart_ProviderPathChainsMultipleStaleContainers(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var start1, start2 *PlanNode
+	var start1, start2 *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch n.Operation.ResourceID {
 		case "service:prov:1":
@@ -1117,7 +1118,7 @@ func TestPlanStart_ProviderPathPreStartGateDoesNotRetryPastARelay(t *testing.T) 
 	assert.NilError(t, err)
 
 	for _, n := range plan.Nodes {
-		assert.Assert(t, n.Operation.Type != OpRunPreStart,
+		assert.Assert(t, n.Operation.Type != planning.OpRunPreStart,
 			"pre_start must not run when the lowest-numbered stale container is a relay, even though a later one (#2) is not:\n%s", plan)
 	}
 }
@@ -1141,7 +1142,7 @@ func TestPlanStart_ProviderRestartIsAChainEnd(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var provStart, webStart *PlanNode
+	var provStart, webStart *planning.PlanNode
 	for _, n := range plan.Nodes {
 		switch n.Operation.ResourceID {
 		case "service:prov:1":
@@ -1225,18 +1226,18 @@ func TestPlanStart_ProviderPathPreStartRunsOnceBeforeTheChain(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, startScopeOptions(ScopeStart), noPrompt)
 	assert.NilError(t, err)
 
-	var wait, pre, start1, start2 *PlanNode
+	var wait, pre, start1, start2 *planning.PlanNode
 	preStarts := 0
 	for _, n := range plan.Nodes {
 		switch {
-		case n.Operation.Type == OpWaitCondition:
+		case n.Operation.Type == planning.OpWaitCondition:
 			wait = n
-		case n.Operation.Type == OpRunPreStart:
+		case n.Operation.Type == planning.OpRunPreStart:
 			pre = n
 			preStarts++
-		case n.Operation.ResourceID == "service:prov:1" && n.Operation.Type == OpStartContainer:
+		case n.Operation.ResourceID == "service:prov:1" && n.Operation.Type == planning.OpStartContainer:
 			start1 = n
-		case n.Operation.ResourceID == "service:prov:2" && n.Operation.Type == OpStartContainer:
+		case n.Operation.ResourceID == "service:prov:2" && n.Operation.Type == planning.OpStartContainer:
 			start2 = n
 		}
 	}
@@ -1266,9 +1267,9 @@ func TestPlanStart_OptionalConditionIsBestEffort(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, emptyObserved(), startScopeOptions(ScopeCreateStart), noPrompt)
 	assert.NilError(t, err)
 
-	var wait *PlanNode
+	var wait *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpWaitCondition {
+		if n.Operation.Type == planning.OpWaitCondition {
 			wait = n
 		}
 	}
@@ -1283,7 +1284,7 @@ func TestPlanStart_OptionalConditionIsBestEffort(t *testing.T) {
 	assert.NilError(t, err)
 	wait = nil
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpWaitCondition {
+		if n.Operation.Type == planning.OpWaitCondition {
 			wait = n
 		}
 	}
@@ -1303,7 +1304,7 @@ func TestPlanStart_DefaultScopeIsInert(t *testing.T) {
 	assert.NilError(t, err)
 
 	for _, n := range plan.Nodes {
-		assert.Assert(t, n.Phase == PhaseCreate)
+		assert.Assert(t, n.Phase == planning.PhaseCreate)
 	}
 	assert.Equal(t, plan.String(), "[] -> #1 service:app:1, CreateContainer, no existing container\n")
 }

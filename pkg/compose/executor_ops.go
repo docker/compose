@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -35,11 +36,11 @@ import (
 
 // --- Network operations ---
 
-func (exec *planExecutor) execCreateNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execCreateNetwork(ctx context.Context, op planning.Operation) error {
 	return exec.compose.createNetwork(ctx, op.Network)
 }
 
-func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().NetworkRemove(ctx, op.Name, client.NetworkRemoveOptions{})
 	// A best-effort removal (old network on a rename) tolerates the network
 	// still being in use — Docker reports that as a conflict. Any other error
@@ -51,7 +52,7 @@ func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op Operation) e
 	return err
 }
 
-func (exec *planExecutor) execDisconnectNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execDisconnectNetwork(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().NetworkDisconnect(ctx, op.Name, client.NetworkDisconnectOptions{
 		Container: op.Container.ID,
 		Force:     true,
@@ -59,7 +60,7 @@ func (exec *planExecutor) execDisconnectNetwork(ctx context.Context, op Operatio
 	return err
 }
 
-func (exec *planExecutor) execConnectNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execConnectNetwork(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().NetworkConnect(ctx, op.Name, client.NetworkConnectOptions{
 		Container: op.Container.ID,
 	})
@@ -68,18 +69,18 @@ func (exec *planExecutor) execConnectNetwork(ctx context.Context, op Operation) 
 
 // --- Volume operations ---
 
-func (exec *planExecutor) execCreateVolume(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execCreateVolume(ctx context.Context, op planning.Operation) error {
 	return exec.compose.createVolume(ctx, *op.Volume)
 }
 
-func (exec *planExecutor) execRemoveVolume(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRemoveVolume(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().VolumeRemove(ctx, op.Name, client.VolumeRemoveOptions{Force: true})
 	return err
 }
 
 // --- Container operations ---
 
-func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) execCreateContainer(ctx context.Context, node *planning.PlanNode) error {
 	op := node.Operation
 	service := *op.Service
 	// Detach VolumesFrom from the source slice: resolveServiceReferences mutates
@@ -138,7 +139,7 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 // either from the observed container or, for a replica the plan itself
 // creates, from the CreateContainer node's result (the same mechanism
 // OpRenameContainer already uses).
-func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execStartContainer(ctx context.Context, op planning.Operation) error {
 	if op.Service == nil {
 		startMx.Lock()
 		defer startMx.Unlock()
@@ -177,7 +178,7 @@ func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) 
 // resolveContainerID returns the ID of the container an operation targets:
 // the observed container when the reconciler already had one, otherwise the
 // result of the CreateContainer node it references.
-func (exec *planExecutor) resolveContainerID(op Operation) (string, error) {
+func (exec *planExecutor) resolveContainerID(op planning.Operation) (string, error) {
 	if op.Container != nil {
 		return op.Container.ID, nil
 	}
@@ -193,7 +194,7 @@ func (exec *planExecutor) resolveContainerID(op Operation) (string, error) {
 // observed container, falling back to the live view populated by the create
 // node execCreateContainer already ran (a dependency of every start-phase
 // node targeting that replica).
-func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summary, error) {
+func (exec *planExecutor) resolveContainerSummary(op planning.Operation) (container.Summary, error) {
 	if op.Container != nil {
 		return *op.Container, nil
 	}
@@ -229,7 +230,7 @@ func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summa
 // planExecutor.waitTimeout (set by upDetached and start) is what gives this
 // node its own fresh per-wait window, without also bounding unrelated Create
 // or Start work the way wrapping the whole plan's ctx would.
-func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op Operation) error {
+func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op planning.Operation) error {
 	s := exec.compose
 	exec.containersMu.Lock()
 	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
@@ -273,7 +274,7 @@ func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op Ope
 // window between observation and execution — the drift the plan design
 // accepts — skips a second, redundant run of the hooks rather than erroring
 // on runners already consumed.
-func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRunPreStart(ctx context.Context, op planning.Operation) error {
 	// Same relationship to run()'s failedDependency check as
 	// execStartContainer's guard above (see its comment): closed for this
 	// node's own direct dependency (the replica's create node) failing,
@@ -295,7 +296,7 @@ func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) err
 
 // execRunPostStart runs the service's post_start hooks against the replica
 // the start chain just brought up.
-func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRunPostStart(ctx context.Context, op planning.Operation) error {
 	// Same relationship to run()'s failedDependency check as
 	// execStartContainer's guard above (see its comment): closed for this
 	// node's own direct dependency (StartContainer) failing, defense in depth
@@ -316,14 +317,14 @@ func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) er
 	return nil
 }
 
-func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execStopContainer(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().ContainerStop(ctx, op.Container.ID, client.ContainerStopOptions{
 		Timeout: utils.DurationSecondToInt(op.Timeout),
 	})
 	return err
 }
 
-func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRemoveContainer(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: op.RemoveVolumes})
 	if err != nil {
 		if op.BestEffort {
@@ -355,7 +356,7 @@ func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation)
 // resolved from the live view at execution time: the node depends on every
 // container operation of its service, so the view is final here, and the
 // lowest-numbered replica matches the one the start phase hands the hooks.
-func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *planning.PlanNode) error {
 	// A dependency's done-channel also closes on failure: when a replica
 	// create failed and canceled the run, bail out on the cancellation
 	// instead of reporting the empty live view as an internal error.
@@ -386,7 +387,7 @@ func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *Pla
 	return nil
 }
 
-func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) execRenameContainer(ctx context.Context, node *planning.PlanNode) error {
 	op := node.Operation
 	if op.CreateNodeID == 0 {
 		return fmt.Errorf("internal: rename node #%d missing CreateNodeID", node.ID)

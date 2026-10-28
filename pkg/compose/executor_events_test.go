@@ -26,6 +26,7 @@ import (
 	"gotest.tools/v3/assert"
 	"gotest.tools/v3/assert/cmp"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -38,30 +39,30 @@ func TestEmittersReportOnTheRowTheyOpened(t *testing.T) {
 	web := startTestSummary("web")
 	tests := []struct {
 		name string
-		op   Operation
+		op   planning.Operation
 		row  string
 	}{
-		{"create container", Operation{Type: OpCreateContainer, ResourceID: "service:web:1", Name: "test-web-1"}, "Container test-web-1"},
-		{"start container", Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
-		{"stop container", Operation{Type: OpStopContainer, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
-		{"remove container", Operation{Type: OpRemoveContainer, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
-		{"create network", Operation{Type: OpCreateNetwork, ResourceID: "network:front", Name: "test_front"}, "Network test_front"},
-		{"remove network", Operation{Type: OpRemoveNetwork, ResourceID: "network:front", Name: "test_front"}, "Network test_front"},
-		{"create volume", Operation{Type: OpCreateVolume, ResourceID: "volume:data", Name: "test_data"}, "Volume test_data"},
-		{"remove volume", Operation{Type: OpRemoveVolume, ResourceID: "volume:data", Name: "test_data"}, "Volume test_data"},
+		{"create container", planning.Operation{Type: planning.OpCreateContainer, ResourceID: "service:web:1", Name: "test-web-1"}, "Container test-web-1"},
+		{"start container", planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
+		{"stop container", planning.Operation{Type: planning.OpStopContainer, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
+		{"remove container", planning.Operation{Type: planning.OpRemoveContainer, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
+		{"create network", planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:front", Name: "test_front"}, "Network test_front"},
+		{"remove network", planning.Operation{Type: planning.OpRemoveNetwork, ResourceID: "network:front", Name: "test_front"}, "Network test_front"},
+		{"create volume", planning.Operation{Type: planning.OpCreateVolume, ResourceID: "volume:data", Name: "test_data"}, "Volume test_data"},
+		{"remove volume", planning.Operation{Type: planning.OpRemoveVolume, ResourceID: "volume:data", Name: "test_data"}, "Volume test_data"},
 	}
 	endings := []struct {
 		name   string
-		emit   func(*PlanNode, api.EventProcessor)
+		emit   func(*planning.PlanNode, api.EventProcessor)
 		status api.EventStatus
 	}{
 		{"done", emitDoneEvent, api.Done},
-		{"error", func(n *PlanNode, e api.EventProcessor) { emitErrorEvent(n, e, errors.New("boom")) }, api.Error},
+		{"error", func(n *planning.PlanNode, e api.EventProcessor) { emitErrorEvent(n, e, errors.New("boom")) }, api.Error},
 	}
 	for _, tt := range tests {
 		for _, end := range endings {
 			t.Run(tt.name+"/"+end.name, func(t *testing.T) {
-				node := &PlanNode{Operation: tt.op}
+				node := &planning.PlanNode{Operation: tt.op}
 				events := &capturingEvents{}
 				emitStartEvent(node, events)
 				end.emit(node, events)
@@ -85,16 +86,16 @@ func TestEmitErrorEventOfANodeWithoutARowOfItsOwn(t *testing.T) {
 	web := startTestSummary("web")
 	tests := []struct {
 		name string
-		op   Operation
+		op   planning.Operation
 		row  string
 	}{
-		{"connect network", Operation{Type: OpConnectNetwork, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
-		{"disconnect network", Operation{Type: OpDisconnectNetwork, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
-		{"hook", Operation{Type: OpRunPreStart, ResourceID: "hook:web:pre_start:0"}, "hook:web:pre_start:0"},
+		{"connect network", planning.Operation{Type: planning.OpConnectNetwork, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
+		{"disconnect network", planning.Operation{Type: planning.OpDisconnectNetwork, ResourceID: "service:web:1", Container: &web}, "Container test-web-1"},
+		{"hook", planning.Operation{Type: planning.OpRunPreStart, ResourceID: "hook:web:pre_start:0"}, "hook:web:pre_start:0"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			node := &PlanNode{Operation: tt.op}
+			node := &planning.PlanNode{Operation: tt.op}
 			events := &capturingEvents{}
 			emitStartEvent(node, events)
 			emitDoneEvent(node, events)
@@ -124,11 +125,11 @@ func volumeCreate(err error) func(*mocks.MockAPIClient) {
 // the row of the resource. The operation itself used to report them too, on top
 // of the executor.
 func TestExecutePlanNetworkAndVolumeRowsOpenAndCloseOnce(t *testing.T) {
-	createFront := Operation{Type: OpCreateNetwork, ResourceID: "network:front", Name: "test_front", Network: &types.NetworkConfig{Name: "test_front"}}
-	createData := Operation{Type: OpCreateVolume, ResourceID: "volume:data", Name: "test_data", Volume: &types.VolumeConfig{Name: "test_data"}}
+	createFront := planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:front", Name: "test_front", Network: &types.NetworkConfig{Name: "test_front"}}
+	createData := planning.Operation{Type: planning.OpCreateVolume, ResourceID: "volume:data", Name: "test_data", Volume: &types.VolumeConfig{Name: "test_data"}}
 	tests := []struct {
 		name   string
-		op     Operation
+		op     planning.Operation
 		expect func(*mocks.MockAPIClient)
 		row    string
 		want   []string // the row's texts; the last one is the error when the node fails
@@ -173,7 +174,7 @@ func TestExecutePlanNetworkAndVolumeRowsOpenAndCloseOnce(t *testing.T) {
 		},
 		{
 			name: "network removal failed",
-			op:   Operation{Type: OpRemoveNetwork, ResourceID: "network:front", Name: "test_front"},
+			op:   planning.Operation{Type: planning.OpRemoveNetwork, ResourceID: "network:front", Name: "test_front"},
 			expect: func(m *mocks.MockAPIClient) {
 				m.EXPECT().NetworkRemove(gomock.Any(), "test_front", gomock.Any()).
 					Return(client.NetworkRemoveResult{}, errors.New("has active endpoints"))
@@ -184,7 +185,7 @@ func TestExecutePlanNetworkAndVolumeRowsOpenAndCloseOnce(t *testing.T) {
 		},
 		{
 			name: "volume removal failed",
-			op:   Operation{Type: OpRemoveVolume, ResourceID: "volume:data", Name: "test_data"},
+			op:   planning.Operation{Type: planning.OpRemoveVolume, ResourceID: "volume:data", Name: "test_data"},
 			expect: func(m *mocks.MockAPIClient) {
 				m.EXPECT().VolumeRemove(gomock.Any(), "test_data", gomock.Any()).
 					Return(client.VolumeRemoveResult{}, errors.New("volume in use"))
@@ -199,8 +200,8 @@ func TestExecutePlanNetworkAndVolumeRowsOpenAndCloseOnce(t *testing.T) {
 			svc, apiClient, recorder := newStartPhaseTestService(t)
 			tt.expect(apiClient)
 
-			plan := &Plan{}
-			plan.addNode(tt.op, "")
+			plan := &planning.Plan{}
+			plan.AddNode(tt.op, "")
 			exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 			err := exec.run(t.Context(), plan)
 
@@ -225,9 +226,9 @@ func TestExecutePlanFailedContainerCreationEndsItsRow(t *testing.T) {
 	apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
 		Return(client.ContainerCreateResult{}, errors.New("Minimum memory limit allowed is 6MB"))
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateContainer,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateContainer,
 		ResourceID: "service:web:1",
 		Service:    &service,
 		Name:       "test-web-1",

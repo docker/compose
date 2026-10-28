@@ -29,6 +29,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -478,7 +479,7 @@ func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
 // Iterates project.Services (not observed.Containers) so that containers of
 // disabled services (e.g. dependencies untouched by `compose run --no-deps`)
 // are not falsely reported as Running — see issue 13882.
-func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Plan, events api.EventProcessor) {
+func emitRunningEvents(project *types.Project, observed *ObservedState, plan *planning.Plan, events api.EventProcessor) {
 	planned := map[string]bool{}
 	for _, node := range plan.Nodes {
 		if node.Operation.Container != nil {
