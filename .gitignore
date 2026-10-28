@@ -3,4 +3,4 @@ bin/
 coverage.out
 covdatafiles/
 .DS_Store
-pkg/e2e/*.tar
+internal/e2e/*.tar
