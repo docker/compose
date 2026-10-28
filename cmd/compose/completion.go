@@ -70,7 +70,7 @@ func completeProjectNames(dockerCli command.Cli, backendOptions *BackendOptions)
 		}
 
 		list, err := backend.List(cmd.Context(), api.ListOptions{
-			All: true,
+			IncludeStopped: true,
 		})
 		if err != nil {
 			return nil, cobra.ShellCompDirectiveError

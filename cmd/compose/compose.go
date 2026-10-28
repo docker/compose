@@ -359,7 +359,7 @@ func (o *ProjectOptions) ToProject(
 		Profiles:          o.Profiles,
 		Services:          services,
 		Offline:           o.Offline,
-		All:               o.All,
+		IncludeUnused:     o.All,
 		Compatibility:     o.Compatibility,
 		ProjectOptionsFns: po,
 		LoadListeners:     []api.LoadListener{metricsListener},
