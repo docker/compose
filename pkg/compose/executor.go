@@ -29,6 +29,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -97,7 +98,7 @@ func (pc *reconciliationContext) get(nodeID int) operationResult {
 // A caller that does, into an attached session (interactive up), builds the
 // executor itself, drives a planRun, and hands its listener to runStart once
 // its session exists.
-func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *Plan) error {
+func (s *composeService) executePlan(ctx context.Context, project *types.Project, observed *ObservedState, plan *planning.Plan) error {
 	return s.newPlanExecutor(project, observed).run(ctx, plan)
 }
 
@@ -118,7 +119,7 @@ func (s *composeService) newPlanExecutor(project *types.Project, observed *Obser
 // event aggregation for composite operations like recreate. It is begin
 // followed by both phases: a caller that must act between the Create and the
 // Start phase drives a planRun itself.
-func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
+func (exec *planExecutor) run(ctx context.Context, plan *planning.Plan) error {
 	if plan.IsEmpty() {
 		return nil
 	}
@@ -167,8 +168,8 @@ func (exec *planExecutor) run(ctx context.Context, plan *Plan) error {
 type planRun struct {
 	exec        *planExecutor
 	rs          *runState
-	createNodes []*PlanNode
-	startNodes  []*PlanNode
+	createNodes []*planning.PlanNode
+	startNodes  []*planning.PlanNode
 
 	createRan bool
 	createErr error
@@ -179,7 +180,7 @@ type planRun struct {
 // the state shared by both phases, splits the nodes by phase and rejects a
 // plan that could only deadlock. An empty plan, or one with a single phase,
 // gives a planRun whose other phase dispatches nothing.
-func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
+func (exec *planExecutor) begin(plan *planning.Plan) (*planRun, error) {
 	// Build a done-channel per node so dependents can wait
 	done := make(map[int]chan struct{}, len(plan.Nodes))
 	for _, node := range plan.Nodes {
@@ -215,7 +216,7 @@ func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
 		defer failuresMu.Unlock()
 		return successes[id]
 	}
-	failedDependency := func(deps []*PlanNode) error {
+	failedDependency := func(deps []*planning.PlanNode) error {
 		failuresMu.Lock()
 		defer failuresMu.Unlock()
 		for _, dep := range deps {
@@ -241,9 +242,9 @@ func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
 		limiter:          concurrency.NewLimiter(exec.compose.maxConcurrency),
 	}
 
-	var createNodes, startNodes []*PlanNode
+	var createNodes, startNodes []*planning.PlanNode
 	for _, node := range plan.Nodes {
-		if node.Phase == PhaseStart {
+		if node.Phase == planning.PhaseStart {
 			startNodes = append(startNodes, node)
 		} else {
 			createNodes = append(createNodes, node)
@@ -259,7 +260,7 @@ func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
 	// clear error beats a silent hang if it ever does.
 	for _, node := range createNodes {
 		for _, dep := range node.DependsOn {
-			if dep.Phase == PhaseStart {
+			if dep.Phase == planning.PhaseStart {
 				return nil, fmt.Errorf("invalid plan: create-phase node %d depends on start-phase node %d", node.ID, dep.ID)
 			}
 		}
@@ -308,7 +309,7 @@ func (r *planRun) runStart(ctx context.Context, listener api.ContainerEventListe
 // no way to tell, so this still matters if that ever changes). See phaseCancel's
 // doc comment for why a node's failure goes through phase.fail instead of
 // errgroup.Group's own first-error-wins race.
-func (exec *planExecutor) runPhase(nodes []*PlanNode, rs *runState, phase *phaseCancel) error {
+func (exec *planExecutor) runPhase(nodes []*planning.PlanNode, rs *runState, phase *phaseCancel) error {
 	defer phase.cancel()
 	eg := errgroup.Group{}
 	for _, node := range nodes {
@@ -345,7 +346,7 @@ type phaseCancel struct {
 	// is not canceled by one of its own nodes (the caller's context may be done
 	// as well, e.g. on Ctrl-C). Set strictly before cancel(), so a node that
 	// sees ctx done because of that failure always finds it here.
-	failed atomic.Pointer[PlanNode]
+	failed atomic.Pointer[planning.PlanNode]
 }
 
 func newPhaseCancel(parent context.Context) *phaseCancel {
@@ -360,7 +361,7 @@ func newPhaseCancel(parent context.Context) *phaseCancel {
 // caller either is a cancellation casualty of the first failure, with nothing
 // of its own to say, or failed for a genuine reason of its own at the same
 // moment, whose row is then for it to close.
-func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *groupTracker, err error) bool {
+func (p *phaseCancel) fail(node *planning.PlanNode, events api.EventProcessor, groups *groupTracker, err error) bool {
 	first := false
 	p.once.Do(func() {
 		first = true
@@ -382,8 +383,8 @@ func (p *phaseCancel) fail(node *PlanNode, events api.EventProcessor, groups *gr
 // that sibling's start needs and only end at its timeout. The waits
 // waitDependencies runs outside any plan stay outside the cap for the same
 // reason.
-func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *PlanNode) (func(), error) {
-	if node.Operation.Type == OpWaitCondition {
+func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *planning.PlanNode) (func(), error) {
+	if node.Operation.Type == planning.OpWaitCondition {
 		return func() {}, nil
 	}
 	if err := concurrency.Acquire(ctx, limiter); err != nil {
@@ -404,7 +405,7 @@ type runState struct {
 	recordFailure    func(id int, err error)
 	recordSuccess    func(id int)
 	succeeded        func(id int) bool
-	failedDependency func(deps []*PlanNode) error
+	failedDependency func(deps []*planning.PlanNode) error
 	groups           *groupTracker
 	events           api.EventProcessor
 	limiter          *semaphore.Weighted
@@ -414,7 +415,7 @@ type runState struct {
 // one of them failed, then dispatches it and records the outcome. phase is
 // the cancellation scope of the runPhase call driving it -- see runPhase and
 // phaseCancel's own doc comments.
-func (exec *planExecutor) runNode(node *PlanNode, rs *runState, phase *phaseCancel) error {
+func (exec *planExecutor) runNode(node *planning.PlanNode, rs *runState, phase *phaseCancel) error {
 	nodeCtx := phase.ctx
 
 	// Every exit path below must close rs.done[node.ID] exactly once, or a
@@ -569,7 +570,7 @@ func translateWaitTimeout(err error) error {
 // an earlier deadline inherited from the caller having fired instead: both
 // make the derived context report DeadlineExceeded, but only the former is
 // this wait's own timeout.
-func (exec *planExecutor) execBoundedWaitCondition(origCtx context.Context, op Operation) error {
+func (exec *planExecutor) execBoundedWaitCondition(origCtx context.Context, op planning.Operation) error {
 	ctx := origCtx
 	if exec.waitTimeout > 0 {
 		var cancel context.CancelFunc
@@ -585,40 +586,40 @@ func (exec *planExecutor) execBoundedWaitCondition(origCtx context.Context, op O
 }
 
 // executeNode dispatches a single plan node to the appropriate API call.
-func (exec *planExecutor) executeNode(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) executeNode(ctx context.Context, node *planning.PlanNode) error {
 	op := node.Operation
 	switch op.Type {
-	case OpCreateNetwork:
+	case planning.OpCreateNetwork:
 		return exec.execCreateNetwork(ctx, op)
-	case OpRemoveNetwork:
+	case planning.OpRemoveNetwork:
 		return exec.execRemoveNetwork(ctx, op)
-	case OpDisconnectNetwork:
+	case planning.OpDisconnectNetwork:
 		return exec.execDisconnectNetwork(ctx, op)
-	case OpConnectNetwork:
+	case planning.OpConnectNetwork:
 		return exec.execConnectNetwork(ctx, op)
-	case OpCreateVolume:
+	case planning.OpCreateVolume:
 		return exec.execCreateVolume(ctx, op)
-	case OpRemoveVolume:
+	case planning.OpRemoveVolume:
 		return exec.execRemoveVolume(ctx, op)
-	case OpCreateContainer:
+	case planning.OpCreateContainer:
 		return exec.execCreateContainer(ctx, node)
-	case OpStartContainer:
+	case planning.OpStartContainer:
 		return exec.execStartContainer(ctx, op)
-	case OpStopContainer:
+	case planning.OpStopContainer:
 		return exec.execStopContainer(ctx, op)
-	case OpRemoveContainer:
+	case planning.OpRemoveContainer:
 		return exec.execRemoveContainer(ctx, op)
-	case OpRenameContainer:
+	case planning.OpRenameContainer:
 		return exec.execRenameContainer(ctx, node)
-	case OpCreateHookContainer:
+	case planning.OpCreateHookContainer:
 		return exec.execCreateHookContainer(ctx, node)
-	case OpWaitCondition:
+	case planning.OpWaitCondition:
 		return exec.execBoundedWaitCondition(ctx, op)
-	case OpRunPreStart:
+	case planning.OpRunPreStart:
 		return exec.execRunPreStart(ctx, op)
-	case OpRunPostStart:
+	case planning.OpRunPostStart:
 		return exec.execRunPostStart(ctx, op)
-	case OpRunProvider:
+	case planning.OpRunProvider:
 		return exec.compose.runPlugin(ctx, exec.project, *op.Service, "up")
 	default:
 		return fmt.Errorf("unknown operation type: %s", op.Type)

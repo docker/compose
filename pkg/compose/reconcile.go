@@ -33,6 +33,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -93,31 +94,31 @@ type reconciler struct {
 	// whose configuration has diverged (an operation that loses the volume's
 	// data). Network recreation is not gated: it is not destructive.
 	prompt Prompt
-	plan   *Plan
+	plan   *planning.Plan
 
 	// networkNodes and volumeNodes track the last plan node for each
 	// network/volume, so container creation nodes can depend on them.
-	networkNodes map[string]*PlanNode // compose network key → create node
-	volumeNodes  map[string]*PlanNode // compose volume key → create node
+	networkNodes map[string]*planning.PlanNode // compose network key → create node
+	volumeNodes  map[string]*planning.PlanNode // compose volume key → create node
 	// serviceNodes tracks the last plan node per service, so dependent
 	// services can order their operations after dependencies.
-	serviceNodes map[string]*PlanNode
+	serviceNodes map[string]*planning.PlanNode
 	// containerNodes tracks, per service then replica number, the
 	// create-phase node that materializes that container (creation,
 	// recreation, or the exceptional-state restart), so start-phase nodes
 	// can depend on it and resolve their target from its result.
-	containerNodes map[string]map[int]*PlanNode
+	containerNodes map[string]map[int]*planning.PlanNode
 	// startChainEnds tracks the nodes ending each service's start-phase
 	// visit: the last node of the replica chain, or — when nothing had to
 	// start — the dependency prerequisites the visit still evaluated. What a
 	// service_started dependent (or a wait node) hooks onto, matching
 	// InDependencyOrder semantics: a dependent's visit begins only once the
 	// dependency's whole visit (waits included) completed.
-	startChainEnds map[string][]*PlanNode
+	startChainEnds map[string][]*planning.PlanNode
 	// waitNodes deduplicates OpWaitCondition nodes per (service, condition):
 	// several dependents awaiting the same condition share one node, like
 	// networkNodes deduplicates network creations.
-	waitNodes map[string]*PlanNode
+	waitNodes map[string]*planning.PlanNode
 	// dependencyGraph memoizes NewGraph(project, ServiceStopped): both
 	// reconcileContainers and planStartPhase need the same dependency-ordered
 	// walk within one reconcile() call. Safe to share — visitInDependencyOrder
@@ -132,18 +133,18 @@ type reconciler struct {
 	// materialize the pre_start hook runners, so the start-phase RunPreStart
 	// node can depend on them — the executor must never run the hooks before
 	// their runners exist.
-	hookRunnerNodes map[string][]*PlanNode
+	hookRunnerNodes map[string][]*planning.PlanNode
 	// stoppedByPlan records containers already stopped by an earlier stage
 	// of the plan (typically planRecreateNetwork) so that downstream stages
 	// can chain on the existing OpStopContainer instead of emitting a second
 	// one against an already-stopped container.
-	stoppedByPlan map[string]*PlanNode // container ID → existing Stop node
+	stoppedByPlan map[string]*planning.PlanNode // container ID → existing Stop node
 
 	// connectNodes records the OpConnectNetwork nodes emitted for a container by
 	// planRecreateNetworks (reconnecting it to a freshly recreated network). If
 	// reconcileContainers later recreates the same container, its RemoveContainer
 	// must wait for these reconnects so they don't race the removal.
-	connectNodes map[string][]*PlanNode // container ID → reconnect nodes
+	connectNodes map[string][]*planning.PlanNode // container ID → reconnect nodes
 
 	// recreatedServices is the set of services with at least one container
 	// scheduled for recreation in the current plan. Services iterate in
@@ -169,23 +170,23 @@ type reconciler struct {
 // reconcile is the main entry point: it builds a Plan from desired vs observed state.
 // The prompt function is consulted while planning to confirm destructive
 // decisions (see the reconciler.prompt field).
-func reconcile(_ context.Context, project *types.Project, observed *ObservedState, options ReconcileOptions, prompt Prompt) (*Plan, error) {
+func reconcile(_ context.Context, project *types.Project, observed *ObservedState, options ReconcileOptions, prompt Prompt) (*planning.Plan, error) {
 	r := &reconciler{
 		project:                     project,
 		observed:                    observed,
 		options:                     options,
 		prompt:                      prompt,
-		plan:                        &Plan{},
-		networkNodes:                map[string]*PlanNode{},
-		volumeNodes:                 map[string]*PlanNode{},
-		serviceNodes:                map[string]*PlanNode{},
-		containerNodes:              map[string]map[int]*PlanNode{},
-		startChainEnds:              map[string][]*PlanNode{},
-		waitNodes:                   map[string]*PlanNode{},
+		plan:                        &planning.Plan{},
+		networkNodes:                map[string]*planning.PlanNode{},
+		volumeNodes:                 map[string]*planning.PlanNode{},
+		serviceNodes:                map[string]*planning.PlanNode{},
+		containerNodes:              map[string]map[int]*planning.PlanNode{},
+		startChainEnds:              map[string][]*planning.PlanNode{},
+		waitNodes:                   map[string]*planning.PlanNode{},
 		removedByPlan:               map[string]bool{},
-		stoppedByPlan:               map[string]*PlanNode{},
-		hookRunnerNodes:             map[string][]*PlanNode{},
-		connectNodes:                map[string][]*PlanNode{},
+		stoppedByPlan:               map[string]*planning.PlanNode{},
+		hookRunnerNodes:             map[string][]*planning.PlanNode{},
+		connectNodes:                map[string][]*planning.PlanNode{},
 		recreatedServices:           map[string]bool{},
 		observedContainersByService: observed.containersByService(),
 	}
@@ -306,8 +307,8 @@ func (r *reconciler) reconcileNetworks() error {
 
 // planCreateNetwork adds a single CreateNetwork node and records it for dependency tracking.
 func (r *reconciler) planCreateNetwork(key string, networkConfig *types.NetworkConfig, cause string) {
-	r.networkNodes[key] = r.plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	r.networkNodes[key] = r.plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:" + key,
 		Cause:      cause,
 		Name:       networkConfig.Name,
@@ -337,14 +338,14 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 		containers := r.containersForServices(r.servicesUsingNetwork(key))
 
 		// Stop then disconnect every attached container.
-		var disconnectNodes []*PlanNode
+		var disconnectNodes []*planning.PlanNode
 		for i := range containers {
 			oc := &containers[i]
 			resID := serviceReplicaID(oc.Summary.Labels[api.ServiceLabel], oc.Number)
 			stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
 			if !alreadyStopped {
-				stopNode = r.plan.addNode(Operation{
-					Type:       OpStopContainer,
+				stopNode = r.plan.AddNode(planning.Operation{
+					Type:       planning.OpStopContainer,
 					ResourceID: resID,
 					Cause:      fmt.Sprintf("network %s config changed", key),
 					Container:  &oc.Summary,
@@ -352,8 +353,8 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 				}, "")
 				r.stoppedByPlan[oc.ID] = stopNode
 			}
-			disconnectNodes = append(disconnectNodes, r.plan.addNode(Operation{
-				Type:       OpDisconnectNetwork,
+			disconnectNodes = append(disconnectNodes, r.plan.AddNode(planning.Operation{
+				Type:       planning.OpDisconnectNetwork,
 				ResourceID: resID,
 				Cause:      fmt.Sprintf("network %s recreate", key),
 				Container:  &oc.Summary,
@@ -376,20 +377,20 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 			createCause = "renamed"
 		}
 
-		removeNode := r.plan.addNode(Operation{
-			Type:       OpRemoveNetwork,
+		removeNode := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpRemoveNetwork,
 			ResourceID: "network:" + key,
 			Cause:      removeCause,
 			Name:       observed.Name,
 			BestEffort: rename,
 		}, "", disconnectNodes...)
 
-		var createDeps []*PlanNode
+		var createDeps []*planning.PlanNode
 		if !rename {
-			createDeps = []*PlanNode{removeNode}
+			createDeps = []*planning.PlanNode{removeNode}
 		}
-		createNode := r.plan.addNode(Operation{
-			Type:       OpCreateNetwork,
+		createNode := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpCreateNetwork,
 			ResourceID: "network:" + key,
 			Cause:      createCause,
 			Name:       desired.Name,
@@ -404,12 +405,12 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 		for i := range containers {
 			oc := &containers[i]
 			resID := serviceReplicaID(oc.Summary.Labels[api.ServiceLabel], oc.Number)
-			deps := []*PlanNode{createNode}
+			deps := []*planning.PlanNode{createNode}
 			if rename {
 				deps = append(deps, disconnectNodes[i])
 			}
-			connectNode := r.plan.addNode(Operation{
-				Type:       OpConnectNetwork,
+			connectNode := r.plan.AddNode(planning.Operation{
+				Type:       planning.OpConnectNetwork,
 				ResourceID: resID,
 				Cause:      fmt.Sprintf("network %s recreate", key),
 				Container:  &oc.Summary,
@@ -487,8 +488,8 @@ func (r *reconciler) reconcileVolumes() error {
 
 // planCreateVolume adds a single CreateVolume node and records it for dependency tracking.
 func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig, cause string) {
-	r.volumeNodes[key] = r.plan.addNode(Operation{
-		Type:       OpCreateVolume,
+	r.volumeNodes[key] = r.plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateVolume,
 		ResourceID: "volume:" + key,
 		Cause:      cause,
 		Name:       vol.Name,
@@ -532,14 +533,14 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 	containers := r.containersForServices(services)
 
 	// Stop then remove every affected container.
-	var removeNodes []*PlanNode
+	var removeNodes []*planning.PlanNode
 	for i := range containers {
 		oc := &containers[i]
 		resID := serviceReplicaID(oc.Summary.Labels[api.ServiceLabel], oc.Number)
 		stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
 		if !alreadyStopped {
-			stopNode = r.plan.addNode(Operation{
-				Type:       OpStopContainer,
+			stopNode = r.plan.AddNode(planning.Operation{
+				Type:       planning.OpStopContainer,
 				ResourceID: resID,
 				Cause:      "mounted volume config changed",
 				Container:  &oc.Summary,
@@ -547,8 +548,8 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 			}, "")
 			r.stoppedByPlan[oc.ID] = stopNode
 		}
-		removeNode := r.plan.addNode(Operation{
-			Type:       OpRemoveContainer,
+		removeNode := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpRemoveContainer,
 			ResourceID: resID,
 			Cause:      "mounted volume config changed",
 			Container:  &oc.Summary,
@@ -561,14 +562,14 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 	// reconcileContainers depend on it (via infrastructureDeps).
 	for _, key := range keys {
 		desired := r.project.Volumes[key]
-		removeVolNode := r.plan.addNode(Operation{
-			Type:       OpRemoveVolume,
+		removeVolNode := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpRemoveVolume,
 			ResourceID: "volume:" + key,
 			Cause:      "config hash diverged",
 			Name:       r.resolvedVolumes[key].Name,
 		}, "", removeNodes...)
-		createVolNode := r.plan.addNode(Operation{
-			Type:       OpCreateVolume,
+		createVolNode := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpCreateVolume,
 			ResourceID: "volume:" + key,
 			Cause:      "recreate after config change",
 			Name:       desired.Name,
@@ -790,15 +791,15 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				continue
 			}
 			resID := serviceReplicaID(service.Name, oc.Number)
-			stopNode := r.plan.addNode(Operation{
-				Type:       OpStopContainer,
+			stopNode := r.plan.AddNode(planning.Operation{
+				Type:       planning.OpStopContainer,
 				ResourceID: resID,
 				Cause:      "service is now provider-backed",
 				Container:  &oc.Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
-			removeNode := r.plan.addNode(Operation{
-				Type:       OpRemoveContainer,
+			removeNode := r.plan.AddNode(planning.Operation{
+				Type:       planning.OpRemoveContainer,
 				ResourceID: resID,
 				Cause:      "service is now provider-backed",
 				Container:  &oc.Summary,
@@ -808,8 +809,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			// be free by then
 			deps = append(deps, removeNode)
 		}
-		node := r.plan.addNode(Operation{
-			Type:       OpRunProvider,
+		node := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpRunProvider,
 			ResourceID: "provider:" + service.Name,
 			Cause:      "provider service",
 			Service:    &serviceCopy,
@@ -848,11 +849,11 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	// Collect dependency nodes that container creation should depend on
 	infraDeps := r.infrastructureDeps(service)
 
-	var lastNode *PlanNode
+	var lastNode *planning.PlanNode
 	// containerNodes collects every node planned for this service's replicas,
 	// so the pre_start hook-runner creation below can wait for the executor's
 	// live container view to be final before resolving its target replica.
-	var containerNodes []*PlanNode
+	var containerNodes []*planning.PlanNode
 	// keptRunning reports whether a running replica survives the plan
 	// untouched — the start phase will then skip pre_start, so no hook
 	// runner is needed.
@@ -865,15 +866,15 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			// node so dependent services wait for the scale-down to finish
 			// even when no other operation runs on this service.
 			resID := serviceReplicaID(service.Name, oc.Number)
-			stopNode := r.plan.addNode(Operation{
-				Type:       OpStopContainer,
+			stopNode := r.plan.AddNode(planning.Operation{
+				Type:       planning.OpStopContainer,
 				ResourceID: resID,
 				Cause:      "scale down",
 				Container:  &containers[i].Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
-			lastNode = r.plan.addNode(Operation{
-				Type:       OpRemoveContainer,
+			lastNode = r.plan.AddNode(planning.Operation{
+				Type:       planning.OpRemoveContainer,
 				ResourceID: resID,
 				Cause:      "scale down",
 				Container:  &containers[i].Summary,
@@ -912,8 +913,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			}
 		default:
 			// Any other state (paused, dead, ...): attempt to (re)start
-			lastNode = r.plan.addNode(Operation{
-				Type:       OpStartContainer,
+			lastNode = r.plan.AddNode(planning.Operation{
+				Type:       planning.OpStartContainer,
 				ResourceID: serviceReplicaID(service.Name, oc.Number),
 				Cause:      "not running",
 				Container:  &containers[i].Summary,
@@ -932,8 +933,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 		number := nextNum + i
 		name := naming.ContainerName(r.project.Name, service, number)
 		serviceCopy := service // copy for pointer stability
-		lastNode = r.plan.addNode(Operation{
-			Type:       OpCreateContainer,
+		lastNode = r.plan.AddNode(planning.Operation{
+			Type:       planning.OpCreateContainer,
 			ResourceID: serviceReplicaID(service.Name, number),
 			Cause:      "no existing container",
 			Service:    &serviceCopy,
@@ -971,7 +972,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 // view with networks in place. When a running replica survives the plan, the
 // start phase skips pre_start entirely: nothing is created, and a hook
 // container retained after a failure stays available for inspection.
-func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expectedScale int, keptRunning bool, containerNodes, infraDeps []*PlanNode) {
+func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expectedScale int, keptRunning bool, containerNodes, infraDeps []*planning.PlanNode) {
 	if keptRunning {
 		return
 	}
@@ -980,8 +981,8 @@ func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expect
 	stale := slices.Clone(r.observed.HookContainers[service.Name])
 	slices.SortFunc(stale, func(a, b ObservedContainer) int { return strings.Compare(a.ID, b.ID) })
 	for i := range stale {
-		node := r.plan.addNode(Operation{
-			Type:          OpRemoveContainer,
+		node := r.plan.AddNode(planning.Operation{
+			Type:          planning.OpRemoveContainer,
 			ResourceID:    fmt.Sprintf("hook:%s:stale:%s", service.Name, stale[i].ID[:min(12, len(stale[i].ID))]),
 			Cause:         "stale pre_start hook container",
 			Service:       &serviceCopy,
@@ -1009,8 +1010,8 @@ func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expect
 		return
 	}
 	for i := range service.PreStart {
-		node := r.plan.addNode(Operation{
-			Type:       OpCreateHookContainer,
+		node := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpCreateHookContainer,
 			ResourceID: fmt.Sprintf("hook:%s:%s:%d", service.Name, preStartHookType, i),
 			Cause:      "pre_start hook",
 			Service:    &serviceCopy,
@@ -1170,7 +1171,7 @@ type startReplica struct {
 	container *container.Summary
 	// after is the create-phase node this replica's start must follow, when
 	// the create phase planned one.
-	after *PlanNode
+	after *planning.PlanNode
 	// createNodeID is the ID of the node whose execution result carries the
 	// materialized container (the OpCreateContainer node); 0 when the
 	// container is observed.
@@ -1196,12 +1197,12 @@ func isReplicaRelay(rep startReplica) bool {
 // always the one whose execution result carries the container ID: a recreate
 // chain registers its final rename node, whose CreateNodeID names the actual
 // create node.
-func plannedReplica(service string, number int, node *PlanNode) startReplica {
+func plannedReplica(service string, number int, node *planning.PlanNode) startReplica {
 	rep := startReplica{resID: serviceReplicaID(service, number), number: number, after: node}
 	switch node.Operation.Type {
-	case OpCreateContainer:
+	case planning.OpCreateContainer:
 		rep.createNodeID = node.ID
-	case OpRenameContainer:
+	case planning.OpRenameContainer:
 		rep.createNodeID = node.Operation.CreateNodeID
 	default:
 		// no other node type is registered in containerNodes today
@@ -1226,9 +1227,9 @@ func startGroupID(resID string) string {
 }
 
 // setContainerNode records the create-phase node materializing a replica.
-func (r *reconciler) setContainerNode(service string, number int, node *PlanNode) {
+func (r *reconciler) setContainerNode(service string, number int, node *planning.PlanNode) {
 	if r.containerNodes[service] == nil {
-		r.containerNodes[service] = map[int]*PlanNode{}
+		r.containerNodes[service] = map[int]*planning.PlanNode{}
 	}
 	r.containerNodes[service][number] = node
 }
@@ -1241,16 +1242,16 @@ func (r *reconciler) setContainerNode(service string, number int, node *PlanNode
 // exceptional-state replica needs every one of them in startChainEnds, or a
 // service_started consumer could run while another replica's restart is
 // still pending.
-func (r *reconciler) exceptionalStateRestartNodes(service string) []*PlanNode {
+func (r *reconciler) exceptionalStateRestartNodes(service string) []*planning.PlanNode {
 	planned := r.containerNodes[service]
 	numbers := make([]int, 0, len(planned))
 	for number, node := range planned {
-		if node.Operation.Type == OpStartContainer {
+		if node.Operation.Type == planning.OpStartContainer {
 			numbers = append(numbers, number)
 		}
 	}
 	sort.Ints(numbers)
-	nodes := make([]*PlanNode, len(numbers))
+	nodes := make([]*planning.PlanNode, len(numbers))
 	for i, number := range numbers {
 		nodes[i] = planned[number]
 	}
@@ -1280,7 +1281,7 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 		}
 		if node, ok := planned[oc.Number]; ok {
 			seen[oc.Number] = true
-			if node.Operation.Type == OpStartContainer {
+			if node.Operation.Type == planning.OpStartContainer {
 				// exceptional-state restart (paused, dead, ...): the
 				// create-phase bare start already brings it to running
 				anyRunning = true
@@ -1328,14 +1329,14 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 // is delegated to shouldWaitForDependency — the gate waitDependencies shares
 // — errors included: a dependency that is neither declared nor disabled is a
 // hard failure.
-func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*PlanNode, error) {
-	var depNodes []*PlanNode
+func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*planning.PlanNode, error) {
+	var depNodes []*planning.PlanNode
 	for _, dep := range slices.Sorted(maps.Keys(service.DependsOn)) {
 		cfg := service.DependsOn[dep]
 		targets := r.startChainEnds[dep]
 		if len(targets) == 0 {
 			if node, ok := r.serviceNodes[dep]; ok {
-				targets = []*PlanNode{node}
+				targets = []*planning.PlanNode{node}
 			}
 		}
 		shouldWait, err := shouldWaitForDependency(dep, cfg, r.project)
@@ -1355,19 +1356,19 @@ func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*Pla
 // creating it on first use. required:false marks it best-effort — a missing
 // dependency is skipped, not fatal; one required dependent upgrades the
 // shared node for everyone.
-func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, targets []*PlanNode) *PlanNode {
+func (r *reconciler) waitConditionNode(dep string, cfg types.ServiceDependency, targets []*planning.PlanNode) *planning.PlanNode {
 	key := dep + ":" + cfg.Condition
 	wait, ok := r.waitNodes[key]
 	if !ok {
-		wait = r.plan.addNode(Operation{
-			Type:       OpWaitCondition,
+		wait = r.plan.AddNode(planning.Operation{
+			Type:       planning.OpWaitCondition,
 			ResourceID: fmt.Sprintf("wait:%s:%s", dep, cfg.Condition),
 			Cause:      "depends_on condition",
 			Name:       dep,
 			Condition:  cfg.Condition,
 			BestEffort: !cfg.Required,
 		}, "", targets...)
-		wait.Phase = PhaseStart
+		wait.Phase = planning.PhaseStart
 		r.waitNodes[key] = wait
 		return wait
 	}
@@ -1445,7 +1446,7 @@ func (r *reconciler) planProviderStart(service types.ServiceConfig) error {
 // there is no Create->Start barrier separating this provider from its
 // siblings, so without its own depends_on wired in here this node could start
 // before a required dependency's condition wait resolves.
-func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps []*PlanNode) *PlanNode {
+func (r *reconciler) planProviderRelayRestart(service types.ServiceConfig, deps []*planning.PlanNode) *planning.PlanNode {
 	replicas, anyRunning := r.startPhaseReplicas(service)
 	return r.chainStartReplicas(service, replicas, anyRunning, deps)
 }
@@ -1524,7 +1525,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 		return nil
 	}
 
-	r.startChainEnds[service.Name] = []*PlanNode{r.chainStartReplicas(service, replicas, anyRunning, depNodes)}
+	r.startChainEnds[service.Name] = []*planning.PlanNode{r.chainStartReplicas(service, replicas, anyRunning, depNodes)}
 	return nil
 }
 
@@ -1533,7 +1534,7 @@ func (r *reconciler) planServiceStart(service types.ServiceConfig) error {
 // eligible, then per replica inject+start and post_start, replica n+1 waiting
 // for the end of replica n's chain. It returns the end of the chain, nil when
 // there is no replica to start.
-func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []startReplica, anyRunning bool, prev []*PlanNode) *PlanNode {
+func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []startReplica, anyRunning bool, prev []*planning.PlanNode) *planning.PlanNode {
 	if len(replicas) == 0 {
 		return nil
 	}
@@ -1548,8 +1549,8 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 	if preStarted {
 		serviceCopy := service
 		first := replicas[0]
-		op := Operation{
-			Type:         OpRunPreStart,
+		op := planning.Operation{
+			Type:         planning.OpRunPreStart,
 			ResourceID:   first.resID,
 			Cause:        "pre_start hooks",
 			Service:      &serviceCopy,
@@ -1565,20 +1566,20 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 		// the hooks execute the runners the create phase prepared: they must
 		// exist before RunPreStart runs
 		deps = append(deps, r.hookRunnerNodes[service.Name]...)
-		preStart := r.plan.addNode(op, startGroupID(first.resID), deps...)
-		preStart.Phase = PhaseStart
-		prev = []*PlanNode{preStart}
+		preStart := r.plan.AddNode(op, startGroupID(first.resID), deps...)
+		preStart.Phase = planning.PhaseStart
+		prev = []*planning.PlanNode{preStart}
 	}
 
 	// the replica chain: inject+start then post_start of replica n+1 waits
 	// for the end of replica n's chain — today's sequential start order
-	var chainEnd *PlanNode
+	var chainEnd *planning.PlanNode
 	for i, rep := range replicas {
 		serviceCopy := service
 		relay := isReplicaRelay(rep)
 		group := startGroupID(rep.resID)
-		op := Operation{
-			Type:         OpStartContainer,
+		op := planning.Operation{
+			Type:         planning.OpStartContainer,
 			ResourceID:   rep.resID,
 			Cause:        "start",
 			Container:    rep.container,
@@ -1593,29 +1594,29 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 			// pre_start node when one was planned: no redundant direct edge
 			deps = append(deps, rep.after)
 		}
-		start := r.plan.addNode(op, group, deps...)
-		start.Phase = PhaseStart
+		start := r.plan.AddNode(op, group, deps...)
+		start.Phase = planning.PhaseStart
 		chainEnd = start
 		if !relay && len(service.PostStart) > 0 {
-			post := r.plan.addNode(Operation{
-				Type:         OpRunPostStart,
+			post := r.plan.AddNode(planning.Operation{
+				Type:         planning.OpRunPostStart,
 				ResourceID:   rep.resID,
 				Cause:        "post_start hooks",
 				Service:      &serviceCopy,
 				Container:    rep.container,
 				CreateNodeID: op.CreateNodeID,
 			}, group, start)
-			post.Phase = PhaseStart
+			post.Phase = planning.PhaseStart
 			chainEnd = post
 		}
-		prev = []*PlanNode{chainEnd}
+		prev = []*planning.PlanNode{chainEnd}
 	}
 	return chainEnd
 }
 
 // planRecreateContainer decomposes container recreation into 4 atomic operations:
 // CreateContainer(tmpName) → StopContainer → RemoveContainer → RenameContainer
-func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*PlanNode) *PlanNode {
+func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*planning.PlanNode) *planning.PlanNode {
 	resID := serviceReplicaID(service.Name, oc.Number)
 	group := fmt.Sprintf("recreate:%s:%d", service.Name, oc.Number)
 	tmpName := fmt.Sprintf("%s_%s", oc.ID[:min(12, len(oc.ID))], naming.ContainerName(r.project.Name, service, oc.Number))
@@ -1633,8 +1634,8 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	}
 
 	// 1. Create new container with temporary name
-	createNode := r.plan.addNode(Operation{
-		Type:       OpCreateContainer,
+	createNode := r.plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateContainer,
 		ResourceID: resID,
 		Cause:      "config changed (tmpName)",
 		Service:    &serviceCopy,
@@ -1650,8 +1651,8 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	// recreate's group tracker still drives Working/Done from the create.
 	stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
 	if !alreadyStopped {
-		stopNode = r.plan.addNode(Operation{
-			Type:       OpStopContainer,
+		stopNode = r.plan.AddNode(planning.Operation{
+			Type:       planning.OpStopContainer,
 			ResourceID: resID,
 			Cause:      fmt.Sprintf("replaced by #%d", createNode.ID),
 			Container:  &oc.Summary,
@@ -1670,7 +1671,7 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	//     holds, so we add createNode to removeDeps explicitly. If anyone
 	//     ever drops the stop → create edge from the !alreadyStopped case,
 	//     they must add createNode here unconditionally.
-	removeDeps := []*PlanNode{stopNode}
+	removeDeps := []*planning.PlanNode{stopNode}
 	if alreadyStopped {
 		removeDeps = append(removeDeps, createNode)
 	}
@@ -1678,8 +1679,8 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	// recreation), let them complete before the old container is removed so the
 	// reconnect does not race the removal.
 	removeDeps = append(removeDeps, r.connectNodes[oc.ID]...)
-	removeNode := r.plan.addNode(Operation{
-		Type:       OpRemoveContainer,
+	removeNode := r.plan.AddNode(planning.Operation{
+		Type:       planning.OpRemoveContainer,
 		ResourceID: resID,
 		Cause:      fmt.Sprintf("replaced by #%d", createNode.ID),
 		Container:  &oc.Summary,
@@ -1692,8 +1693,8 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	// read it by service name) once the rename actually lands — otherwise
 	// they'd keep seeing the temporary name past this node.
 	finalName := naming.ContainerName(r.project.Name, service, oc.Number)
-	renameNode := r.plan.addNode(Operation{
-		Type:         OpRenameContainer,
+	renameNode := r.plan.AddNode(planning.Operation{
+		Type:         planning.OpRenameContainer,
 		ResourceID:   resID,
 		Cause:        "finalize recreate",
 		Name:         finalName,
@@ -1708,18 +1709,18 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 // depend on the given service with restart: true. Each emitted Stop is
 // recorded in stoppedByPlan so a later planRecreateContainer for the same
 // dependent reuses it instead of emitting a duplicate Stop.
-func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode {
+func (r *reconciler) planStopDependents(service types.ServiceConfig) []*planning.PlanNode {
 	dependents := r.project.GetDependentsForService(service, func(dep types.ServiceDependency) bool {
 		return dep.Restart
 	})
-	var nodes []*PlanNode
+	var nodes []*planning.PlanNode
 	for _, depName := range dependents {
 		for i, oc := range r.observed.Containers[depName] {
 			if _, already := r.stoppedByPlan[oc.ID]; already {
 				continue
 			}
-			node := r.plan.addNode(Operation{
-				Type:       OpStopContainer,
+			node := r.plan.AddNode(planning.Operation{
+				Type:       planning.OpStopContainer,
 				ResourceID: serviceReplicaID(depName, oc.Number),
 				Cause:      fmt.Sprintf("dependency %s being recreated", service.Name),
 				Container:  &r.observed.Containers[depName][i].Summary,
@@ -1735,8 +1736,8 @@ func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode
 // infrastructureDeps returns the plan nodes that a container creation for this
 // service should depend on: network creates and volume creates that the service
 // references, plus the last node of dependency services.
-func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode {
-	var deps []*PlanNode
+func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*planning.PlanNode {
+	var deps []*planning.PlanNode
 	// Sort map keys for deterministic plan output in tests
 	for _, net := range slices.Sorted(maps.Keys(service.Networks)) {
 		if node, ok := r.networkNodes[net]; ok {
@@ -1790,15 +1791,15 @@ func (r *reconciler) sortContainers(containers []ObservedContainer, service type
 // reconcileOrphans plans stop + remove for orphaned containers.
 func (r *reconciler) reconcileOrphans() {
 	for i, oc := range r.observed.Orphans {
-		stopNode := r.plan.addNode(Operation{
-			Type:       OpStopContainer,
+		stopNode := r.plan.AddNode(planning.Operation{
+			Type:       planning.OpStopContainer,
 			ResourceID: "orphan:" + oc.Name,
 			Cause:      "orphaned container",
 			Container:  &r.observed.Orphans[i].Summary,
 			Timeout:    r.options.Timeout,
 		}, "")
-		r.plan.addNode(Operation{
-			Type:       OpRemoveContainer,
+		r.plan.AddNode(planning.Operation{
+			Type:       planning.OpRemoveContainer,
 			ResourceID: "orphan:" + oc.Name,
 			Cause:      "orphaned container",
 			Container:  &r.observed.Orphans[i].Summary,

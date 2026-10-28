@@ -44,6 +44,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -110,7 +111,7 @@ func (s *composeService) planAndExecute(ctx context.Context, project *types.Proj
 // how to run it (detached up's single-plan Create+Start, interactive up's
 // phase boundary, #14081) call this directly instead of create with a wider
 // scope; create itself still just chains ScopeCreate with executePlan.
-func (s *composeService) preparePlan(ctx context.Context, project *types.Project, options api.CreateOptions, scope ReconcileScope) (*types.Project, *ObservedState, *Plan, error) {
+func (s *composeService) preparePlan(ctx context.Context, project *types.Project, options api.CreateOptions, scope ReconcileScope) (*types.Project, *ObservedState, *planning.Plan, error) {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
