@@ -58,7 +58,8 @@ func incompatible(reason string, options ...string) error {
 // Validate checks that the options requested for Up can be honored together.
 // It is a pure function, called by Up before it does anything, and can also be
 // called by integrators to fail early. It returns nil, or an error matching
-// ErrIncompatibleOptions describing every conflict found.
+// ErrIncompatibleOptions describing every conflict found, or ErrInvalidOption
+// when Create holds a value that CreateOptions.Validate rejects.
 //
 // Up has two modes, selected by Start.Attach: detached (nil) returns once the
 // containers are started, interactive (set) keeps running a foreground session.
@@ -78,6 +79,9 @@ func incompatible(reason string, options ...string) error {
 // flags; Validate is the safety net for programs using the library directly.
 func (o UpOptions) Validate() error {
 	var errs []error
+	if err := o.Create.Validate(); err != nil {
+		errs = append(errs, err)
+	}
 	errs = append(errs, validateWaitIsDetached(o.Start)...)
 	errs = append(errs, validateDetachedHasNoSession(o.Start)...)
 	switch len(errs) {
