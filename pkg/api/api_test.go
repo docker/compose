@@ -17,6 +17,7 @@
 package api
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -51,6 +52,69 @@ func TestRunOptionsEnvironmentMap(t *testing.T) {
 	assert.Equal(t, *env["FOO"], "BAR")
 	assert.Equal(t, *env["ZOT"], "")
 	assert.Check(t, env["QIX"] == nil)
+}
+
+// Callers written before ExecOptions existed pass a RunOptions to Exec.
+var (
+	_ ExecOptionsProvider = RunOptions{}
+	_ ExecOptionsProvider = ExecOptions{}
+)
+
+func TestRunOptionsToExecOptions(t *testing.T) {
+	run := RunOptions{
+		Service:     "web",
+		Index:       2,
+		Command:     []string{"ls", "-l"},
+		Environment: []string{"FOO=BAR"},
+		Tty:         true,
+		Interactive: true,
+		Detach:      true,
+		User:        "nobody",
+		Privileged:  true,
+		WorkingDir:  "/srv",
+		Name:        "ignored",
+	}
+	assert.DeepEqual(t, run.ToExecOptions(), ExecOptions{
+		Service:     "web",
+		Index:       2,
+		Command:     []string{"ls", "-l"},
+		Environment: []string{"FOO=BAR"},
+		Tty:         true,
+		Interactive: true,
+		Detach:      true,
+		User:        "nobody",
+		Privileged:  true,
+		WorkingDir:  "/srv",
+	})
+}
+
+// Every field of ExecOptions must be copied from the RunOptions field of the
+// same name, so that a field added to ExecOptions is not silently dropped.
+func TestRunOptionsToExecOptionsCoversAllFields(t *testing.T) {
+	run := reflect.New(reflect.TypeOf(RunOptions{})).Elem()
+	exec := reflect.TypeOf(ExecOptions{})
+	for i := 0; i < exec.NumField(); i++ {
+		f := exec.Field(i)
+		rf := run.FieldByName(f.Name)
+		assert.Assert(t, rf.IsValid(), "RunOptions has no field %s", f.Name)
+		assert.Equal(t, rf.Type(), f.Type, "field %s", f.Name)
+		switch f.Type.Kind() {
+		case reflect.String:
+			rf.SetString("x")
+		case reflect.Int:
+			rf.SetInt(1)
+		case reflect.Bool:
+			rf.SetBool(true)
+		case reflect.Slice:
+			rf.Set(reflect.ValueOf([]string{"x"}))
+		default:
+			t.Fatalf("unhandled kind %s for %s", f.Type.Kind(), f.Name)
+		}
+	}
+	got := reflect.ValueOf(run.Interface().(RunOptions).ToExecOptions())
+	for i := 0; i < exec.NumField(); i++ {
+		assert.Assert(t, !got.Field(i).IsZero(), "field %s is not copied by ToExecOptions", exec.Field(i).Name)
+	}
 }
 
 func TestGetDependentImages(t *testing.T) {
