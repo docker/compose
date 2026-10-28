@@ -17,6 +17,7 @@
 package api
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -89,31 +90,33 @@ func TestRunOptionsToExecOptions(t *testing.T) {
 }
 
 // Every field of ExecOptions must be copied from the RunOptions field of the
-// same name, so that a field added to ExecOptions is not silently dropped.
+// same name, so that a field added to ExecOptions is not silently dropped or
+// mapped to another one. Each field gets a distinct value to tell them apart.
 func TestRunOptionsToExecOptionsCoversAllFields(t *testing.T) {
-	run := reflect.New(reflect.TypeOf(RunOptions{})).Elem()
-	exec := reflect.TypeOf(ExecOptions{})
-	for i := 0; i < exec.NumField(); i++ {
+	run := reflect.New(reflect.TypeFor[RunOptions]()).Elem()
+	exec := reflect.TypeFor[ExecOptions]()
+	for i := range exec.NumField() {
 		f := exec.Field(i)
 		rf := run.FieldByName(f.Name)
 		assert.Assert(t, rf.IsValid(), "RunOptions has no field %s", f.Name)
 		assert.Equal(t, rf.Type(), f.Type, "field %s", f.Name)
 		switch f.Type.Kind() {
 		case reflect.String:
-			rf.SetString("x")
+			rf.SetString(fmt.Sprint(f.Name, i))
 		case reflect.Int:
-			rf.SetInt(1)
+			rf.SetInt(int64(i + 1))
 		case reflect.Bool:
 			rf.SetBool(true)
 		case reflect.Slice:
-			rf.Set(reflect.ValueOf([]string{"x"}))
+			rf.Set(reflect.ValueOf([]string{fmt.Sprint(f.Name, i)}))
 		default:
 			t.Fatalf("unhandled kind %s for %s", f.Type.Kind(), f.Name)
 		}
 	}
 	got := reflect.ValueOf(run.Interface().(RunOptions).ToExecOptions())
-	for i := 0; i < exec.NumField(); i++ {
-		assert.Assert(t, !got.Field(i).IsZero(), "field %s is not copied by ToExecOptions", exec.Field(i).Name)
+	for i := range exec.NumField() {
+		name := exec.Field(i).Name
+		assert.DeepEqual(t, got.Field(i).Interface(), run.FieldByName(name).Interface())
 	}
 }
 
