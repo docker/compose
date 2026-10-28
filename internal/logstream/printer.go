@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package logstream
 
 import (
 	"fmt"
@@ -22,8 +22,8 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// logPrinter watch application containers and collect their logs
-type logPrinter interface {
+// Printer watches application containers and collects their logs.
+type Printer interface {
 	HandleEvent(event api.ContainerEvent)
 }
 
@@ -31,8 +31,8 @@ type printer struct {
 	consumer api.LogConsumer
 }
 
-// newLogPrinter builds a LogPrinter passing containers logs to LogConsumer
-func newLogPrinter(consumer api.LogConsumer) logPrinter {
+// NewPrinter builds a Printer passing containers logs to LogConsumer
+func NewPrinter(consumer api.LogConsumer) Printer {
 	printer := printer{
 		consumer: consumer,
 	}

@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package logstream
 
 import (
 	"context"
@@ -34,29 +34,34 @@ import (
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
-type monitor struct {
+// Monitor follows the events of the containers of a project and reports them to
+// its listeners, see Start.
+type Monitor struct {
 	apiClient client.APIClient
 	project   string
 	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
 	services  map[string]bool
 	listeners []api.ContainerEventListener
 	// since is the point from which Start subscribes to events, as the events
-	// API's "<seconds>.<nanoseconds>" timestamp, once readDaemonTime got it
+	// API's "<seconds>.<nanoseconds>" timestamp, once ReadDaemonTime got it
 	since string
-	// sinceRead tells readDaemonTime has been through, whether it found a
+	// sinceRead tells ReadDaemonTime has been through, whether it found a
 	// point or had to do without one (since is then empty)
 	sinceRead bool
 }
 
-func newMonitor(apiClient client.APIClient, project string) *monitor {
-	return &monitor{
+// NewMonitor creates a Monitor of the containers of a project.
+func NewMonitor(apiClient client.APIClient, project string) *Monitor {
+	return &Monitor{
 		apiClient: apiClient,
 		project:   project,
 		services:  map[string]bool{},
 	}
 }
 
-func (c *monitor) withServices(services []string) {
+// WithServices restricts the monitor to the given services, all of them when
+// none is given.
+func (c *Monitor) WithServices(services []string) {
 	for _, name := range services {
 		c.services[name] = true
 	}
@@ -155,9 +160,9 @@ func (c *monitor) withServices(services []string) {
 // window can't be closed. A daemon that answers with a time that can't be
 // used is another matter and makes Start fail. A caller needing to know that
 // before it goes on (before it starts the containers the monitor is to
-// follow) calls readDaemonTime itself first; Start then doesn't ask again.
-func (c *monitor) Start(ctx context.Context) error {
-	if err := c.readDaemonTime(ctx); err != nil {
+// follow) calls ReadDaemonTime itself first; Start then doesn't ask again.
+func (c *Monitor) Start(ctx context.Context) error {
+	if err := c.ReadDaemonTime(ctx); err != nil {
 		if ctx.Err() != nil {
 			// interrupted, not failed: the same quiet end as a canceled
 			// monitor below
@@ -219,7 +224,7 @@ func (c *monitor) Start(ctx context.Context) error {
 	}
 }
 
-// readDaemonTime takes, as the point from which to subscribe to events, the
+// ReadDaemonTime takes, as the point from which to subscribe to events, the
 // daemon's current time, in the "<seconds>.<nanoseconds>" form the events API
 // takes as since. It does so once. A daemon that can't be asked (the request
 // is refused or fails) leaves since empty, so that events are subscribed live
@@ -229,7 +234,7 @@ func (c *monitor) Start(ctx context.Context) error {
 // point, and nothing explains the answer. An interruption is an error too, the
 // client's, which carries the context's: callers decide how to report it (Start
 // ends quietly, an interactive up returns it).
-func (c *monitor) readDaemonTime(ctx context.Context) error {
+func (c *Monitor) ReadDaemonTime(ctx context.Context) error {
 	if c.sinceRead {
 		return nil
 	}
@@ -257,7 +262,7 @@ func (c *monitor) readDaemonTime(ctx context.Context) error {
 
 // initialContainers collects the application's containers at startup,
 // restricted to the services this monitor watches
-func (c *monitor) initialContainers(ctx context.Context) (utils.Set[string], error) {
+func (c *Monitor) initialContainers(ctx context.Context) (utils.Set[string], error) {
 	initialState, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
 		Filters: naming.ProjectFilter(c.project).Add("label",
@@ -279,18 +284,18 @@ func (c *monitor) initialContainers(ctx context.Context) (utils.Set[string], err
 
 // watched tells whether a service's containers are watched by this monitor.
 // An empty service set means "the whole application".
-func (c *monitor) watched(service string) bool {
+func (c *Monitor) watched(service string) bool {
 	return len(c.services) == 0 || c.services[service]
 }
 
 // notify broadcasts a container event to the registered listeners
-func (c *monitor) notify(event api.ContainerEvent) {
+func (c *Monitor) notify(event api.ContainerEvent) {
 	for _, listener := range c.listeners {
 		listener(event)
 	}
 }
 
-func (c *monitor) onContainerCreate(event events.Message, ctr *api.ContainerSummary, containers utils.Set[string]) {
+func (c *Monitor) onContainerCreate(event events.Message, ctr *api.ContainerSummary, containers utils.Set[string]) {
 	if c.watched(ctr.Labels[api.ServiceLabel]) && !relaymgr.IsRelay(ctr.Labels) {
 		containers.Add(ctr.ID)
 	}
@@ -302,7 +307,7 @@ func (c *monitor) onContainerCreate(event events.Message, ctr *api.ContainerSumm
 	logrus.Debugf("container %s created", ctr.Name)
 }
 
-func (c *monitor) onContainerStart(event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
+func (c *Monitor) onContainerStart(event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
 	if restarting.Has(ctr.ID) {
 		logrus.Debugf("container %s restarted", ctr.Name)
 		c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted, func(e *api.ContainerEvent) {
@@ -317,12 +322,12 @@ func (c *monitor) onContainerStart(event events.Message, ctr *api.ContainerSumma
 	}
 }
 
-func (c *monitor) onContainerRestart(event events.Message, ctr *api.ContainerSummary) {
+func (c *Monitor) onContainerRestart(event events.Message, ctr *api.ContainerSummary) {
 	c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventRestarted))
 	logrus.Debugf("container %s restarted", ctr.Name)
 }
 
-func (c *monitor) onContainerDie(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
+func (c *Monitor) onContainerDie(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
 	logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
 	willRestart, _, _, err := c.isRestarting(ctx, ctr.ID)
 	if err != nil {
@@ -358,7 +363,7 @@ func (c *monitor) onContainerDie(ctx context.Context, event events.Message, ctr 
 // signal — even a NotFound inspect (the container's removal outran this
 // inspect, racing the still-unread die right behind this stop) defers to
 // that pending die rather than evicting on `!found` alone.
-func (c *monitor) onContainerStop(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
+func (c *Monitor) onContainerStop(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
 	willRestart, found, exitCode, err := c.isRestarting(ctx, ctr.ID)
 	if err != nil {
 		return err
@@ -388,7 +393,7 @@ func (c *monitor) onContainerStop(ctx context.Context, event events.Message, ctr
 
 // onContainerDestroy handles a container removed by an external `docker compose down`:
 // terminal state, there is nothing left to inspect.
-func (c *monitor) onContainerDestroy(ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
+func (c *Monitor) onContainerDestroy(ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
 	logrus.Debugf("container %s destroyed", ctr.Name)
 	restarting.Remove(ctr.ID)
 	containers.Remove(ctr.ID)
@@ -399,7 +404,7 @@ func (c *monitor) onContainerDestroy(ctr *api.ContainerSummary, containers, rest
 // exit, but not on a ContainerRestart, where state still is reported as "running"
 // (see https://github.com/moby/moby/issues/45538). A container already removed won't
 // come back, which found reports; exitCode is only meaningful when found is true.
-func (c *monitor) isRestarting(ctx context.Context, containerID string) (willRestart, found bool, exitCode int, err error) {
+func (c *Monitor) isRestarting(ctx context.Context, containerID string) (willRestart, found bool, exitCode int, err error) {
 	inspect, err := c.apiClient.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
 	if errdefs.IsNotFound(err) {
 		return false, false, 0, nil
@@ -432,7 +437,7 @@ func newContainerEvent(timeNano int64, ctr *api.ContainerSummary, eventType int,
 	return event
 }
 
-func (c *monitor) getContainerSummary(event events.Message) (*api.ContainerSummary, error) {
+func (c *Monitor) getContainerSummary(event events.Message) (*api.ContainerSummary, error) {
 	ctr := &api.ContainerSummary{
 		ID:      event.Actor.ID,
 		Name:    event.Actor.Attributes["name"],
@@ -450,6 +455,7 @@ func (c *monitor) getContainerSummary(event events.Message) (*api.ContainerSumma
 	return ctr, nil
 }
 
-func (c *monitor) withListener(listener api.ContainerEventListener) {
+// WithListener registers a listener of the events of the monitored containers.
+func (c *Monitor) WithListener(listener api.ContainerEventListener) {
 	c.listeners = append(c.listeners, listener)
 }

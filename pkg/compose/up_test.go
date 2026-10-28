@@ -34,6 +34,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/logstream"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -264,10 +265,10 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return u.streamContainerLogs(newLogCursors().enter("c1"), api.ContainerEvent{ID: "c1", Service: "web"}, "")
+		return u.streamContainerLogs(logstream.NewCursors().Enter("c1"), api.ContainerEvent{ID: "c1", Service: "web"}, "")
 	})
 	eg.Go(func() error {
-		return u.streamContainerLogs(newLogCursors().enter("c2"), api.ContainerEvent{ID: "c2", Service: "web"}, "")
+		return u.streamContainerLogs(logstream.NewCursors().Enter("c2"), api.ContainerEvent{ID: "c2", Service: "web"}, "")
 	})
 	assert.NilError(t, eg.Wait())
 	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
