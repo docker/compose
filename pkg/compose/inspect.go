@@ -55,6 +55,9 @@ func (s *composeService) Volumes(ctx context.Context, projectName string, option
 }
 
 func (s *composeService) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	return s.inspector().Events(ctx, projectName, options)
 }
 
