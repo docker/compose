@@ -35,20 +35,8 @@ func (s *composeService) Pause(ctx context.Context, projectName string, options 
 }
 
 func (s *composeService) pause(ctx context.Context, projectName string, options api.PauseOptions) error {
-	containers, err := s.getContainers(ctx, projectName, oneOffExclude, false, options.Services...)
-	if err != nil {
-		return err
-	}
-
-	if options.Project != nil {
-		containers = containers.filter(isService(options.Project.ServiceNames()...))
-	}
-
-	return concurrency.ForEachBounded(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
+	return s.forEachPausable(ctx, projectName, options, "Paused", func(ctx context.Context, ctr container.Summary) error {
 		_, err := s.apiClient().ContainerPause(ctx, ctr.ID, client.ContainerPauseOptions{})
-		if err == nil {
-			s.events.On(progress.New(getContainerProgressName(ctr), api.Done, "Paused"))
-		}
 		return err
 	})
 }
@@ -60,6 +48,16 @@ func (s *composeService) UnPause(ctx context.Context, projectName string, option
 }
 
 func (s *composeService) unPause(ctx context.Context, projectName string, options api.PauseOptions) error {
+	return s.forEachPausable(ctx, projectName, options, "Unpaused", func(ctx context.Context, ctr container.Summary) error {
+		_, err := s.apiClient().ContainerUnpause(ctx, ctr.ID, client.ContainerUnpauseOptions{})
+		return err
+	})
+}
+
+// forEachPausable runs fn concurrently on the containers pause and unpause act on:
+// those of the selected services, one-off containers excluded. Each container fn
+// succeeded on is reported as done with the given status.
+func (s *composeService) forEachPausable(ctx context.Context, projectName string, options api.PauseOptions, status string, fn func(context.Context, container.Summary) error) error {
 	containers, err := s.getContainers(ctx, projectName, oneOffExclude, false, options.Services...)
 	if err != nil {
 		return err
@@ -70,9 +68,9 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 	}
 
 	return concurrency.ForEachBounded(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
-		_, err := s.apiClient().ContainerUnpause(ctx, ctr.ID, client.ContainerUnpauseOptions{})
+		err := fn(ctx, ctr)
 		if err == nil {
-			s.events.On(progress.New(getContainerProgressName(ctr), api.Done, "Unpaused"))
+			s.events.On(progress.New(getContainerProgressName(ctr), api.Done, status))
 		}
 		return err
 	})
