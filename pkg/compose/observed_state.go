@@ -62,6 +62,8 @@ type ObservedState struct {
 // orphans. Selection is deterministic: an exact name match wins; otherwise the
 // lexicographically smallest name is chosen so repeated runs are stable
 // regardless of the daemon's list order.
+//
+//nolint:dupl // mirrors selectVolume over distinct types; a generic version would read worse than the two
 func (s *ObservedState) selectNetwork(key, desiredName string) (ObservedNetwork, []ObservedNetwork, bool) {
 	matches := s.Networks[key]
 	if len(matches) == 0 {
@@ -86,6 +88,8 @@ func (s *ObservedState) selectNetwork(key, desiredName string) (ObservedNetwork,
 }
 
 // selectVolume is the volume counterpart of selectNetwork.
+//
+//nolint:dupl // mirrors selectNetwork, see there
 func (s *ObservedState) selectVolume(key, desiredName string) (ObservedVolume, []ObservedVolume, bool) {
 	matches := s.Volumes[key]
 	if len(matches) == 0 {

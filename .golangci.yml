@@ -15,6 +15,7 @@ linters:
   enable:
     - copyloopvar
     - depguard
+    - dupl
     - errcheck
     - errorlint
     - forbidigo
@@ -66,6 +67,8 @@ linters:
           deny:
             - pkg: github.com/docker/compose/v5/cmd
               desc: the library must not depend on the CLI, inject an implementation instead.
+    dupl:
+      threshold: 80
     forbidigo:
       analyze-types: true
       forbid:
@@ -113,6 +116,11 @@ linters:
       - path-except: '_test\.go'
         linters:
           - forbidigo
+      # Tests repeat their setup on purpose, to stay readable on their own, and the
+      # e2e DSL spells its checks one by one.
+      - path: '(_test\.go|(pkg|internal)/e2e/)'
+        linters:
+          - dupl
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0
