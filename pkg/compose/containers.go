@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -223,7 +224,7 @@ func forEachContainerConcurrent(ctx context.Context, maxConcurrency int, contain
 // sorted sorts containers in place by canonical name and returns the (same) slice.
 func (containers Containers) sorted() Containers {
 	sort.Slice(containers, func(i, j int) bool {
-		return getCanonicalContainerName(containers[i]) < getCanonicalContainerName(containers[j])
+		return naming.CanonicalContainerName(containers[i]) < naming.CanonicalContainerName(containers[j])
 	})
 	return containers
 }

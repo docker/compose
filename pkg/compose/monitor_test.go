@@ -37,6 +37,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -132,7 +133,7 @@ func TestMonitorStartLifecycle(t *testing.T) {
 	)
 
 	// the monitor trims the default "<project>-<service>-<number>" name to "<service>-<number>"
-	defaultName := getDefaultContainerName("p", "web", "1")
+	defaultName := naming.DefaultContainerName("p", "web", "1")
 	messages <- containerMessage(events.ActionCreate, "c2", defaultName, "web", nil)
 	messages <- containerMessage(events.ActionCreate, "c3", "custom-name", "job", map[string]string{api.ContainerReplaceLabel: "old"})
 	messages <- containerMessage(events.ActionRestart, "c2", defaultName, "web", nil)

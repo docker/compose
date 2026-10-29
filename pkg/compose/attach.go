@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -45,7 +46,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 
 	var names []string
 	for _, ctr := range containers {
-		names = append(names, getContainerNameWithoutProject(ctr))
+		names = append(names, naming.ContainerNameWithoutProject(ctr))
 	}
 
 	_, err = fmt.Fprintf(s.stdout(), "Attaching to %s\n", strings.Join(names, ", "))
@@ -55,7 +56,7 @@ func (s *composeService) attach(ctx context.Context, project *types.Project, lis
 
 	for _, ctr := range containers {
 		service := ctr.Labels[api.ServiceLabel]
-		err := s.doAttachContainer(ctx, service, ctr.ID, getContainerNameWithoutProject(ctr), listener)
+		err := s.doAttachContainer(ctx, service, ctr.ID, naming.ContainerNameWithoutProject(ctr), listener)
 		if err != nil {
 			return nil, err
 		}

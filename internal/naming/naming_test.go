@@ -22,6 +22,8 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestContainerName(t *testing.T) {
@@ -33,4 +35,10 @@ func TestCanonicalContainerName(t *testing.T) {
 	assert.Equal(t, CanonicalContainerName(container.Summary{Names: []string{"/proj-web-1", "/other/web"}}), "proj-web-1")
 	assert.Equal(t, CanonicalContainerName(container.Summary{Names: []string{"/linked_by/web"}}), "linked_by/web")
 	assert.Equal(t, CanonicalContainerName(container.Summary{ID: "0123456789abcdef"}), "0123456789ab")
+}
+
+func TestContainerNameWithoutProject(t *testing.T) {
+	labels := map[string]string{api.ProjectLabel: "proj", api.ServiceLabel: "web", api.ContainerNumberLabel: "1"}
+	assert.Equal(t, ContainerNameWithoutProject(container.Summary{Names: []string{"/proj-web-1"}, Labels: labels}), "web-1")
+	assert.Equal(t, ContainerNameWithoutProject(container.Summary{Names: []string{"/custom"}, Labels: labels}), "custom")
 }

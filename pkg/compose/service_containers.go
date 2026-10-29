@@ -32,6 +32,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -123,20 +124,8 @@ func resolveSharedNamespaces(service *types.ServiceConfig, containersByService m
 	return nil
 }
 
-func getContainerName(projectName string, service types.ServiceConfig, number int) string {
-	name := getDefaultContainerName(projectName, service.Name, strconv.Itoa(number))
-	if service.ContainerName != "" {
-		name = service.ContainerName
-	}
-	return name
-}
-
-func getDefaultContainerName(projectName, serviceName, index string) string {
-	return strings.Join([]string{projectName, serviceName, index}, api.Separator)
-}
-
 func getContainerProgressName(ctr container.Summary) string {
-	return "Container " + getCanonicalContainerName(ctr)
+	return "Container " + naming.CanonicalContainerName(ctr)
 }
 
 func containerEvents(containers Containers, eventFunc func(string) api.Resource) []api.Resource {
@@ -337,7 +326,7 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 			return nil, err
 		}
 		for _, ctr := range serviceContainers {
-			containerName := getCanonicalContainerName(ctr)
+			containerName := naming.CanonicalContainerName(ctr)
 			links = append(links,
 				format(containerName, linkName),
 				format(containerName, linkServiceName+api.Separator+strconv.Itoa(number)),
@@ -352,7 +341,7 @@ func (s *composeService) getLinks(ctx context.Context, projectName string, servi
 			return nil, err
 		}
 		for _, ctr := range serviceContainers {
-			containerName := getCanonicalContainerName(ctr)
+			containerName := naming.CanonicalContainerName(ctr)
 			links = append(links,
 				format(containerName, service.Name),
 				format(containerName, strings.TrimPrefix(containerName, projectName+api.Separator)),

@@ -37,6 +37,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -80,7 +81,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 			}
 			mux.Lock()
 			defer mux.Unlock()
-			summary[getCanonicalContainerName(ctr)] = img
+			summary[naming.CanonicalContainerName(ctr)] = img
 			return nil
 		})
 	}

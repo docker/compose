@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/naming"
 	relaymgr "github.com/docker/compose/v5/internal/relay"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -414,12 +415,7 @@ func (c *monitor) isRestarting(ctx context.Context, containerID string) (willRes
 }
 
 func newContainerEvent(timeNano int64, ctr *api.ContainerSummary, eventType int, opts ...func(e *api.ContainerEvent)) api.ContainerEvent {
-	name := ctr.Name
-	defaultName := getDefaultContainerName(ctr.Project, ctr.Labels[api.ServiceLabel], ctr.Labels[api.ContainerNumberLabel])
-	if name == defaultName {
-		// remove project- prefix
-		name = name[len(ctr.Project)+1:]
-	}
+	name := naming.WithoutProjectPrefix(ctr.Name, ctr.Project, ctr.Labels[api.ServiceLabel], ctr.Labels[api.ContainerNumberLabel])
 
 	event := api.ContainerEvent{
 		Type:      eventType,
