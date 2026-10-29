@@ -34,6 +34,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -216,7 +217,7 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *types.Project, pruneOpts ImagePruneOptions, limiter *semaphore.Weighted) error {
 	images, err := NewImagePruner(s.apiClient(), project, limiter).ImagesToPrune(ctx, pruneOpts)
 	if err != nil {
-		s.events.On(errorEvent("Tagged images", err.Error()))
+		s.events.On(progress.Error("Tagged images", err.Error()))
 		return err
 	}
 
@@ -264,14 +265,14 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 	eventID := "Dangling images"
 	eligible, err := s.eligibleDanglingImages(ctx, projectName, keep)
 	if err != nil {
-		s.events.On(errorEvent(eventID, err.Error()))
+		s.events.On(progress.Error(eventID, err.Error()))
 		return err
 	}
 	if len(eligible) == 0 {
 		return nil
 	}
 
-	s.events.On(removingEvent(eventID))
+	s.events.On(progress.Removing(eventID))
 	removed, stillInUse, err := s.removeImages(ctx, eligible, limiter)
 	var stillInUseNote string
 	if len(stillInUse) > 0 {
@@ -284,22 +285,22 @@ func (s *composeService) removeDanglingImagesOp(ctx context.Context, projectName
 			details = fmt.Sprintf("%s; %s", details, stillInUseNote)
 		}
 		if len(removed) == 0 {
-			s.events.On(errorEvent(eventID, details))
+			s.events.On(progress.Error(eventID, details))
 		} else {
-			s.events.On(newEvent(eventID, api.Warning, "Removed", details))
+			s.events.On(progress.New(eventID, api.Warning, "Removed", details))
 		}
 	case len(stillInUse) > 0 && len(removed) == 0:
-		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use", stillInUseNote))
+		s.events.On(progress.New(eventID, api.Warning, "Resource is still in use", stillInUseNote))
 	case len(stillInUse) > 0:
-		s.events.On(newEvent(eventID, api.Warning, "Removed", stillInUseNote))
+		s.events.On(progress.New(eventID, api.Warning, "Removed", stillInUseNote))
 	case len(removed) == 0:
 		// every eligible image was already gone by the time we got to it:
 		// we already emitted "Removing", so this needs a terminal event
 		// too, not silence — same wording removeResource uses for a
 		// not-found tagged image.
-		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
+		s.events.On(progress.New(eventID, api.Done, "Warning: No resource found to remove"))
 	default:
-		s.events.On(removedEvent(eventID))
+		s.events.On(progress.Removed(eventID))
 	}
 	return err
 }
@@ -338,7 +339,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 	}
 
 	eventName := "Network " + name
-	s.events.On(removingEvent(eventName))
+	s.events.On(progress.Removing(eventName))
 
 	var found int
 	for _, net := range networks {
@@ -347,7 +348,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		}
 		nwInspect, err := s.apiClient().NetworkInspect(ctx, net.ID, client.NetworkInspectOptions{})
 		if errdefs.IsNotFound(err) {
-			s.events.On(newEvent(eventName, api.Warning, "No resource found to remove"))
+			s.events.On(progress.New(eventName, api.Warning, "No resource found to remove"))
 			return nil
 		}
 		if err != nil {
@@ -355,7 +356,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		}
 		inspectedNetwork := nwInspect.Network
 		if len(inspectedNetwork.Containers) > 0 {
-			s.events.On(newEvent(eventName, api.Warning, "Resource is still in use"))
+			s.events.On(progress.New(eventName, api.Warning, "Resource is still in use"))
 			found++
 			continue
 		}
@@ -364,10 +365,10 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 			if errdefs.IsNotFound(err) {
 				continue
 			}
-			s.events.On(errorEvent(eventName, err.Error()))
+			s.events.On(progress.Error(eventName, err.Error()))
 			return fmt.Errorf("failed to remove network %s: %w", name, err)
 		}
-		s.events.On(removedEvent(eventName))
+		s.events.On(progress.Removed(eventName))
 		found++
 	}
 
@@ -375,7 +376,7 @@ func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName s
 		// in practice, it's extremely unlikely for this to ever occur, as it'd
 		// mean the network was present when we queried at the start of this
 		// method but was then deleted by something else in the interim
-		s.events.On(newEvent(eventName, api.Warning, "No resource found to remove"))
+		s.events.On(progress.New(eventName, api.Warning, "No resource found to remove"))
 		return nil
 	}
 	return nil
@@ -401,7 +402,7 @@ func (s *composeService) removeVolume(ctx context.Context, id string, projectNam
 		if owner == "" {
 			reason = "Volume was not created by Docker Compose"
 		}
-		s.events.On(newEvent(resource, api.Warning, "Skipped", reason))
+		s.events.On(progress.New(resource, api.Warning, "Skipped", reason))
 		return nil
 	}
 
@@ -425,19 +426,19 @@ func classifyRemovalError(err error) (stillInUse, alreadyGone bool) {
 // removeResource emits a "Removing" progress event, calls op, then emits the appropriate
 // completion event based on the error: nil→Removed, conflict→still-in-use warning, not-found→gone warning.
 func (s *composeService) removeResource(eventID string, op func() error) error {
-	s.events.On(newEvent(eventID, api.Working, "Removing"))
+	s.events.On(progress.New(eventID, api.Working, "Removing"))
 	err := op()
 	if err == nil {
-		s.events.On(newEvent(eventID, api.Done, "Removed"))
+		s.events.On(progress.New(eventID, api.Done, "Removed"))
 		return nil
 	}
 	stillInUse, alreadyGone := classifyRemovalError(err)
 	if stillInUse {
-		s.events.On(newEvent(eventID, api.Warning, "Resource is still in use"))
+		s.events.On(progress.New(eventID, api.Warning, "Resource is still in use"))
 		return nil
 	}
 	if alreadyGone {
-		s.events.On(newEvent(eventID, api.Done, "Warning: No resource found to remove"))
+		s.events.On(progress.New(eventID, api.Done, "Warning: No resource found to remove"))
 		return nil
 	}
 	return err
@@ -445,7 +446,7 @@ func (s *composeService) removeResource(eventID string, op func() error) error {
 
 func (s *composeService) stopContainer(ctx context.Context, service *types.ServiceConfig, ctr containerType.Summary, timeout *time.Duration, listener api.ContainerEventListener) error {
 	eventName := getContainerProgressName(ctr)
-	s.events.On(newEvent(eventName, api.Working, api.StatusStopping))
+	s.events.On(progress.New(eventName, api.Working, api.StatusStopping))
 
 	if service != nil && !isRelayContainer(ctr) {
 		for _, hook := range service.PreStop {
@@ -464,10 +465,10 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 		Timeout: utils.DurationSecondToInt(timeout),
 	})
 	if err != nil {
-		s.events.On(errorEvent(eventName, "Error while Stopping"))
+		s.events.On(progress.Error(eventName, "Error while Stopping"))
 		return err
 	}
-	s.events.On(newEvent(eventName, api.Done, api.StatusStopped))
+	s.events.On(progress.New(eventName, api.Done, api.StatusStopped))
 	return nil
 }
 
@@ -501,22 +502,22 @@ func (s *composeService) stopAndRemoveContainer(ctx context.Context, ctr contain
 	eventName := getContainerProgressName(ctr)
 	err := s.stopContainer(ctx, service, ctr, timeout, nil)
 	if errdefs.IsNotFound(err) {
-		s.events.On(removedEvent(eventName))
+		s.events.On(progress.Removed(eventName))
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	s.events.On(removingEvent(eventName))
+	s.events.On(progress.Removing(eventName))
 	_, err = s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
 		Force:         true,
 		RemoveVolumes: volumes,
 	})
 	if err != nil && !errdefs.IsNotFound(err) && !errdefs.IsConflict(err) {
-		s.events.On(errorEvent(eventName, "Error while Removing"))
+		s.events.On(progress.Error(eventName, "Error while Removing"))
 		return err
 	}
-	s.events.On(removedEvent(eventName))
+	s.events.On(progress.Removed(eventName))
 	return nil
 }
 

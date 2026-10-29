@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -483,7 +484,7 @@ func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Pl
 	for _, service := range project.Services {
 		for _, observedContainer := range observed.Containers[service.Name] {
 			if observedContainer.State == container.StateRunning && !planned[observedContainer.ID] {
-				events.On(newEvent("Container "+observedContainer.Name, api.Done, api.StatusRunning))
+				events.On(progress.New("Container "+observedContainer.Name, api.Done, api.StatusRunning))
 			}
 		}
 	}

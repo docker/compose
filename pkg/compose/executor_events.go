@@ -22,6 +22,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -139,7 +140,7 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) b
 	gs.started++
 	if gs.triggersWorking(node.Operation.Type) {
 		gs.working = true
-		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
+		events.On(progress.New(gs.eventName, api.Working, gs.kind.workingText()))
 	}
 	return true
 }
@@ -167,7 +168,7 @@ func (gt *groupTracker) onNodeDone(node *PlanNode, events api.EventProcessor) {
 	gs.done++
 	if gs.done == gs.total && !gs.finished {
 		gs.finished = true
-		events.On(newEvent(gs.eventName, api.Done, gs.kind.doneText()))
+		events.On(progress.New(gs.eventName, api.Done, gs.kind.doneText()))
 	}
 }
 
@@ -186,7 +187,7 @@ func (gt *groupTracker) onNodeError(node *PlanNode, events api.EventProcessor, e
 		// well-formed (Working always precedes Done/Error) instead of a bare
 		// Error a progress consumer never saw the resource transition into.
 		gs.working = true
-		events.On(newEvent(gs.eventName, api.Working, gs.kind.workingText()))
+		events.On(progress.New(gs.eventName, api.Working, gs.kind.workingText()))
 	}
 	gs.finished = true
 	events.On(api.Resource{
@@ -337,7 +338,7 @@ func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *p
 	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
 	exec.containersMu.Unlock()
 	reason := fmt.Sprintf("%s not reached: %s", unmetCondition(op), exec.interruption(rs, failed))
-	rs.events.On(containerReasonEvents(waitingFor, skippedEvent, reason)...)
+	rs.events.On(containerReasonEvents(waitingFor, progress.Skipped, reason)...)
 	return fmt.Errorf("%s: %w", reason, context.Canceled)
 }
 
@@ -346,22 +347,22 @@ func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	switch op.Type {
 	case OpCreateContainer:
-		events.On(creatingEvent("Container " + op.Name))
+		events.On(progress.Creating("Container " + op.Name))
 	case OpStartContainer:
 		name := getContainerProgressName(*op.Container)
-		events.On(newEvent(name, api.Working, api.StatusStarting))
+		events.On(progress.New(name, api.Working, api.StatusStarting))
 	case OpStopContainer:
-		events.On(stoppingEvent(getContainerProgressName(*op.Container)))
+		events.On(progress.Stopping(getContainerProgressName(*op.Container)))
 	case OpRemoveContainer:
-		events.On(removingEvent(getContainerProgressName(*op.Container)))
+		events.On(progress.Removing(getContainerProgressName(*op.Container)))
 	case OpCreateNetwork:
-		events.On(creatingEvent("Network " + op.Name))
+		events.On(progress.Creating("Network " + op.Name))
 	case OpRemoveNetwork:
-		events.On(removingEvent("Network " + op.Name))
+		events.On(progress.Removing("Network " + op.Name))
 	case OpCreateVolume:
-		events.On(creatingEvent("Volume " + op.Name))
+		events.On(progress.Creating("Volume " + op.Name))
 	case OpRemoveVolume:
-		events.On(removingEvent("Volume " + op.Name))
+		events.On(progress.Removing("Volume " + op.Name))
 	}
 }
 
@@ -370,22 +371,22 @@ func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	switch op.Type {
 	case OpCreateContainer:
-		events.On(createdEvent("Container " + op.Name))
+		events.On(progress.Created("Container " + op.Name))
 	case OpStartContainer:
 		name := getContainerProgressName(*op.Container)
-		events.On(newEvent(name, api.Done, api.StatusStarted))
+		events.On(progress.New(name, api.Done, api.StatusStarted))
 	case OpStopContainer:
-		events.On(stoppedEvent(getContainerProgressName(*op.Container)))
+		events.On(progress.Stopped(getContainerProgressName(*op.Container)))
 	case OpRemoveContainer:
-		events.On(removedEvent(getContainerProgressName(*op.Container)))
+		events.On(progress.Removed(getContainerProgressName(*op.Container)))
 	case OpCreateNetwork:
-		events.On(createdEvent("Network " + op.Name))
+		events.On(progress.Created("Network " + op.Name))
 	case OpRemoveNetwork:
-		events.On(removedEvent("Network " + op.Name))
+		events.On(progress.Removed("Network " + op.Name))
 	case OpCreateVolume:
-		events.On(createdEvent("Volume " + op.Name))
+		events.On(progress.Created("Volume " + op.Name))
 	case OpRemoveVolume:
-		events.On(removedEvent("Volume " + op.Name))
+		events.On(progress.Removed("Volume " + op.Name))
 	}
 }
 

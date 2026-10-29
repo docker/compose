@@ -23,6 +23,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -58,15 +59,15 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 
 	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		eventName := getContainerProgressName(ctr)
-		s.events.On(newEvent(eventName, api.Working, api.StatusKilling))
+		s.events.On(progress.New(eventName, api.Working, api.StatusKilling))
 		_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{
 			Signal: options.Signal,
 		})
 		if err != nil {
-			s.events.On(errorEvent(eventName, "Error while Killing"))
+			s.events.On(progress.Error(eventName, "Error while Killing"))
 			return err
 		}
-		s.events.On(newEvent(eventName, api.Done, api.StatusKilled))
+		s.events.On(progress.New(eventName, api.Done, api.StatusKilled))
 		return nil
 	})
 }

@@ -39,6 +39,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -299,7 +300,7 @@ func getUnwrappedErrorMessage(err error) string {
 
 func (s *composeService) pullServiceImage(ctx context.Context, service types.ServiceConfig, quietPull bool, defaultPlatform string) error {
 	resource := "Image " + service.Image
-	s.events.On(newEvent(resource, api.Working, api.StatusPulling))
+	s.events.On(progress.New(resource, api.Working, api.StatusPulling))
 	ref, err := reference.ParseNormalizedNamed(service.Image)
 	if err != nil {
 		return err
@@ -350,7 +351,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 	}
 
 	if err != nil {
-		s.events.On(errorEvent(resource, getUnwrappedErrorMessage(err)))
+		s.events.On(progress.Error(resource, getUnwrappedErrorMessage(err)))
 		return err
 	}
 
@@ -370,7 +371,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 			toPullProgressEvent(resource, jm, s.events)
 		}
 	}
-	s.events.On(newEvent(resource, api.Done, api.StatusPulled))
+	s.events.On(progress.New(resource, api.Done, api.StatusPulled))
 
 	return nil
 }
