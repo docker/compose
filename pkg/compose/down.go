@@ -42,6 +42,17 @@ import (
 
 type downOp func() error
 
+// limitedDownOp gates fn on the shared limiter: it runs once it holds a slot of it.
+func limitedDownOp(ctx context.Context, limiter *semaphore.Weighted, fn func() error) downOp {
+	return func() error {
+		if err := concurrency.Acquire(ctx, limiter); err != nil {
+			return err
+		}
+		defer concurrency.Release(limiter)
+		return fn()
+	}
+}
+
 func (s *composeService) Down(ctx context.Context, projectName string, options api.DownOptions) error {
 	return Run(ctx, func(ctx context.Context) error {
 		return s.down(ctx, strings.ToLower(projectName), options)
@@ -163,13 +174,9 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 			continue
 		}
 		volumeName := vol.Name
-		ops = append(ops, func() error {
-			if err := concurrency.Acquire(ctx, limiter); err != nil {
-				return err
-			}
-			defer concurrency.Release(limiter)
+		ops = append(ops, limitedDownOp(ctx, limiter, func() error {
 			return s.removeVolume(ctx, volumeName, project.Name)
-		})
+		}))
 	}
 
 	return ops
@@ -312,13 +319,9 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 		// loop capture variable for op closure
 		networkKey := key
 		idOrName := n.Name
-		ops = append(ops, func() error {
-			if err := concurrency.Acquire(ctx, limiter); err != nil {
-				return err
-			}
-			defer concurrency.Release(limiter)
+		ops = append(ops, limitedDownOp(ctx, limiter, func() error {
 			return s.removeNetwork(ctx, networkKey, project.Name, idOrName)
-		})
+		}))
 	}
 	return ops
 }
