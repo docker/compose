@@ -110,28 +110,38 @@ type PingResponse struct {
 
 // Ping is a minimal API used to ensure that the server is available.
 func (c *Client) Ping(ctx context.Context) (*PingResponse, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, "/ping", http.NoBody)
+	ret, err := get[PingResponse](ctx, c, "/ping")
 	if err != nil {
 		return nil, err
+	}
+	return &ret, nil
+}
+
+// get fetches path from the Desktop API and decodes the JSON answer into a T.
+func get[T any](ctx context.Context, c *Client, path string) (T, error) {
+	var ret T
+	req, err := c.newRequest(ctx, http.MethodGet, path, http.NoBody)
+	if err != nil {
+		return ret, err
 	}
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, err
+		return ret, err
 	}
 	defer func() {
 		_ = resp.Body.Close()
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return ret, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	var ret PingResponse
 	if err := json.NewDecoder(resp.Body).Decode(&ret); err != nil {
-		return nil, err
+		var zero T
+		return zero, err
 	}
-	return &ret, nil
+	return ret, nil
 }
 
 type FeatureFlagResponse map[string]FeatureFlagValue
@@ -141,28 +151,7 @@ type FeatureFlagValue struct {
 }
 
 func (c *Client) FeatureFlags(ctx context.Context) (FeatureFlagResponse, error) {
-	req, err := c.newRequest(ctx, http.MethodGet, "/features", http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := c.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
-	}
-
-	var ret FeatureFlagResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ret); err != nil {
-		return nil, err
-	}
-	return ret, nil
+	return get[FeatureFlagResponse](ctx, c, "/features")
 }
 
 // IsFeatureEnabled checks the feature flag (GET /features) for a given
