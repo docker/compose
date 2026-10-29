@@ -30,7 +30,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
-	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/relay"
 	"github.com/docker/compose/v5/pkg/api"
@@ -108,7 +108,7 @@ func (s *Service) listContainersTargetedForCopy(ctx context.Context, projectName
 	var err error
 	switch {
 	case options.Index > 0:
-		ctr, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffExclude, true, serviceName, options.Index)
+		ctr, err := s.backend.SpecifiedContainer(ctx, projectName, engine.OneOffExclude, true, serviceName, options.Index)
 		if err != nil {
 			return nil, err
 		}
@@ -117,9 +117,9 @@ func (s *Service) listContainersTargetedForCopy(ctx context.Context, projectName
 		}
 		return append(containers, ctr), nil
 	default:
-		withOneOff := inspect.OneOffExclude
+		withOneOff := engine.OneOffExclude
 		if options.All {
-			withOneOff = inspect.OneOffInclude
+			withOneOff = engine.OneOffInclude
 		}
 		containers, err = s.backend.Containers(ctx, projectName, withOneOff, true, serviceName)
 		if err != nil {

@@ -27,7 +27,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/moby/sys/atomicwriter"
 
-	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
@@ -37,7 +37,7 @@ import (
 func (s *Service) Export(ctx context.Context, projectName string, options api.ExportOptions) error {
 	projectName = strings.ToLower(projectName)
 
-	container, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
+	container, err := s.backend.SpecifiedContainer(ctx, projectName, engine.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return err
 	}

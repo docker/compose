@@ -23,12 +23,13 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *Service) Ports(ctx context.Context, projectName string, serviceName string, port uint16, options api.PortOptions) (api.PortPublishers, error) {
 	projectName = strings.ToLower(projectName)
-	ctr, err := s.backend.SpecifiedContainer(ctx, projectName, OneOffInclude, false, serviceName, options.Index)
+	ctr, err := s.backend.SpecifiedContainer(ctx, projectName, engine.OneOffInclude, false, serviceName, options.Index)
 	if err != nil {
 		return nil, err
 	}

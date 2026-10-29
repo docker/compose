@@ -24,7 +24,7 @@ import (
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command/container"
 
-	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/relay"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -32,7 +32,7 @@ import (
 // Exec runs a command in a running container of a service and returns its exit code.
 func (s *Service) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
 	projectName = strings.ToLower(projectName)
-	target, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
+	target, err := s.backend.SpecifiedContainer(ctx, projectName, engine.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return 0, err
 	}
