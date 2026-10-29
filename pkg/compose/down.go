@@ -33,6 +33,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -104,9 +105,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		resourceToRemove = true
 	}
 
-	// shared across services — see restart.go's newOptionalLimiter comment
+	// shared across services — see restart.go's concurrency.NewLimiter comment
 	// for why a per-service limiter alone isn't enough.
-	limiter := newOptionalLimiter(s.maxConcurrency)
+	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
 	err = InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		return s.downService(ctx, project, containers, options, service, limiter)
@@ -144,7 +145,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	// ops dispatch itself is intentionally unbounded: each op already gates
 	// its own engine call(s) on the shared limiter (network/volume ops
-	// directly, image ops internally via their own forEachWithLimiter call),
+	// directly, image ops internally via their own concurrency.ForEach call),
 	// so bounding this dispatch too on the same limiter would have an op
 	// hold a slot for its own fan-out to acquire from -- deadlocking once
 	// enough ops are in flight to exhaust it (see
@@ -164,10 +165,10 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 		}
 		volumeName := vol.Name
 		ops = append(ops, func() error {
-			if err := acquireSlot(ctx, limiter); err != nil {
+			if err := concurrency.Acquire(ctx, limiter); err != nil {
 				return err
 			}
-			defer releaseSlot(limiter)
+			defer concurrency.Release(limiter)
 			return s.removeVolume(ctx, volumeName, project.Name)
 		})
 	}
@@ -221,11 +222,11 @@ func (s *composeService) removeTaggedImagesOp(ctx context.Context, project *type
 
 	var mu sync.Mutex
 	var errs []error
-	// forEachWithLimiter's own error handling isn't used here since a single
+	// concurrency.ForEach's own error handling isn't used here since a single
 	// image failure must not cancel the shared errgroup ctx (see
 	// TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails) -- every failure
 	// is collected instead, so fn itself always returns nil.
-	_ = forEachWithLimiter(ctx, limiter, images, func(ctx context.Context, img string) error {
+	_ = concurrency.ForEach(ctx, limiter, images, func(ctx context.Context, img string) error {
 		if err := s.removeResource("Image "+img, func() error {
 			_, err := s.apiClient().ImageRemove(ctx, img, client.ImageRemoveOptions{})
 			return err
@@ -313,10 +314,10 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 		networkKey := key
 		idOrName := n.Name
 		ops = append(ops, func() error {
-			if err := acquireSlot(ctx, limiter); err != nil {
+			if err := concurrency.Acquire(ctx, limiter); err != nil {
 				return err
 			}
-			defer releaseSlot(limiter)
+			defer concurrency.Release(limiter)
 			return s.removeNetwork(ctx, networkKey, project.Name, idOrName)
 		})
 	}
@@ -478,7 +479,7 @@ func (s *composeService) stopContainers(
 	listener api.ContainerEventListener,
 	limiter *semaphore.Weighted,
 ) error {
-	return forEachWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+	return concurrency.ForEach(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
 		return s.stopContainer(ctx, serv, ctr, timeout, listener)
 	})
 }
@@ -491,7 +492,7 @@ func (s *composeService) removeContainers(
 	volumes bool,
 	limiter *semaphore.Weighted,
 ) error {
-	return forEachWithLimiter(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
+	return concurrency.ForEach(ctx, limiter, containers, func(ctx context.Context, ctr containerType.Summary) error {
 		return s.stopAndRemoveContainer(ctx, ctr, service, timeout, volumes)
 	})
 }

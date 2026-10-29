@@ -24,7 +24,6 @@ import (
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -75,13 +74,4 @@ func inServices(containers []container.Summary, services []string) []container.S
 		}
 	}
 	return filtered
-}
-
-// limitedGroup returns an errgroup running at most maxConcurrency goroutines at once.
-func limitedGroup(ctx context.Context, maxConcurrency int) (*errgroup.Group, context.Context) {
-	eg, ctx := errgroup.WithContext(ctx)
-	if maxConcurrency > 0 {
-		eg.SetLimit(maxConcurrency)
-	}
-	return eg, ctx
 }

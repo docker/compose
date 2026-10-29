@@ -38,6 +38,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -70,7 +71,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		return err
 	}
 
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 
 	p := &imagePuller{
 		composeService: s,
@@ -447,7 +448,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 
 	// the errgroup context is canceled as soon as Wait returns; the post-pull
 	// resolution below needs the caller's context
-	eg, pullCtx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, pullCtx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	pulled := map[string]bool{}
 	var mutex sync.Mutex
 	for name, service := range needPull {

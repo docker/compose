@@ -460,7 +460,7 @@ func TestDoLogContainer_ReleasesSlotOnPanic(t *testing.T) {
 	svc := tested.(*composeService)
 
 	limiter := semaphore.NewWeighted(1)
-	assert.NilError(t, limiter.Acquire(t.Context(), 1)) // simulates the slot logContainer would have acquired via acquireSlot
+	assert.NilError(t, limiter.Acquire(t.Context(), 1)) // simulates the slot logContainer would have acquired via concurrency.Acquire
 
 	api.EXPECT().ContainerLogs(anyCancellableContext(), "c1", gomock.Any()).
 		DoAndReturn(func(context.Context, string, client.ContainerLogsOptions) (io.ReadCloser, error) {
@@ -487,7 +487,7 @@ func (panicReader) Read([]byte) (int, error) {
 // double-release: doLogContainer's slot-release guard must only cover the
 // acquire-to-release window around ContainerLogs, not the copy loop that
 // follows. A panic after that point must propagate unmodified, not trigger a
-// second releaseSlot on an already-released semaphore (which would either
+// second concurrency.Release on an already-released semaphore (which would either
 // panic on its own — masking the real panic — or silently corrupt the
 // semaphore's count).
 func TestDoLogContainer_CopyPanicDoesNotDoubleReleaseSlot(t *testing.T) {
@@ -500,7 +500,7 @@ func TestDoLogContainer_CopyPanicDoesNotDoubleReleaseSlot(t *testing.T) {
 	svc := tested.(*composeService)
 
 	limiter := semaphore.NewWeighted(1)
-	assert.NilError(t, limiter.Acquire(t.Context(), 1)) // simulates the slot logContainer would have acquired via acquireSlot
+	assert.NilError(t, limiter.Acquire(t.Context(), 1)) // simulates the slot logContainer would have acquired via concurrency.Acquire
 
 	api.EXPECT().ContainerLogs(anyCancellableContext(), "c1", gomock.Any()).
 		Return(io.NopCloser(panicReader{}), nil)
