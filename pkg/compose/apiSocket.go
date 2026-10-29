@@ -23,12 +23,25 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
+	clitypes "github.com/docker/cli/cli/config/types"
 )
 
 // --use-api-socket is not actually supported by the Docker Engine
 // but is a client-side hack (see https://github.com/docker/cli/blob/master/cli/command/container/create.go#L246)
 // we replicate here by transforming the project model
 
+// apiSocketConfigName names the config useAPISocket adds to the project, which
+// is also what tells that a project went through it.
+const apiSocketConfigName = "#apisocket"
+
+// useAPISocket mounts the Docker API socket in the services asking for it and
+// hands them the registry credentials of the host, the way the Docker CLI does
+// for `docker run --use-api-socket`:
+//   - to the container's root only: the config file is created with mode 0600
+//     and the ownership the engine gives a file it copies in (root), so another
+//     user of the container cannot read it;
+//   - not to a service that sets DOCKER_CONFIG itself, which is taken to know
+//     where its credentials are, nor when the host has none.
 func (s *composeService) useAPISocket(project *types.Project) (*types.Project, error) {
 	useAPISocket := false
 	for _, service := range project.Services {
@@ -44,7 +57,7 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 	// when it is handed to a later plan (a watch rebuild): transforming it a
 	// second time would append the socket volume and the config entry again,
 	// duplicate entries in the model that also change the service's config hash.
-	if _, applied := project.Configs["#apisocket"]; applied {
+	if _, applied := project.Configs[apiSocketConfigName]; applied {
 		return project, nil
 	}
 
@@ -52,9 +65,18 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		return nil, errors.New("use_api_socket can't be used with a Windows Docker Engine")
 	}
 
-	creds, err := s.configFile().GetAllCredentials()
-	if err != nil {
-		return nil, fmt.Errorf("resolving credentials failed: %w", err)
+	// The credentials are looked up only if a service is to get them: one that
+	// sets DOCKER_CONFIG is taken to know what it does.
+	var creds map[string]clitypes.AuthConfig
+	for _, service := range project.Services {
+		if service.UseAPISocket && !definesDockerConfig(service) {
+			var err error
+			creds, err = s.configFile().GetAllCredentials()
+			if err != nil {
+				return nil, fmt.Errorf("resolving credentials failed: %w", err)
+			}
+			break
+		}
 	}
 
 	newConfig := &configfile.ConfigFile{
@@ -71,7 +93,9 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 	if project.Configs == nil {
 		project.Configs = types.Configs{}
 	}
-	project.Configs["#apisocket"] = types.ConfigObjConfig{
+	// also tells that the project went through here, whether or not any service
+	// is given the credentials
+	project.Configs[apiSocketConfigName] = types.ConfigObjConfig{
 		Content: configBuf.String(),
 	}
 
@@ -85,24 +109,30 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 			Target: "/var/run/docker.sock",
 		})
 
-		if service.Environment == nil {
-			service.Environment = types.MappingWithEquals{}
-		}
-		_, envvarPresent := service.Environment["DOCKER_CONFIG"]
-
-		// If the DOCKER_CONFIG env var is already present, we assume the client knows
-		// what they're doing and don't inject the creds.
-		if !envvarPresent {
+		if len(creds) > 0 && !definesDockerConfig(service) {
+			if service.Environment == nil {
+				service.Environment = types.MappingWithEquals{}
+			}
 			// Set our special little location for the config file.
 			path := "/run/secrets/docker"
 			service.Environment["DOCKER_CONFIG"] = &path
-		}
 
-		service.Configs = append(service.Configs, types.ServiceConfigObjConfig{
-			Source: "#apisocket",
-			Target: "/run/secrets/docker/config.json",
-		})
+			// like the file of the Docker CLI: readable by root only. One mode
+			// per service, so that no service shares it with another.
+			mode := types.FileMode(0o600)
+			service.Configs = append(service.Configs, types.ServiceConfigObjConfig{
+				Source: apiSocketConfigName,
+				Target: "/run/secrets/docker/config.json",
+				Mode:   &mode,
+			})
+		}
 		project.Services[name] = service
 	}
 	return project, nil
+}
+
+// definesDockerConfig tells whether the service sets DOCKER_CONFIG itself.
+func definesDockerConfig(service types.ServiceConfig) bool {
+	_, defined := service.Environment["DOCKER_CONFIG"]
+	return defined
 }
