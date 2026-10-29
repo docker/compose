@@ -121,6 +121,23 @@ func TestUseAPISocketCredentialsAreForRootOnly(t *testing.T) {
 	assert.Assert(t, project.Configs["#apisocket"].Content != "", "the config carries the credentials")
 }
 
+// TestUseAPISocketServicesDoNotShareTheirMode pins that each service gets its
+// own mode: changing it for one must not change it for the others.
+func TestUseAPISocketServicesDoNotShareTheirMode(t *testing.T) {
+	svc := newAPISocketTestService(t, hostRegistryConfig())
+
+	project, err := svc.useAPISocket(apiSocketProject(
+		apiSocketService("one", types.MappingWithEquals{}),
+		apiSocketService("two", types.MappingWithEquals{}),
+	))
+
+	assert.NilError(t, err)
+	one, two := project.Services["one"].Configs[0], project.Services["two"].Configs[0]
+	assert.Assert(t, one.Mode != two.Mode, "the services share the same mode pointer")
+	*one.Mode = 0o644
+	assert.Equal(t, *two.Mode, types.FileMode(0o600))
+}
+
 // TestUseAPISocketHonorsDockerConfig pins that a service which sets
 // DOCKER_CONFIG itself gets the socket but no credentials, as with `docker run
 // --use-api-socket`: it is taken to know where its credentials are, and its

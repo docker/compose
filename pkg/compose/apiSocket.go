@@ -99,8 +99,6 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 		Content: configBuf.String(),
 	}
 
-	// like the file of the Docker CLI: readable by root only
-	mode := types.FileMode(0o600)
 	for name, service := range project.Services {
 		if !service.UseAPISocket {
 			continue
@@ -119,6 +117,9 @@ func (s *composeService) useAPISocket(project *types.Project) (*types.Project, e
 			path := "/run/secrets/docker"
 			service.Environment["DOCKER_CONFIG"] = &path
 
+			// like the file of the Docker CLI: readable by root only. One mode
+			// per service, so that no service shares it with another.
+			mode := types.FileMode(0o600)
 			service.Configs = append(service.Configs, types.ServiceConfigObjConfig{
 				Source: apiSocketConfigName,
 				Target: "/run/secrets/docker/config.json",
