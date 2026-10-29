@@ -14,7 +14,9 @@
    limitations under the License.
 */
 
-package compose
+// Package envresolver resolves environment variables the way the platform does:
+// case-sensitively, except on Windows.
+package envresolver
 
 import (
 	"runtime"
@@ -24,17 +26,17 @@ import (
 // isCaseInsensitiveEnvVars is true on platforms where environment variable names are treated case-insensitively.
 var isCaseInsensitiveEnvVars = (runtime.GOOS == "windows")
 
-// envResolver returns resolver for environment variables suitable for the current platform.
+// New returns resolver for environment variables suitable for the current platform.
 // Expected to be used with `MappingWithEquals.Resolve`.
 // Updates in `environment` may not be reflected.
-func envResolver(environment map[string]string) func(string) (string, bool) {
-	return envResolverWithCase(environment, isCaseInsensitiveEnvVars)
+func New(environment map[string]string) func(string) (string, bool) {
+	return NewWithCase(environment, isCaseInsensitiveEnvVars)
 }
 
-// envResolverWithCase returns resolver for environment variables with the specified case-sensitive condition.
+// NewWithCase returns resolver for environment variables with the specified case-sensitive condition.
 // Expected to be used with `MappingWithEquals.Resolve`.
 // Updates in `environment` may not be reflected.
-func envResolverWithCase(environment map[string]string, caseInsensitive bool) func(string) (string, bool) {
+func NewWithCase(environment map[string]string, caseInsensitive bool) func(string) (string, bool) {
 	if environment == nil {
 		return func(s string) (string, bool) {
 			return "", false

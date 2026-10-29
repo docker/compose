@@ -72,12 +72,3 @@ const (
 	// dockerEngineV29_8 is the specific version string for Docker Engine 29.8
 	dockerEngineV29_8 = "v29.8"
 )
-
-// Build tool version constants
-const (
-	// buildxMinVersion is the minimum required version of buildx for compose build
-	buildxMinVersion = "0.17.0"
-
-	// buildxJobsMinVersion is the minimum version of buildx supporting `bake --jobs`
-	buildxJobsMinVersion = "0.38.0"
-)
