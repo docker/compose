@@ -343,6 +343,8 @@ func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *p
 }
 
 // emitStartEvent emits the appropriate Working event for an ungrouped node.
+//
+//nolint:dupl // mirrors emitDoneEvent: keeping the Working and Done events side by side keeps their pairing visible
 func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	switch op.Type {
@@ -367,6 +369,8 @@ func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 }
 
 // emitDoneEvent emits the appropriate Done event for an ungrouped node.
+//
+//nolint:dupl // mirrors emitStartEvent, see there
 func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	switch op.Type {

@@ -29,6 +29,7 @@ type pauseOptions struct {
 	*ProjectOptions
 }
 
+//nolint:dupl // declarative cobra command, the mirror of unpauseCommand
 func pauseCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := pauseOptions{
 		ProjectOptions: p,
@@ -61,6 +62,7 @@ type unpauseOptions struct {
 	*ProjectOptions
 }
 
+//nolint:dupl // declarative cobra command, the mirror of pauseCommand
 func unpauseCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := unpauseOptions{
 		ProjectOptions: p,

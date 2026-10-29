@@ -35,6 +35,7 @@ type topOptions struct {
 	*ProjectOptions
 }
 
+//nolint:dupl // declarative cobra command: its flags and wiring look like its siblings' by design
 func topCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *BackendOptions) *cobra.Command {
 	opts := topOptions{
 		ProjectOptions: p,
