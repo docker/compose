@@ -29,6 +29,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -491,7 +492,7 @@ func TestEnsureServiceRelayRemovesExistingWhenNoDependents(t *testing.T) {
 	apiMock.EXPECT().ContainerRemove(gomock.Any(), "relay-1", client.ContainerRemoveOptions{Force: true}).
 		Return(client.ContainerRemoveResult{}, nil)
 	apiMock.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("p").Add("label", serviceFilter("db")).Add("label", api.RelayNetworkLabel),
+		Filters: naming.ProjectFilter("p").Add("label", naming.ServiceFilter("db")).Add("label", api.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	err := svc.Ensure(t.Context(), project, db, endpoints, nil)
@@ -526,7 +527,7 @@ func TestRemoveServiceRelayRemovesExisting(t *testing.T) {
 	// removeServiceRelay always also tries the relay-link network, even
 	// when nothing is left connected to it.
 	apiMock.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("p").Add("label", serviceFilter("db")).Add("label", api.RelayNetworkLabel),
+		Filters: naming.ProjectFilter("p").Add("label", naming.ServiceFilter("db")).Add("label", api.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	assert.NilError(t, svc.Remove(t.Context(), "p", "db"))

@@ -24,13 +24,14 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *Service) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	projectName = strings.ToLower(projectName)
 	res := s.backend.APIClient().Events(ctx, client.EventsListOptions{
-		Filters: projectFilter(projectName),
+		Filters: naming.ProjectFilter(projectName),
 		Since:   options.Since,
 		Until:   options.Until,
 	})

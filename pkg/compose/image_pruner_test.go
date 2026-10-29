@@ -25,6 +25,8 @@ import (
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/internal/naming"
 )
 
 // TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures guards the
@@ -46,7 +48,7 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	svc := svcIface.(*composeService)
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:keep"},
 		{ID: "sha256:removed"},
@@ -121,7 +123,7 @@ func TestRemoveDanglingImages_NoneFound(t *testing.T) {
 	svc := svcIface.(*composeService)
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
 	removed, err := svc.removeDanglingImages(t.Context(), "prj", func(image.Summary) bool { return false })

@@ -45,7 +45,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	projectName = strings.ToLower(projectName)
 	allContainers, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
-		Filters: projectFilter(projectName),
+		Filters: naming.ProjectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err

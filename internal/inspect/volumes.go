@@ -23,12 +23,13 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *Service) Volumes(ctx context.Context, projectName string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
 	allContainers, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
-		Filters: projectFilter(projectName),
+		Filters: naming.ProjectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err
@@ -48,7 +49,7 @@ func (s *Service) Volumes(ctx context.Context, projectName string, options api.V
 	}
 
 	volumesResponse, err := s.backend.APIClient().VolumeList(ctx, client.VolumeListOptions{
-		Filters: projectFilter(projectName),
+		Filters: naming.ProjectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err

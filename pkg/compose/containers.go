@@ -63,7 +63,7 @@ func (s *composeService) getContainers(ctx context.Context, projectName string, 
 // (see createPreStartContainer), so they are invisible to getContainers'
 // default filters and must be listed by project+hook label alone.
 func (s *composeService) getHookContainers(ctx context.Context, projectName string) (Containers, error) {
-	f := projectFilter(projectName)
+	f := naming.ProjectFilter(projectName)
 	f.Add("label", hookFilter(preStartHookType))
 	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
@@ -90,9 +90,9 @@ func (s *composeService) getContainersByService(ctx context.Context, projectName
 }
 
 func getDefaultFilters(projectName string, oneOff oneOff, selectedServices ...string) client.Filters {
-	f := projectFilter(projectName)
+	f := naming.ProjectFilter(projectName)
 	if len(selectedServices) == 1 {
-		f.Add("label", serviceFilter(selectedServices[0]))
+		f.Add("label", naming.ServiceFilter(selectedServices[0]))
 	}
 	f.Add("label", api.ConfigHashLabel)
 	switch oneOff {

@@ -32,6 +32,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -163,7 +164,7 @@ func (p *ImagePruner) namedImages(ctx context.Context) ([]string, error) {
 // created from the project + service name.
 func (p *ImagePruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error) {
 	res, err := p.client.ImageList(ctx, client.ImageListOptions{
-		Filters: projectFilter(p.project.Name).Add("dangling", "false"),
+		Filters: naming.ProjectFilter(p.project.Name).Add("dangling", "false"),
 	})
 	if err != nil {
 		return nil, err
@@ -222,7 +223,7 @@ func (s *composeService) removeImages(ctx context.Context, images []image.Summar
 // so the two don't drift apart.
 func (s *composeService) eligibleDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]image.Summary, error) {
 	res, err := s.apiClient().ImageList(ctx, client.ImageListOptions{
-		Filters: projectFilter(projectName).Add("dangling", "true"),
+		Filters: naming.ProjectFilter(projectName).Add("dangling", "true"),
 	})
 	if err != nil {
 		return nil, err

@@ -175,7 +175,7 @@ func (c *monitor) Start(ctx context.Context) error {
 
 	res := c.apiClient.Events(ctx, client.EventsListOptions{
 		Since:   c.since,
-		Filters: projectFilter(c.project).Add("type", "container").Add("label", oneOffFilter(false)),
+		Filters: naming.ProjectFilter(c.project).Add("type", "container").Add("label", oneOffFilter(false)),
 	})
 	for {
 		if len(containers) == 0 {
@@ -260,7 +260,7 @@ func (c *monitor) readDaemonTime(ctx context.Context) error {
 func (c *monitor) initialContainers(ctx context.Context) (utils.Set[string], error) {
 	initialState, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
-		Filters: projectFilter(c.project).Add("label",
+		Filters: naming.ProjectFilter(c.project).Add("label",
 			oneOffFilter(false),
 			api.ConfigHashLabel,
 		),

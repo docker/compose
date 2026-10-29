@@ -285,7 +285,7 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 // gated behind scope.plansCreatePhase() there -- see its own comment).
 func (s *composeService) collectObservedNetworksAndVolumes(ctx context.Context, project *types.Project, state *ObservedState) error {
 	networkList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: projectFilter(project.Name),
+		Filters: naming.ProjectFilter(project.Name),
 	})
 	if err != nil {
 		return err
@@ -304,7 +304,7 @@ func (s *composeService) collectObservedNetworksAndVolumes(ctx context.Context, 
 	}
 
 	volList, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
-		Filters: projectFilter(project.Name),
+		Filters: naming.ProjectFilter(project.Name),
 	})
 	if err != nil {
 		return err

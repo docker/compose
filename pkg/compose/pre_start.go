@@ -31,6 +31,7 @@ import (
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -149,8 +150,8 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 // old-generation container without an index label is not executable; only a
 // fresh runner prepared by the reconciliation plan is.
 func (s *composeService) listPreStartRunners(ctx context.Context, projectName, serviceName string) (map[int]container.Summary, error) {
-	f := projectFilter(projectName)
-	f.Add("label", serviceFilter(serviceName))
+	f := naming.ProjectFilter(projectName)
+	f.Add("label", naming.ServiceFilter(serviceName))
 	f.Add("label", hookFilter(preStartHookType))
 	f.Add("status", "created")
 	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{

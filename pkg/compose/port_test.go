@@ -26,6 +26,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 )
 
@@ -93,7 +94,7 @@ func TestPorts(t *testing.T) {
 			ctr.Ports = append([]container.PortSummary(nil), ports...)
 
 			api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
-				Filters: projectFilter(projectName).Add("label", serviceFilter(service), compose.ConfigHashLabel),
+				Filters: naming.ProjectFilter(projectName).Add("label", naming.ServiceFilter(service), compose.ConfigHashLabel),
 			}).Return(client.ContainerListResult{Items: []container.Summary{ctr}}, nil)
 
 			got, err := tested.Ports(t.Context(), projectName, service, tt.port, compose.PortOptions{Protocol: tt.protocol})

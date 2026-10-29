@@ -32,6 +32,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -70,8 +71,8 @@ func TestServiceLinks(t *testing.T) {
 	}
 
 	containerListOptions := client.ContainerListOptions{
-		Filters: projectFilter(testProject).Add("label",
-			serviceFilter("db"),
+		Filters: naming.ProjectFilter(testProject).Add("label",
+			naming.ServiceFilter("db"),
 			oneOffFilter(false),
 			api.ConfigHashLabel,
 		),
@@ -198,8 +199,8 @@ func TestServiceLinks(t *testing.T) {
 
 		c := testContainer("web", webContainerName, true)
 		containerListOptionsOneOff := client.ContainerListOptions{
-			Filters: projectFilter(testProject).Add("label",
-				serviceFilter("web"),
+			Filters: naming.ProjectFilter(testProject).Add("label",
+				naming.ServiceFilter("web"),
 				oneOffFilter(false),
 				api.ConfigHashLabel,
 			),

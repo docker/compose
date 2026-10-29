@@ -59,14 +59,6 @@ func New(backend Backend) *Service {
 	return &Service{backend: backend}
 }
 
-func projectFilter(projectName string) client.Filters {
-	return make(client.Filters).Add("label", api.ProjectLabel+"="+projectName)
-}
-
-func serviceFilter(serviceName string) string {
-	return api.ServiceLabel + "=" + serviceName
-}
-
 // defaultRelayImage is the published network-relay image deployed in place of
 // a provider service that published endpoints. Overridable for development
 // and air-gapped setups with COMPOSE_RELAY_IMAGE.
@@ -258,9 +250,9 @@ func (s *Service) findRelayLinkNetwork(ctx context.Context, projectName, service
 // empty. Selection is by label alone — the one criterion that still holds
 // for a project reconstructed from live containers.
 func (s *Service) listRelayLinkNetworks(ctx context.Context, projectName, serviceName string) ([]network.Summary, error) {
-	filters := projectFilter(projectName).Add("label", api.RelayNetworkLabel)
+	filters := naming.ProjectFilter(projectName).Add("label", api.RelayNetworkLabel)
 	if serviceName != "" {
-		filters = filters.Add("label", serviceFilter(serviceName))
+		filters = filters.Add("label", naming.ServiceFilter(serviceName))
 	}
 	existing, err := s.backend.APIClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
 	if err != nil {
@@ -620,8 +612,8 @@ func (s *Service) Remove(ctx context.Context, projectName, serviceName string) e
 
 // findRelayContainer returns the service's relay container, if any.
 func (s *Service) findRelayContainer(ctx context.Context, projectName, serviceName string) (*container.Summary, error) {
-	f := projectFilter(projectName)
-	f.Add("label", serviceFilter(serviceName))
+	f := naming.ProjectFilter(projectName)
+	f.Add("label", naming.ServiceFilter(serviceName))
 	f.Add("label", api.RelayLabel)
 	result, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
