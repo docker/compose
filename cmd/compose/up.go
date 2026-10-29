@@ -32,7 +32,6 @@ import (
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/cmd/formatter"
@@ -178,14 +177,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 	flags.BoolVarP(&create.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
-	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		// assumeYes was introduced by mistake as `--y`
-		if name == "y" {
-			logrus.Warn("--y is deprecated, please use --yes instead")
-			name = "yes"
-		}
-		return pflag.NormalizedName(name)
-	})
+	flags.SetNormalizeFunc(normalizeYesFlag)
 	return upCmd
 }
 

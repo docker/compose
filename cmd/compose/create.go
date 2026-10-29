@@ -96,15 +96,17 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVarP(&opts.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
-	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		// assumeYes was introduced by mistake as `--y`
-		if name == "y" {
-			logrus.Warn("--y is deprecated, please use --yes instead")
-			name = "yes"
-		}
-		return pflag.NormalizedName(name)
-	})
+	flags.SetNormalizeFunc(normalizeYesFlag)
 	return cmd
+}
+
+// normalizeYesFlag maps the --y spelling of --yes, introduced by mistake, to --yes.
+func normalizeYesFlag(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+	if name == "y" {
+		logrus.Warn("--y is deprecated, please use --yes instead")
+		name = "yes"
+	}
+	return pflag.NormalizedName(name)
 }
 
 func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
