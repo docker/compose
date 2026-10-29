@@ -19,7 +19,6 @@ package compose
 import (
 	"context"
 	"fmt"
-	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -52,12 +51,7 @@ func (s *composeService) Images(ctx context.Context, projectName string, options
 	}
 	var containers []container.Summary
 	if len(options.Services) > 0 {
-		// filter service containers
-		for _, ctr := range allContainers.Items {
-			if slices.Contains(options.Services, ctr.Labels[api.ServiceLabel]) {
-				containers = append(containers, ctr)
-			}
-		}
+		containers = naming.InServices(allContainers.Items, options.Services)
 	} else {
 		containers = allContainers.Items
 	}

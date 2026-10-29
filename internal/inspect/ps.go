@@ -42,7 +42,7 @@ func (s *Service) Ps(ctx context.Context, projectName string, options api.PsOpti
 	}
 
 	if len(options.Services) != 0 {
-		containers = inServices(containers, options.Services)
+		containers = naming.InServices(containers, options.Services)
 	}
 	summary := make([]api.ContainerSummary, len(containers))
 	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())

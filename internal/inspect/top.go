@@ -35,7 +35,7 @@ func (s *Service) Top(ctx context.Context, projectName string, services []string
 		return nil, err
 	}
 	if len(services) > 0 {
-		containers = inServices(containers, services)
+		containers = naming.InServices(containers, services)
 	}
 	summary := make([]api.ContainerProcSummary, len(containers))
 	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())

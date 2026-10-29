@@ -19,12 +19,7 @@
 package inspect
 
 import (
-	"slices"
-
-	"github.com/moby/moby/api/types/container"
-
 	"github.com/docker/compose/v5/internal/engine"
-	"github.com/docker/compose/v5/pkg/api"
 )
 
 // Backend is what the operations need from the engine they report on.
@@ -40,15 +35,4 @@ type Service struct {
 // New creates a Service reporting on the given Backend.
 func New(backend Backend) *Service {
 	return &Service{backend: backend}
-}
-
-// inServices keeps the containers of the given services.
-func inServices(containers []container.Summary, services []string) []container.Summary {
-	var filtered []container.Summary
-	for _, ctr := range containers {
-		if slices.Contains(services, ctr.Labels[api.ServiceLabel]) {
-			filtered = append(filtered, ctr)
-		}
-	}
-	return filtered
 }
