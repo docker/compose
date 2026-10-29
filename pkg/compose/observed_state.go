@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -431,7 +432,7 @@ func toObservedContainer(c container.Summary) ObservedContainer {
 
 	return ObservedContainer{
 		ID:                c.ID,
-		Name:              getCanonicalContainerName(c),
+		Name:              naming.CanonicalContainerName(c),
 		State:             c.State,
 		ConfigHash:        c.Labels[api.ConfigHashLabel],
 		ImageDigest:       c.Labels[api.ImageDigestLabel],

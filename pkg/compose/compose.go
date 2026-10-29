@@ -32,11 +32,11 @@ import (
 	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/docker/cli/cli/flags"
 	"github.com/docker/cli/cli/streams"
-	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
@@ -366,32 +366,6 @@ func (w *streamOverrideWrapper) In() *streams.In {
 	return w.Cli.In()
 }
 
-func getCanonicalContainerName(c container.Summary) string {
-	if len(c.Names) == 0 {
-		// corner case, sometime happens on removal. return short ID as a safeguard value
-		return c.ID[:12]
-	}
-	// Names return container canonical name /foo  + link aliases /linked_by/foo
-	for _, name := range c.Names {
-		if strings.LastIndex(name, "/") == 0 {
-			return name[1:]
-		}
-	}
-
-	return strings.TrimPrefix(c.Names[0], "/")
-}
-
-func getContainerNameWithoutProject(c container.Summary) string {
-	project := c.Labels[api.ProjectLabel]
-	defaultName := getDefaultContainerName(project, c.Labels[api.ServiceLabel], c.Labels[api.ContainerNumberLabel])
-	name := getCanonicalContainerName(c)
-	if name != defaultName {
-		// service declares a custom container_name
-		return name
-	}
-	return name[len(project)+1:]
-}
-
 // projectFromName builds a types.Project based on actual resources with compose labels set
 func (s *composeService) projectFromName(containers Containers, projectName string, services ...string) (*types.Project, error) {
 	project := &types.Project{
@@ -405,7 +379,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	for _, ctr := range containers {
 		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
 		if !ok {
-			serviceLabel = getCanonicalContainerName(ctr)
+			serviceLabel = naming.CanonicalContainerName(ctr)
 		}
 		service, ok := set[serviceLabel]
 		if !ok {

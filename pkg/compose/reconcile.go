@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -928,7 +929,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 	nextNum := nextContainerNumber(r.observedSummaries(service.Name))
 	for i := 0; i < expected-actual; i++ {
 		number := nextNum + i
-		name := getContainerName(r.project.Name, service, number)
+		name := naming.ContainerName(r.project.Name, service, number)
 		serviceCopy := service // copy for pointer stability
 		lastNode = r.plan.addNode(Operation{
 			Type:       OpCreateContainer,
@@ -1616,7 +1617,7 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*PlanNode) *PlanNode {
 	resID := serviceReplicaID(service.Name, oc.Number)
 	group := fmt.Sprintf("recreate:%s:%d", service.Name, oc.Number)
-	tmpName := fmt.Sprintf("%s_%s", oc.ID[:min(12, len(oc.ID))], getContainerName(r.project.Name, service, oc.Number))
+	tmpName := fmt.Sprintf("%s_%s", oc.ID[:min(12, len(oc.ID))], naming.ContainerName(r.project.Name, service, oc.Number))
 	serviceCopy := service // copy for pointer stability
 
 	// Stop dependents first
@@ -1689,7 +1690,7 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	// containersByService view (OpWaitCondition and sibling create calls
 	// read it by service name) once the rename actually lands — otherwise
 	// they'd keep seeing the temporary name past this node.
-	finalName := getContainerName(r.project.Name, service, oc.Number)
+	finalName := naming.ContainerName(r.project.Name, service, oc.Number)
 	renameNode := r.plan.addNode(Operation{
 		Type:         OpRenameContainer,
 		ResourceID:   resID,

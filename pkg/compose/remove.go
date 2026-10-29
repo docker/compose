@@ -24,6 +24,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -74,7 +75,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 
 	var names []string
 	for _, ctr := range stoppedContainers {
-		names = append(names, getCanonicalContainerName(ctr))
+		names = append(names, naming.CanonicalContainerName(ctr))
 	}
 
 	if len(names) == 0 {

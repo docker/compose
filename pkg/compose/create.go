@@ -43,6 +43,7 @@ import (
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
 	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -519,7 +520,7 @@ func (s *composeService) prepareContainerMACAddress(service types.ServiceConfig,
 }
 
 func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
-	aliases := []string{getContainerName(project.Name, service, serviceIndex)}
+	aliases := []string{naming.ContainerName(project.Name, service, serviceIndex)}
 	if useNetworkAliases {
 		if cfg.ServiceNameAliasEnabled() {
 			aliases = append(aliases, service.Name)

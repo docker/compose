@@ -32,6 +32,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -132,9 +133,9 @@ func (s *composeService) logContainer(ctx context.Context, limiter *semaphore.We
 	if err != nil {
 		return err
 	}
-	err = s.doLogContainer(ctx, limiter, consumer, getContainerNameWithoutProject(ctr), res, options, nil)
+	err = s.doLogContainer(ctx, limiter, consumer, naming.ContainerNameWithoutProject(ctr), res, options, nil)
 	if errdefs.IsNotImplemented(err) {
-		logrus.Warnf("Can't retrieve logs for %q: %s", getCanonicalContainerName(ctr), err.Error())
+		logrus.Warnf("Can't retrieve logs for %q: %s", naming.CanonicalContainerName(ctr), err.Error())
 		return nil
 	}
 	return err

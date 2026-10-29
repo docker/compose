@@ -33,7 +33,29 @@ func ContainerName(projectName string, service types.ServiceConfig, number int) 
 	if service.ContainerName != "" {
 		return service.ContainerName
 	}
-	return strings.Join([]string{projectName, service.Name, strconv.Itoa(number)}, api.Separator)
+	return DefaultContainerName(projectName, service.Name, strconv.Itoa(number))
+}
+
+// DefaultContainerName returns the <project>-<service>-<index> name Compose gives
+// a container when the service declares no container_name.
+func DefaultContainerName(projectName, serviceName, index string) string {
+	return strings.Join([]string{projectName, serviceName, index}, api.Separator)
+}
+
+// ContainerNameWithoutProject returns the name of a container as Compose displays
+// it: without the project prefix, unless the service declares a custom container_name.
+func ContainerNameWithoutProject(c container.Summary) string {
+	return WithoutProjectPrefix(CanonicalContainerName(c), c.Labels[api.ProjectLabel], c.Labels[api.ServiceLabel], c.Labels[api.ContainerNumberLabel])
+}
+
+// WithoutProjectPrefix strips the project prefix from a container name when it is
+// the default name of the replica of the service, and returns it unchanged otherwise.
+func WithoutProjectPrefix(name, projectName, serviceName, number string) string {
+	if name != DefaultContainerName(projectName, serviceName, number) {
+		// service declares a custom container_name
+		return name
+	}
+	return name[len(projectName)+1:]
 }
 
 // CanonicalContainerName returns the name a container goes by, without the
