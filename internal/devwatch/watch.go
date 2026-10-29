@@ -12,7 +12,11 @@
    limitations under the License.
 */
 
-package compose
+// Package devwatch implements the development loop of a project: the
+// develop.watch triggers that sync, restart or rebuild services as the files
+// they come from change. It sits on top of pkg/watch, which only reports the
+// file system events.
+package devwatch
 
 import (
 	"context"
@@ -32,6 +36,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/compose-spec/compose-go/v2/utils"
+	"github.com/docker/cli/cli/command"
 	ccli "github.com/docker/cli/cli/command/container"
 	"github.com/moby/buildkit/util/progress/progressui"
 	"github.com/moby/moby/api/types/container"
@@ -41,6 +46,7 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/engine"
 	pathutil "github.com/docker/compose/v5/internal/paths"
 	"github.com/docker/compose/v5/internal/sync"
 	"github.com/docker/compose/v5/internal/tracing"
@@ -49,6 +55,34 @@ import (
 	"github.com/docker/compose/v5/pkg/watch"
 )
 
+// Backend is what the development loop needs from the engine it drives.
+type Backend interface {
+	engine.Backend
+	// CLI is the Docker CLI Compose runs in: it owns the output stream the
+	// sync commands write to, the config the exec hooks read, and runs them.
+	CLI() command.Cli
+	// Build builds the images of the project's services.
+	Build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error)
+	// CreateAndStart converges the project's services to their configuration
+	// and starts them.
+	CreateAndStart(ctx context.Context, project *types.Project, options api.CreateOptions) error
+	// Restart restarts the services of a project.
+	Restart(ctx context.Context, projectName string, options api.RestartOptions) error
+	// RemoveDanglingImages removes the dangling images of a project, but the ones keep reports.
+	RemoveDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) error
+}
+
+// Service runs the development loop on a Backend.
+type Service struct {
+	backend Backend
+}
+
+// New creates a Service driving the given Backend.
+func New(backend Backend) *Service {
+	return &Service{backend: backend}
+}
+
+// WatchFunc starts a watch and returns the function that waits for its end.
 type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)
 
 type Watcher struct {
@@ -117,7 +151,7 @@ func (w *Watcher) Stop() error {
 //
 // Currently, an implementation that batches files and transfers them using
 // the Moby `Untar` API.
-func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syncer, error) {
+func (s *Service) getSyncImplementation(project *types.Project) (sync.Syncer, error) {
 	var useTar bool
 	if useTarEnv, ok := os.LookupEnv("COMPOSE_EXPERIMENTAL_WATCH_TAR"); ok {
 		useTar, _ = strconv.ParseBool(useTarEnv)
@@ -128,15 +162,7 @@ func (s *composeService) getSyncImplementation(project *types.Project) (sync.Syn
 		return nil, errors.New("no available sync implementation")
 	}
 
-	return sync.NewTar(project.Name, tarDockerClient{s: s}, s.maxConcurrency), nil
-}
-
-func (s *composeService) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) error {
-	wait, err := s.watch(ctx, project, options)
-	if err != nil {
-		return err
-	}
-	return wait()
+	return sync.NewTar(project.Name, tarDockerClient{backend: s.backend}, s.backend.MaxConcurrency()), nil
 }
 
 type watchRule struct {
@@ -187,7 +213,9 @@ func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
 	}
 }
 
-func (s *composeService) watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) {
+// Watch starts watching the project's services and returns the function that
+// waits for the watch to end.
+func (s *Service) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) {
 	var err error
 	if project, err = project.WithSelectedServices(options.Services); err != nil {
 		return nil, err
@@ -279,7 +307,7 @@ func prepareRebuildTriggers(project *types.Project, serviceName string, service 
 // watchTriggerPaths collects the paths to monitor for a service, skipping
 // (with a warning) those already covered by a bind mount volume, and runs the
 // initial sync for sync triggers requesting one.
-func (s *composeService) watchTriggerPaths(ctx context.Context, service types.ServiceConfig, config *types.DevelopConfig, syncer sync.Syncer) ([]string, error) {
+func (s *Service) watchTriggerPaths(ctx context.Context, service types.ServiceConfig, config *types.DevelopConfig, syncer sync.Syncer) ([]string, error) {
 	var paths []string
 	for _, trigger := range config.Watch {
 		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
@@ -355,7 +383,7 @@ func isSync(trigger types.Trigger) bool {
 	return trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart || trigger.Action == types.WatchActionSyncExec
 }
 
-func (s *composeService) watchEvents(ctx context.Context, project *types.Project, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, rules []watchRule) error {
+func (s *Service) watchEvents(ctx context.Context, project *types.Project, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, rules []watchRule) error {
 	ctx, cancel := context.WithCancel(ctx)
 
 	// debounce and group filesystem events so that we capture IDE saving many files as one "batch" event
@@ -425,11 +453,11 @@ func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolu
 }
 
 type tarDockerClient struct {
-	s *composeService
+	backend Backend
 }
 
 func (t tarDockerClient) ContainersForService(ctx context.Context, projectName string, serviceName string) ([]container.Summary, error) {
-	containers, err := t.s.getContainers(ctx, projectName, oneOffExclude, true, serviceName)
+	containers, err := t.backend.Containers(ctx, projectName, engine.OneOffExclude, true, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -437,7 +465,7 @@ func (t tarDockerClient) ContainersForService(ctx context.Context, projectName s
 }
 
 func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
-	execCreateResp, err := t.s.apiClient().ExecCreate(ctx, containerID, client.ExecCreateOptions{
+	execCreateResp, err := t.backend.APIClient().ExecCreate(ctx, containerID, client.ExecCreateOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
 		AttachStderr: true,
@@ -448,7 +476,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	conn, err := t.s.apiClient().ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{
+	conn, err := t.backend.APIClient().ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{
 		TTY: false,
 	})
 	if err != nil {
@@ -467,11 +495,11 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		})
 	}
 	eg.Go(func() error {
-		_, err := io.Copy(t.s.stdout(), conn.Reader)
+		_, err := io.Copy(t.backend.CLI().Out(), conn.Reader)
 		return err
 	})
 
-	_, err = t.s.apiClient().ExecStart(ctx, execCreateResp.ID, client.ExecStartOptions{
+	_, err = t.backend.APIClient().ExecStart(ctx, execCreateResp.ID, client.ExecStartOptions{
 		TTY:    false,
 		Detach: false,
 	})
@@ -486,7 +514,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	execResult, err := t.s.apiClient().ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
+	execResult, err := t.backend.APIClient().ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -500,7 +528,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 }
 
 func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
-	_, err := t.s.apiClient().CopyToContainer(ctx, id, client.CopyToContainerOptions{
+	_, err := t.backend.APIClient().CopyToContainer(ctx, id, client.CopyToContainerOptions{
 		DestinationPath: "/",
 		Content:         archive,
 		CopyUIDGID:      true,
@@ -508,7 +536,7 @@ func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCl
 	return err
 }
 
-func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions,
+func (s *Service) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions,
 	batch []watch.FileEvent, rules []watchRule, syncer sync.Syncer, scheduler *rebuildScheduler,
 ) error {
 	var (
@@ -584,7 +612,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 	}
 	if len(restart) > 0 {
 		services := utils.MapKeys(restart)
-		err := s.restart(ctx, project.Name, api.RestartOptions{
+		err := s.backend.Restart(ctx, project.Name, api.RestartOptions{
 			Services: services,
 			Project:  project,
 			NoDeps:   false,
@@ -597,7 +625,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 			fmt.Sprintf("service(s) %q restarted", services))
 	}
 
-	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())
 	for service, rulesToExec := range exec {
 		slices.Sort(rulesToExec)
 		for _, i := range slices.Compact(rulesToExec) {
@@ -610,8 +638,8 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 	return eg.Wait()
 }
 
-func (s *composeService) exec(ctx context.Context, project *types.Project, serviceName string, x types.ServiceHook, eg *errgroup.Group) error {
-	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, false, serviceName)
+func (s *Service) exec(ctx context.Context, project *types.Project, serviceName string, x types.ServiceHook, eg *errgroup.Group) error {
+	containers, err := s.backend.Containers(ctx, project.Name, engine.OneOffExclude, false, serviceName)
 	if err != nil {
 		return err
 	}
@@ -622,20 +650,20 @@ func (s *composeService) exec(ctx context.Context, project *types.Project, servi
 			exec.Privileged = x.Privileged
 			exec.Command = x.Command
 			exec.Workdir = x.WorkingDir
-			exec.DetachKeys = s.configFile().DetachKeys
+			exec.DetachKeys = s.backend.CLI().ConfigFile().DetachKeys
 			for _, v := range x.Environment.ToMapping().Values() {
 				err := exec.Env.Set(v)
 				if err != nil {
 					return err
 				}
 			}
-			return ccli.RunExec(ctx, s.dockerCli, ctr.ID, exec)
+			return ccli.RunExec(ctx, s.backend.CLI(), ctr.ID, exec)
 		})
 	}
 	return nil
 }
 
-func (s *composeService) rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+func (s *Service) rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
 	// Work on a copy so concurrent watch events don't race on the shared
 	// BuildOptions pointer carried by WatchOptions.
@@ -657,7 +685,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	)
 	err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
 		func(ctx context.Context) error {
-			imageNameToIdMap, err = s.build(ctx, project, buildOpts, nil)
+			imageNameToIdMap, err = s.backend.Build(ctx, project, buildOpts)
 			return err
 		})(ctx)
 	if err != nil {
@@ -681,7 +709,7 @@ func (s *composeService) rebuild(ctx context.Context, project *types.Project, se
 	if err != nil {
 		return err
 	}
-	err = s.createAndStart(ctx, p, api.CreateOptions{
+	err = s.backend.CreateAndStart(ctx, p, api.CreateOptions{
 		Services:      services,
 		Inherit:       true,
 		Recreate:      api.RecreateForce,
@@ -716,7 +744,7 @@ func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings
 	}
 }
 
-func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
+func (s *Service) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
 	// imageNameToIdMap is keyed by image name; the freshly built images to
 	// spare are its VALUES (image IDs), matched against the dangling IDs
 	builtIDs := make(map[string]struct{}, len(imageNameToIdMap))
@@ -727,14 +755,14 @@ func (s *composeService) pruneDanglingImagesOnRebuild(ctx context.Context, proje
 		_, ok := builtIDs[img.ID]
 		return ok
 	}
-	if _, err := s.removeDanglingImages(ctx, projectName, keep); err != nil {
+	if err := s.backend.RemoveDanglingImages(ctx, projectName, keep); err != nil {
 		logrus.Debugf("Failed to prune dangling images: %v", err)
 	}
 }
 
 // Walks develop.watch.path and checks which files should be copied inside the container
 // ignores develop.watch.ignore, Dockerfile, compose files, bind mounted paths and .git
-func (s *composeService) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
+func (s *Service) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
 	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
 	if err != nil {
 		return err
@@ -778,7 +806,7 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 }
 
 // Syncs files from develop.watch.path, ignoring bind-mounted and excluded paths.
-func (s *composeService) initialSyncFiles(service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+func (s *Service) initialSyncFiles(service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
 	fi, err := os.Stat(trigger.Path)
 	if err != nil {
 		return nil, err

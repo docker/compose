@@ -12,7 +12,7 @@
    limitations under the License.
 */
 
-package compose
+package devwatch
 
 import (
 	"cmp"
@@ -27,18 +27,80 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/docker/cli/cli/streams"
+	"github.com/docker/cli/cli/command"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
-	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/sync"
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/mocks"
 	"github.com/docker/compose/v5/pkg/watch"
 )
+
+// fakeBackend stands in for the engine: the calls a test does not expect fail
+// it, the ones it does are served by the func fields.
+type fakeBackend struct {
+	t *testing.T
+
+	build                func(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error)
+	createAndStart       func(ctx context.Context, project *types.Project, options api.CreateOptions) error
+	removeDanglingImages func(ctx context.Context, projectName string, keep func(image.Summary) bool) error
+}
+
+func (f *fakeBackend) APIClient() client.APIClient {
+	f.t.Errorf("unexpected call to the Docker client")
+	return nil
+}
+
+func (f *fakeBackend) MaxConcurrency() int {
+	return 0
+}
+
+func (f *fakeBackend) CLI() command.Cli {
+	f.t.Errorf("unexpected call to the Docker CLI")
+	return nil
+}
+
+func (f *fakeBackend) Containers(context.Context, string, engine.OneOff, bool, ...string) ([]container.Summary, error) {
+	f.t.Errorf("unexpected container listing")
+	return nil, nil
+}
+
+func (f *fakeBackend) SpecifiedContainer(context.Context, string, engine.OneOff, bool, string, int) (container.Summary, error) {
+	f.t.Errorf("unexpected container lookup")
+	return container.Summary{}, nil
+}
+
+func (f *fakeBackend) Build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error) {
+	if f.build == nil {
+		f.t.Errorf("unexpected build")
+		return nil, nil
+	}
+	return f.build(ctx, project, options)
+}
+
+func (f *fakeBackend) CreateAndStart(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	if f.createAndStart == nil {
+		f.t.Errorf("unexpected create and start")
+		return nil
+	}
+	return f.createAndStart(ctx, project, options)
+}
+
+func (f *fakeBackend) Restart(context.Context, string, api.RestartOptions) error {
+	f.t.Errorf("unexpected restart")
+	return nil
+}
+
+func (f *fakeBackend) RemoveDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) error {
+	if f.removeDanglingImages == nil {
+		f.t.Errorf("unexpected image removal")
+		return nil
+	}
+	return f.removeDanglingImages(ctx, projectName, keep)
+}
 
 type testWatcher struct {
 	events chan watch.FileEvent
@@ -77,30 +139,37 @@ func (s stdLogger) Status(containerName, msg string) {
 
 func TestWatch_Sync(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		mockCtrl := gomock.NewController(t)
-		cli := mocks.NewMockCli(mockCtrl)
-		cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
-		apiClient := mocks.NewMockAPIClient(mockCtrl)
-		apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
-			Items: []container.Summary{
-				testContainer("test", "123", false),
+		// the Backend calls below run on the rebuild's goroutine, where a failed
+		// assertion must not abort the goroutine (FailNow is for the test's own
+		// goroutine): they record what they observe, checked once the rebuild
+		// has settled.
+		type prune struct {
+			projectName string
+			keep        [2]bool
+		}
+		var (
+			pruned     atomic.Int32
+			created    atomic.Pointer[api.CreateOptions]
+			lastPruned atomic.Pointer[prune]
+		)
+		backend := &fakeBackend{
+			t: t,
+			build: func(context.Context, *types.Project, api.BuildOptions) (map[string]string, error) {
+				return map[string]string{}, nil
 			},
-		}, nil).AnyTimes()
-		// we expect the image to be pruned
-		apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-			Filters: make(client.Filters).
-				Add("dangling", "true").
-				Add("label", api.ProjectLabel+"=myProjectName"),
-		}).Return(client.ImageListResult{
-			Items: []image.Summary{
-				{ID: "123"},
-				{ID: "456"},
+			createAndStart: func(_ context.Context, _ *types.Project, options api.CreateOptions) error {
+				created.Store(&options)
+				return nil
 			},
-		}, nil).Times(1)
-		apiClient.EXPECT().ImageRemove(gomock.Any(), "123", client.ImageRemoveOptions{}).Times(1)
-		apiClient.EXPECT().ImageRemove(gomock.Any(), "456", client.ImageRemoveOptions{}).Times(1)
-		//
-		cli.EXPECT().Client().Return(apiClient).AnyTimes()
+			removeDanglingImages: func(_ context.Context, projectName string, keep func(image.Summary) bool) error {
+				lastPruned.Store(&prune{
+					projectName: projectName,
+					keep:        [2]bool{keep(image.Summary{ID: "123"}), keep(image.Summary{ID: "456"})},
+				})
+				pruned.Add(1)
+				return nil
+			},
+		}
 
 		proj := types.Project{
 			Name: "myProjectName",
@@ -118,9 +187,7 @@ func TestWatch_Sync(t *testing.T) {
 
 		syncer := newFakeSyncer()
 		go func() {
-			service := composeService{
-				dockerCli: cli,
-			}
+			service := New(backend)
 			rules, err := getWatchRules(&types.DevelopConfig{
 				Watch: []types.Trigger{
 					{
@@ -163,8 +230,8 @@ func TestWatch_Sync(t *testing.T) {
 		// longer blocks the sync of "/sync/changed" from the same batch.
 		// synctest.Wait() only returns once the rebuild's goroutine has
 		// settled (it runs to completion here, exercising the mocked
-		// ImageList/ImageRemove prune calls), so the mock expectations above
-		// are already satisfied by the time we get here.
+		// image prune call), so the expectation above is already satisfied by
+		// the time we get here.
 		watcher.Events() <- watch.NewFileEvent("/rebuild")
 		watcher.Events() <- watch.NewFileEvent("/sync/changed")
 		time.Sleep(watch.QuietPeriod)
@@ -174,6 +241,18 @@ func TestWatch_Sync(t *testing.T) {
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 		}
 		assert.DeepEqual(t, expected, actual)
+		// we expect the image to be pruned
+		assert.Equal(t, pruned.Load(), int32(1))
+		assert.DeepEqual(t, *created.Load(), api.CreateOptions{
+			Services:      []string{"test"},
+			Inherit:       true,
+			Recreate:      api.RecreateForce,
+			SkipProviders: true,
+		})
+		got := lastPruned.Load()
+		assert.Equal(t, got.projectName, "myProjectName")
+		// nothing was just built: no dangling image is spared
+		assert.Equal(t, got.keep, [2]bool{false, false})
 	})
 }
 
@@ -211,12 +290,9 @@ func TestWatchRules_IgnoreGitDirectoryAtAnyDepth(t *testing.T) {
 // interrupted and a fresh rebuild (recreate + start, the restart intent)
 // converges on a context snapshot taken after the change.
 func TestHandleWatchBatch_RestartDuringInFlightRebuildConverges(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	cli := mocks.NewMockCli(mockCtrl)
-	cli.EXPECT().Err().Return(streams.NewOut(os.Stderr)).AnyTimes()
-	// A correctly folded restart never touches the Docker client at all.
-	cli.EXPECT().Client().Times(0)
-	service := composeService{dockerCli: cli}
+	// A correctly folded restart never touches the engine at all: any call to
+	// the backend fails the test.
+	service := New(&fakeBackend{t: t})
 
 	proj := types.Project{
 		Name: "myProjectName",
@@ -285,7 +361,7 @@ func TestInitialSyncFilesDirectory(t *testing.T) {
 	oldTime := time.Now().Add(-time.Hour)
 	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
 
-	paths, err := (&composeService{}).initialSyncFiles(types.ServiceConfig{Name: "svc"}, types.Trigger{
+	paths, err := (&Service{}).initialSyncFiles(types.ServiceConfig{Name: "svc"}, types.Trigger{
 		Path:   hostDir,
 		Target: "/app/src",
 	}, watch.EmptyMatcher{})
@@ -306,7 +382,7 @@ func TestInitialSyncFilesRegularFile(t *testing.T) {
 	assert.NilError(t, os.Chtimes(hostFile, oldTime, oldTime))
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
-	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
 		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
 		Path:   hostFile,
@@ -330,7 +406,7 @@ func TestInitialSync_ExcludesDockerfileAndComposeFiles(t *testing.T) {
 	}
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
-	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
 		Name:         "svc",
 		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, types.Trigger{
@@ -356,7 +432,7 @@ func TestInitialSync_ExcludesCustomNamedDockerfile(t *testing.T) {
 	}
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
-	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
 		Name:         "svc",
 		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir, Dockerfile: "Dockerfile.prod"}},
 	}, types.Trigger{
@@ -385,7 +461,7 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 	assert.NilError(t, os.WriteFile(filepath.Join(hostDir, "app.go"), []byte("content"), 0o600))
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
-	err := (&composeService{}).initialSync(t.Context(), types.ServiceConfig{
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
 		Name:         "svc",
 		WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir, Dockerfile: "docker/Dockerfile.prod"}},
 	}, types.Trigger{
@@ -407,24 +483,23 @@ func TestInitialSync_ExcludesNestedCustomNamedDockerfile(t *testing.T) {
 // name-keyed map with an image ID, matching nothing — every dangling image
 // of the project was removed on each rebuild.
 func TestPruneDanglingImagesOnRebuild(t *testing.T) {
-	mockCtrl := gomock.NewController(t)
-	defer mockCtrl.Finish()
-	apiMock, cli := prepareMocks(mockCtrl)
-	tested, err := NewComposeService(cli)
-	assert.NilError(t, err)
+	// the images the prune is handed to spare, as the dangling ones are
+	// listed: only the superseded image may be removed; removing the
+	// just-built one would fail the test
+	var removed []string
+	tested := New(&fakeBackend{t: t, removeDanglingImages: func(_ context.Context, projectName string, keep func(image.Summary) bool) error {
+		assert.Equal(t, projectName, "proj")
+		for _, img := range []image.Summary{{ID: "sha256:justbuilt"}, {ID: "sha256:superseded"}} {
+			if !keep(img) {
+				removed = append(removed, img.ID)
+			}
+		}
+		return nil
+	}})
 
-	apiMock.EXPECT().ImageList(gomock.Any(), gomock.Any()).
-		Return(client.ImageListResult{Items: []image.Summary{
-			{ID: "sha256:justbuilt"},
-			{ID: "sha256:superseded"},
-		}}, nil)
-	// only the superseded image may be removed; removing the just-built one
-	// would be an unexpected call and fail the test
-	apiMock.EXPECT().ImageRemove(gomock.Any(), "sha256:superseded", gomock.Any()).
-		Return(client.ImageRemoveResult{}, nil)
-
-	tested.(*composeService).pruneDanglingImagesOnRebuild(t.Context(), "proj",
+	tested.pruneDanglingImagesOnRebuild(t.Context(), "proj",
 		map[string]string{"app-image:latest": "sha256:justbuilt"})
+	assert.DeepEqual(t, removed, []string{"sha256:superseded"})
 }
 
 // TestWatcher_StartStopIndependent guards that the Start/Stop lock is per
@@ -492,7 +567,7 @@ func TestWatchTriggerPaths_BindMountedPath(t *testing.T) {
 		types.WatchActionRebuild:     true,
 	} {
 		t.Run(string(action), func(t *testing.T) {
-			paths, err := (&composeService{}).watchTriggerPaths(t.Context(), service, &types.DevelopConfig{
+			paths, err := (&Service{}).watchTriggerPaths(t.Context(), service, &types.DevelopConfig{
 				Watch: []types.Trigger{{Path: hostDir, Action: action, Target: "/tmp/target"}},
 			}, nil)
 			assert.NilError(t, err)
@@ -512,7 +587,7 @@ func TestWatchTriggerPaths_InitialSyncExec(t *testing.T) {
 	assert.NilError(t, os.WriteFile(hostFile, []byte("hello"), 0o600))
 
 	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
-	paths, err := (&composeService{}).watchTriggerPaths(t.Context(), types.ServiceConfig{
+	paths, err := (&Service{}).watchTriggerPaths(t.Context(), types.ServiceConfig{
 		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
 	}, &types.DevelopConfig{
 		Watch: []types.Trigger{{Path: hostDir, Action: types.WatchActionSyncExec, Target: "/app", InitialSync: true}},
