@@ -74,16 +74,7 @@ func (s *composeService) Create(ctx context.Context, project *types.Project, opt
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	project, observed, plan, err := s.preparePlan(ctx, project, options, ScopeCreate)
-	if err != nil {
-		return err
-	}
-
-	// Emit "Running" events for containers that are already up-to-date, so
-	// the progress display accounts for containers the plan will not touch.
-	emitRunningEvents(project, observed, plan, s.events)
-
-	return s.executePlan(ctx, project, observed, plan)
+	return s.planAndExecute(ctx, project, options, ScopeCreate)
 }
 
 // createAndStart runs project's Create and Start phases as a single plan --
@@ -93,11 +84,18 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 // need --wait's post-plan verification (only up -d does) use upDetached
 // instead, not this.
 func (s *composeService) createAndStart(ctx context.Context, project *types.Project, options api.CreateOptions) error {
-	project, observed, plan, err := s.preparePlan(ctx, project, options, ScopeCreateStart)
+	return s.planAndExecute(ctx, project, options, ScopeCreateStart)
+}
+
+// planAndExecute prepares the plan of the given scope and executes it.
+func (s *composeService) planAndExecute(ctx context.Context, project *types.Project, options api.CreateOptions, scope ReconcileScope) error {
+	project, observed, plan, err := s.preparePlan(ctx, project, options, scope)
 	if err != nil {
 		return err
 	}
 
+	// Emit "Running" events for containers that are already up-to-date, so
+	// the progress display accounts for containers the plan will not touch.
 	emitRunningEvents(project, observed, plan, s.events)
 
 	return s.executePlan(ctx, project, observed, plan)
