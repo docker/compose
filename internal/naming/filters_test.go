@@ -19,6 +19,7 @@ package naming
 import (
 	"testing"
 
+	"github.com/moby/moby/api/types/container"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -28,4 +29,11 @@ func TestFilters(t *testing.T) {
 	assert.Equal(t, LabelFilter("k", "v"), "k=v")
 	assert.Equal(t, ServiceFilter("web"), api.ServiceLabel+"=web")
 	assert.DeepEqual(t, ProjectFilter("proj")["label"], map[string]bool{api.ProjectLabel + "=proj": true})
+}
+
+func TestInServices(t *testing.T) {
+	web := container.Summary{ID: "1", Labels: map[string]string{api.ServiceLabel: "web"}}
+	db := container.Summary{ID: "2", Labels: map[string]string{api.ServiceLabel: "db"}}
+	assert.DeepEqual(t, InServices([]container.Summary{web, db}, []string{"db"}), []container.Summary{db})
+	assert.Equal(t, len(InServices([]container.Summary{web, db}, []string{"other"})), 0)
 }

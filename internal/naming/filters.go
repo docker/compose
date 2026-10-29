@@ -17,6 +17,9 @@
 package naming
 
 import (
+	"slices"
+
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -35,4 +38,15 @@ func ProjectFilter(projectName string) client.Filters {
 // ServiceFilter returns the label filter selecting the resources of a service.
 func ServiceFilter(serviceName string) string {
 	return LabelFilter(api.ServiceLabel, serviceName)
+}
+
+// InServices keeps the containers of the given services.
+func InServices(containers []container.Summary, services []string) []container.Summary {
+	var filtered []container.Summary
+	for _, ctr := range containers {
+		if slices.Contains(services, ctr.Labels[api.ServiceLabel]) {
+			filtered = append(filtered, ctr)
+		}
+	}
+	return filtered
 }

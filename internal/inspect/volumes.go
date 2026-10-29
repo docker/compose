@@ -18,7 +18,6 @@ package inspect
 
 import (
 	"context"
-	"slices"
 
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -38,12 +37,7 @@ func (s *Service) Volumes(ctx context.Context, projectName string, options api.V
 	var containers []container.Summary
 
 	if len(options.Services) > 0 {
-		// filter service containers
-		for _, ctr := range allContainers.Items {
-			if slices.Contains(options.Services, ctr.Labels[api.ServiceLabel]) {
-				containers = append(containers, ctr)
-			}
-		}
+		containers = naming.InServices(allContainers.Items, options.Services)
 	} else {
 		containers = allContainers.Items
 	}
