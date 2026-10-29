@@ -33,7 +33,7 @@ import (
 func (s *Service) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
 	list, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("label", api.ProjectLabel).Add("label", api.ConfigHashLabel),
-		All:     options.All,
+		All:     options.All || options.IncludeStopped, //nolint:staticcheck // All is the deprecated alias of IncludeStopped, honored until it is removed
 	})
 	if err != nil {
 		return nil, err

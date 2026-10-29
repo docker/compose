@@ -118,7 +118,7 @@ func (s *Service) listContainersTargetedForCopy(ctx context.Context, projectName
 		return append(containers, ctr), nil
 	default:
 		withOneOff := inspect.OneOffExclude
-		if options.All {
+		if options.All || options.IncludeOneOff { //nolint:staticcheck // All is the deprecated alias of IncludeOneOff, honored until it is removed
 			withOneOff = inspect.OneOffInclude
 		}
 		containers, err = s.backend.Containers(ctx, projectName, withOneOff, true, serviceName)

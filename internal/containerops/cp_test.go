@@ -84,7 +84,8 @@ func TestCopyOneOffContainersOnlyWithAll(t *testing.T) {
 	for _, all := range []bool{false, true} {
 		backend := &fakeBackend{listed: []container.Summary{webContainer("web1")}}
 
-		_, err := New(backend).listContainersTargetedForCopy(t.Context(), "proj", api.CopyOptions{All: all}, toService, "web")
+		options := api.CopyOptions{All: all} //nolint:staticcheck // the deprecated All still includes the one-off containers
+		_, err := New(backend).listContainersTargetedForCopy(t.Context(), "proj", options, toService, "web")
 
 		assert.NilError(t, err)
 		assert.DeepEqual(t, backend.services, []string{"web"})
@@ -123,4 +124,19 @@ func TestCopyRefusesWhatItCannotDo(t *testing.T) {
 
 	err = service.Copy(t.Context(), "proj", api.CopyOptions{Source: "/a", Destination: "/b"})
 	assert.Error(t, err, "unknown copy direction")
+}
+
+func TestCopyIncludeOneOff(t *testing.T) {
+	for _, include := range []bool{false, true} {
+		backend := &fakeBackend{listed: []container.Summary{webContainer("web1")}}
+
+		_, err := New(backend).listContainersTargetedForCopy(t.Context(), "proj", api.CopyOptions{IncludeOneOff: include}, toService, "web")
+
+		assert.NilError(t, err)
+		if include {
+			assert.Equal(t, backend.oneOff, inspect.OneOffInclude)
+		} else {
+			assert.Equal(t, backend.oneOff, inspect.OneOffExclude)
+		}
+	}
 }

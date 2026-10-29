@@ -30,11 +30,13 @@ import (
 
 func (s *Service) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	projectName = strings.ToLower(projectName)
+	includeStopped := options.All || options.IncludeStopped //nolint:staticcheck // All is the deprecated alias of IncludeStopped, honored until it is removed
+	includeOneOff := options.All || options.IncludeOneOff   //nolint:staticcheck // All is the deprecated alias of IncludeOneOff, honored until it is removed
 	oneOff := OneOffExclude
-	if options.All {
+	if includeOneOff {
 		oneOff = OneOffInclude
 	}
-	containers, err := s.backend.Containers(ctx, projectName, oneOff, options.All, options.Services...)
+	containers, err := s.backend.Containers(ctx, projectName, oneOff, includeStopped, options.Services...)
 	if err != nil {
 		return nil, err
 	}

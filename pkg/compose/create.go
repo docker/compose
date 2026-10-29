@@ -66,6 +66,9 @@ type createConfigs struct {
 }
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	return Run(ctx, func(ctx context.Context) error {
 		return s.create(ctx, project, options)
 	}, "create", s.events)
