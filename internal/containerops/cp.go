@@ -30,6 +30,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/relay"
@@ -76,7 +77,7 @@ func (s *Service) Copy(ctx context.Context, projectName string, options api.Copy
 		return err
 	}
 
-	return forEachContainerConcurrent(ctx, s.backend.MaxConcurrency(), containers, func(ctx context.Context, ctr container.Summary) error {
+	return concurrency.ForEachBounded(ctx, s.backend.MaxConcurrency(), containers, func(ctx context.Context, ctr container.Summary) error {
 		name := naming.CanonicalContainerName(ctr)
 		var msg string
 		if direction == fromService {

@@ -19,12 +19,8 @@
 package containerops
 
 import (
-	"context"
-
 	"github.com/docker/cli/cli/command"
-	"github.com/moby/moby/api/types/container"
 
-	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -53,16 +49,4 @@ type Service struct {
 // New creates a Service acting on the given Backend.
 func New(backend Backend) *Service {
 	return &Service{backend: backend}
-}
-
-// forEachContainerConcurrent runs fn for every container concurrently, at most
-// maxConcurrency at a time (0 meaning no bound), and waits for all of them.
-func forEachContainerConcurrent(ctx context.Context, maxConcurrency int, containers []container.Summary, fn func(context.Context, container.Summary) error) error {
-	eg, ctx := concurrency.NewErrgroup(ctx, maxConcurrency)
-	for _, ctr := range containers {
-		eg.Go(func() error {
-			return fn(ctx, ctr)
-		})
-	}
-	return eg.Wait()
 }

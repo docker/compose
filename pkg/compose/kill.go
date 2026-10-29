@@ -23,6 +23,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -57,7 +58,7 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return api.ErrNoResources
 	}
 
-	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
+	return concurrency.ForEachBounded(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		eventName := getContainerProgressName(ctr)
 		s.events.On(progress.New(eventName, api.Working, api.StatusKilling))
 		_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{

@@ -23,6 +23,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -43,7 +44,7 @@ func (s *composeService) pause(ctx context.Context, projectName string, options 
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
+	return concurrency.ForEachBounded(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		_, err := s.apiClient().ContainerPause(ctx, ctr.ID, client.ContainerPauseOptions{})
 		if err == nil {
 			s.events.On(progress.New(getContainerProgressName(ctr), api.Done, "Paused"))
@@ -68,7 +69,7 @@ func (s *composeService) unPause(ctx context.Context, projectName string, option
 		containers = containers.filter(isService(options.Project.ServiceNames()...))
 	}
 
-	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
+	return concurrency.ForEachBounded(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		_, err := s.apiClient().ContainerUnpause(ctx, ctr.ID, client.ContainerUnpauseOptions{})
 		if err == nil {
 			s.events.On(progress.New(getContainerProgressName(ctr), api.Done, "Unpaused"))
