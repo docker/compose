@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package logstream
 
 import (
 	"context"
@@ -22,24 +22,26 @@ import (
 
 	"github.com/docker/cli/cli/command/container"
 
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) Attach(ctx context.Context, projectName string, options api.AttachOptions) error {
+// Attach attaches the terminal to the container of a service.
+func (s *Service) Attach(ctx context.Context, projectName string, options api.AttachOptions) error {
 	projectName = strings.ToLower(projectName)
-	target, err := s.getSpecifiedContainer(ctx, projectName, oneOffInclude, false, options.Service, options.Index)
+	target, err := s.backend.SpecifiedContainer(ctx, projectName, engine.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return err
 	}
 
 	detachKeys := options.DetachKeys
 	if detachKeys == "" {
-		detachKeys = s.configFile().DetachKeys
+		detachKeys = s.backend.CLI().ConfigFile().DetachKeys
 	}
 
 	var attach container.AttachOptions
 	attach.DetachKeys = detachKeys
 	attach.NoStdin = options.NoStdin
 	attach.Proxy = options.Proxy
-	return container.RunAttach(ctx, s.dockerCli, target.ID, &attach)
+	return container.RunAttach(ctx, s.backend.CLI(), target.ID, &attach)
 }
