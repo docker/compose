@@ -20,7 +20,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -374,11 +376,7 @@ func warnIgnoredJobs(project *types.Project) {
 	if len(jobs) == 0 {
 		return
 	}
-	names := make([]string, 0, len(jobs))
-	for name := range jobs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(jobs))
 	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
 }
 

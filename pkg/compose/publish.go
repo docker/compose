@@ -24,6 +24,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"slices"
 	"strconv"
@@ -449,16 +450,7 @@ type serviceEnvFindings struct {
 // sortedSuspiciousKeys returns the suspicious env var names alphabetically
 // sorted for stable output.
 func (f *serviceEnvFindings) sortedSuspiciousKeys() []string {
-	return sortedMapKeys(f.suspiciousKeys)
-}
-
-func sortedMapKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	slices.Sort(keys)
-	return keys
+	return slices.Sorted(maps.Keys(f.suspiciousKeys))
 }
 
 func (f *envCheckFindings) hasEnvFinding() bool {
@@ -573,7 +565,7 @@ func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envC
 	}
 
 	if len(literalCfgs) > 0 {
-		findings.configsLiteralContent = sortedMapKeys(literalCfgs)
+		findings.configsLiteralContent = slices.Sorted(maps.Keys(literalCfgs))
 	}
 	return findings, nil
 }
@@ -647,7 +639,7 @@ func buildEnvPromptMessage(services map[string]*serviceEnvFindings) string {
 	b.WriteString("you are about to publish env-related declarations within your OCI artifact.\n")
 	b.WriteString("env_file paths and literal values for sensitive-looking keys are embedded as-is in the published YAML;\n")
 	b.WriteString("interpolated values like \"${VAR}\" are kept symbolic and have already been excluded.\n")
-	for _, name := range sortedMapKeys(services) {
+	for _, name := range slices.Sorted(maps.Keys(services)) {
 		f := services[name]
 		// name may be a service or a job: findings.services carries both.
 		if f.hasEnvFile {
