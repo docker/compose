@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package images
 
 import (
 	"testing"
@@ -27,6 +27,8 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/naming"
+	compose "github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 // TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures guards the
@@ -42,10 +44,8 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	apiClient, cli := prepareMocks(mockCtrl)
-	svcIface, err := NewComposeService(cli)
-	assert.NilError(t, err)
-	svc := svcIface.(*composeService)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	svc := New(&fakeBackend{apiClient: apiClient})
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
 		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
@@ -67,7 +67,7 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 	// no expectation for "sha256:keep" — a call to ImageRemove for it fails the test
 
 	keep := func(img image.Summary) bool { return img.ID == "sha256:keep" }
-	removed, err := svc.removeDanglingImages(t.Context(), "prj", keep)
+	removed, err := svc.RemoveDanglingImages(t.Context(), "prj", keep)
 	assert.DeepEqual(t, removed, []string{"sha256:removed"})
 	assert.ErrorContains(t, err, "sha256:fails")
 	assert.ErrorContains(t, err, "permission denied")
@@ -84,10 +84,8 @@ func TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	apiClient, cli := prepareMocks(mockCtrl)
-	svcIface, err := NewComposeService(cli)
-	assert.NilError(t, err)
-	svc := svcIface.(*composeService)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	svc := New(&fakeBackend{apiClient: apiClient})
 
 	images := []image.Summary{
 		{ID: "sha256:removed"},
@@ -104,7 +102,7 @@ func TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved(t *testing.T) {
 	apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:fails", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, errdefs.ErrPermissionDenied.WithMessage("permission denied"))
 
-	removed, stillInUse, err := svc.removeImages(t.Context(), images, nil)
+	removed, stillInUse, err := svc.RemoveImages(t.Context(), images, nil)
 	assert.DeepEqual(t, removed, []string{"sha256:removed"})
 	assert.DeepEqual(t, stillInUse, []string{"sha256:in-use"})
 	assert.ErrorContains(t, err, "sha256:fails")
@@ -117,16 +115,14 @@ func TestRemoveDanglingImages_NoneFound(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	apiClient, cli := prepareMocks(mockCtrl)
-	svcIface, err := NewComposeService(cli)
-	assert.NilError(t, err)
-	svc := svcIface.(*composeService)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	svc := New(&fakeBackend{apiClient: apiClient})
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
 		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
-	removed, err := svc.removeDanglingImages(t.Context(), "prj", func(image.Summary) bool { return false })
+	removed, err := svc.RemoveDanglingImages(t.Context(), "prj", func(image.Summary) bool { return false })
 	assert.NilError(t, err)
 	assert.Equal(t, len(removed), 0)
 }
@@ -142,9 +138,9 @@ func TestImagesToPrune_RejectsInvalidMode(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	apiClient, _ := prepareMocks(mockCtrl)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
 
-	pruner := NewImagePruner(apiClient, &types.Project{Name: "prj"}, nil)
-	_, err := pruner.ImagesToPrune(t.Context(), ImagePruneOptions{Mode: ImagePruneMode("bogus")})
+	pruner := NewPruner(apiClient, &types.Project{Name: "prj"}, nil)
+	_, err := pruner.ImagesToPrune(t.Context(), PruneOptions{Mode: compose.ImagePruneMode("bogus")})
 	assert.ErrorContains(t, err, "unsupported image prune mode: bogus")
 }
