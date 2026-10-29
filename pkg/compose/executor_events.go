@@ -22,6 +22,7 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -47,9 +48,9 @@ const (
 	groupStart
 )
 
-func groupKindOf(t OperationType) groupKind {
+func groupKindOf(t planning.OperationType) groupKind {
 	switch t {
-	case OpRunPreStart, OpStartContainer, OpRunPostStart:
+	case planning.OpRunPreStart, planning.OpStartContainer, planning.OpRunPostStart:
 		return groupStart
 	default:
 		return groupRecreate
@@ -80,7 +81,7 @@ type groupState struct {
 	finished  bool   // the group's final event (Done or Error) has been emitted
 }
 
-func (exec *planExecutor) buildGroupTracker(plan *Plan) *groupTracker {
+func (exec *planExecutor) buildGroupTracker(plan *planning.Plan) *groupTracker {
 	gt := &groupTracker{groups: map[string]*groupState{}, exec: exec}
 	for _, node := range plan.Nodes {
 		if node.Group == "" {
@@ -108,7 +109,7 @@ func (exec *planExecutor) buildGroupTracker(plan *Plan) *groupTracker {
 // targeting a replica the plan itself creates. By the time this node starts,
 // the CreateContainer node it depends on has already run and published its
 // result (see resolveContainerID) — the DAG dependency guarantees it.
-func (exec *planExecutor) groupEventName(op Operation) string {
+func (exec *planExecutor) groupEventName(op planning.Operation) string {
 	if op.Container != nil {
 		return getContainerProgressName(*op.Container)
 	}
@@ -122,7 +123,7 @@ func (exec *planExecutor) groupEventName(op Operation) string {
 // another node of the group while this one was getting a slot. A Working event
 // now would follow the group's final one and leave the row on it, and so would
 // whatever the node then fails with.
-func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) bool {
+func (gt *groupTracker) onNodeStart(node *planning.PlanNode, events api.EventProcessor) bool {
 	if node.Group == "" {
 		// Ungrouped: emit individual event
 		emitStartEvent(node, events)
@@ -150,14 +151,14 @@ func (gt *groupTracker) onNodeStart(node *PlanNode, events api.EventProcessor) b
 // fires specifically on OpStartContainer — pre_start hooks, when planned,
 // run silently before it: no Starting event is surfaced until the
 // ContainerStart call itself begins.
-func (gs *groupState) triggersWorking(t OperationType) bool {
+func (gs *groupState) triggersWorking(t planning.OperationType) bool {
 	if gs.kind == groupStart {
-		return t == OpStartContainer
+		return t == planning.OpStartContainer
 	}
 	return gs.started == 1
 }
 
-func (gt *groupTracker) onNodeDone(node *PlanNode, events api.EventProcessor) {
+func (gt *groupTracker) onNodeDone(node *planning.PlanNode, events api.EventProcessor) {
 	if node.Group == "" {
 		emitDoneEvent(node, events)
 		return
@@ -172,7 +173,7 @@ func (gt *groupTracker) onNodeDone(node *PlanNode, events api.EventProcessor) {
 	}
 }
 
-func (gt *groupTracker) onNodeError(node *PlanNode, events api.EventProcessor, err error) {
+func (gt *groupTracker) onNodeError(node *planning.PlanNode, events api.EventProcessor, err error) {
 	if node.Group == "" {
 		emitErrorEvent(node, events, err)
 		return
@@ -203,7 +204,7 @@ func (gt *groupTracker) onNodeError(node *PlanNode, events api.EventProcessor, e
 // "Recreated", as if nothing was left to do. It is a no-op once the group has
 // its final event, so the failing node's own Error (which also ends the
 // nodes depending on it) is never followed by a second one.
-func (gt *groupTracker) onNodeAborted(node *PlanNode, events api.EventProcessor, reason string) {
+func (gt *groupTracker) onNodeAborted(node *planning.PlanNode, events api.EventProcessor, reason string) {
 	if node.Group == "" {
 		return
 	}
@@ -228,7 +229,7 @@ func (gt *groupTracker) onNodeAborted(node *PlanNode, events api.EventProcessor,
 }
 
 // resourceName is the name a node's resource goes by in the progress output.
-func (gt *groupTracker) resourceName(node *PlanNode) string {
+func (gt *groupTracker) resourceName(node *planning.PlanNode) string {
 	if node.Group != "" {
 		gt.mu.Lock()
 		name := gt.groups[node.Group].eventName
@@ -244,15 +245,15 @@ func (gt *groupTracker) resourceName(node *PlanNode) string {
 }
 
 // unmetCondition names the depends_on condition a wait node is bound to.
-func unmetCondition(op Operation) string {
+func unmetCondition(op planning.Operation) string {
 	return fmt.Sprintf("condition %q of service %q", op.Condition, op.Name)
 }
 
 // interruption says what ended the phase: the resource whose failure
 // interrupted it or, for the failure of a wait node, which has no resource of
 // its own to name, the depends_on condition that was not met.
-func (exec *planExecutor) interruption(rs *runState, failed *PlanNode) string {
-	if failed.Operation.Type == OpWaitCondition {
+func (exec *planExecutor) interruption(rs *runState, failed *planning.PlanNode) string {
+	if failed.Operation.Type == planning.OpWaitCondition {
 		return "interrupted by the unmet " + unmetCondition(failed.Operation)
 	}
 	return "interrupted by the failure of " + rs.groups.resourceName(failed)
@@ -262,24 +263,24 @@ func (exec *planExecutor) interruption(rs *runState, failed *PlanNode) string {
 // (transitively: a start is held through its pre_start, a post_start through
 // its start), that has not succeeded, failed itself being preferred: which of
 // the nodes of a chain reports first must not change what is said.
-func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNode {
-	var first *PlanNode
+func unmetPrerequisite(node, failed *planning.PlanNode, succeeded func(int) bool) *planning.PlanNode {
+	var first *planning.PlanNode
 	seen := map[int]bool{}
-	var walk func(n *PlanNode)
-	walk = func(n *PlanNode) {
+	var walk func(n *planning.PlanNode)
+	walk = func(n *planning.PlanNode) {
 		for _, dep := range n.DependsOn {
 			if seen[dep.ID] || succeeded(dep.ID) {
 				continue
 			}
 			seen[dep.ID] = true
-			if dep.Operation.Type == OpWaitCondition && first == nil {
+			if dep.Operation.Type == planning.OpWaitCondition && first == nil {
 				first = dep
 			}
 			walk(dep)
 		}
 	}
 	walk(node)
-	if failed != nil && seen[failed.ID] && failed.Operation.Type == OpWaitCondition {
+	if failed != nil && seen[failed.ID] && failed.Operation.Type == planning.OpWaitCondition {
 		return failed
 	}
 	return first
@@ -289,7 +290,7 @@ func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNo
 // of its phase: the depends_on condition it was still waiting for, if that is
 // what it was held by, and what ended the phase. A node held by the very wait
 // that failed was not interrupted: its dependency did not meet the condition.
-func (exec *planExecutor) abortReason(node *PlanNode, rs *runState, failed *PlanNode) string {
+func (exec *planExecutor) abortReason(node *planning.PlanNode, rs *runState, failed *planning.PlanNode) string {
 	reason := exec.interruption(rs, failed)
 	if held := unmetPrerequisite(node, failed, rs.succeeded); held != nil {
 		if held == failed {
@@ -297,8 +298,8 @@ func (exec *planExecutor) abortReason(node *PlanNode, rs *runState, failed *Plan
 		}
 		return fmt.Sprintf("%s not reached: %s", unmetCondition(held.Operation), reason)
 	}
-	if node.Operation.Type == OpRunPostStart && slices.ContainsFunc(node.DependsOn, func(dep *PlanNode) bool {
-		return dep.Operation.Type == OpStartContainer && rs.succeeded(dep.ID)
+	if node.Operation.Type == planning.OpRunPostStart && slices.ContainsFunc(node.DependsOn, func(dep *planning.PlanNode) bool {
+		return dep.Operation.Type == planning.OpStartContainer && rs.succeeded(dep.ID)
 	}) {
 		// the container is started by then: only its hooks were cut short
 		return "started, post_start hooks " + reason
@@ -312,8 +313,8 @@ func (exec *planExecutor) abortReason(node *PlanNode, rs *runState, failed *Plan
 // status. A phase canceled by its caller (Ctrl-C) reports nothing, as before,
 // and so does the create phase, whose failure never was reported on the nodes
 // it gives up.
-func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *phaseCancel) {
-	if node.Phase != PhaseStart || node.Operation.Type == OpWaitCondition {
+func (exec *planExecutor) reportAborted(node *planning.PlanNode, rs *runState, phase *phaseCancel) {
+	if node.Phase != planning.PhaseStart || node.Operation.Type == planning.OpWaitCondition {
 		return
 	}
 	failed := phase.failed.Load()
@@ -328,7 +329,7 @@ func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *pha
 // rows of the containers it was waiting on, left on "Waiting", are closed with
 // the same reason. A phase not canceled by one of its own nodes is not an
 // interruption to report: the wait ends as it always did, with cause.
-func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *phaseCancel, cause error) error {
+func (exec *planExecutor) interruptedWait(node *planning.PlanNode, rs *runState, phase *phaseCancel, cause error) error {
 	failed := phase.failed.Load()
 	if failed == nil {
 		return cause
@@ -345,25 +346,25 @@ func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *p
 // emitStartEvent emits the appropriate Working event for an ungrouped node.
 //
 //nolint:dupl // mirrors emitDoneEvent: keeping the Working and Done events side by side keeps their pairing visible
-func emitStartEvent(node *PlanNode, events api.EventProcessor) {
+func emitStartEvent(node *planning.PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	switch op.Type {
-	case OpCreateContainer:
+	case planning.OpCreateContainer:
 		events.On(progress.Creating("Container " + op.Name))
-	case OpStartContainer:
+	case planning.OpStartContainer:
 		name := getContainerProgressName(*op.Container)
 		events.On(progress.New(name, api.Working, api.StatusStarting))
-	case OpStopContainer:
+	case planning.OpStopContainer:
 		events.On(progress.Stopping(getContainerProgressName(*op.Container)))
-	case OpRemoveContainer:
+	case planning.OpRemoveContainer:
 		events.On(progress.Removing(getContainerProgressName(*op.Container)))
-	case OpCreateNetwork:
+	case planning.OpCreateNetwork:
 		events.On(progress.Creating("Network " + op.Name))
-	case OpRemoveNetwork:
+	case planning.OpRemoveNetwork:
 		events.On(progress.Removing("Network " + op.Name))
-	case OpCreateVolume:
+	case planning.OpCreateVolume:
 		events.On(progress.Creating("Volume " + op.Name))
-	case OpRemoveVolume:
+	case planning.OpRemoveVolume:
 		events.On(progress.Removing("Volume " + op.Name))
 	}
 }
@@ -371,33 +372,33 @@ func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 // emitDoneEvent emits the appropriate Done event for an ungrouped node.
 //
 //nolint:dupl // mirrors emitStartEvent, see there
-func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
+func emitDoneEvent(node *planning.PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	switch op.Type {
-	case OpCreateContainer:
+	case planning.OpCreateContainer:
 		events.On(progress.Created("Container " + op.Name))
-	case OpStartContainer:
+	case planning.OpStartContainer:
 		name := getContainerProgressName(*op.Container)
 		events.On(progress.New(name, api.Done, api.StatusStarted))
-	case OpStopContainer:
+	case planning.OpStopContainer:
 		events.On(progress.Stopped(getContainerProgressName(*op.Container)))
-	case OpRemoveContainer:
+	case planning.OpRemoveContainer:
 		events.On(progress.Removed(getContainerProgressName(*op.Container)))
-	case OpCreateNetwork:
+	case planning.OpCreateNetwork:
 		events.On(progress.Created("Network " + op.Name))
-	case OpRemoveNetwork:
+	case planning.OpRemoveNetwork:
 		events.On(progress.Removed("Network " + op.Name))
-	case OpCreateVolume:
+	case planning.OpCreateVolume:
 		events.On(progress.Created("Volume " + op.Name))
-	case OpRemoveVolume:
+	case planning.OpRemoveVolume:
 		events.On(progress.Removed("Volume " + op.Name))
 	}
 }
 
 // emitErrorEvent emits an error event for an ungrouped node.
-func emitErrorEvent(node *PlanNode, events api.EventProcessor, err error) {
+func emitErrorEvent(node *planning.PlanNode, events api.EventProcessor, err error) {
 	op := node.Operation
-	if op.Type == OpWaitCondition {
+	if op.Type == planning.OpWaitCondition {
 		// execWaitCondition already reported this failure as one event per
 		// container of the dependency it was waiting on (see
 		// waitDependency/checkDependency*), exactly like waitDependencies

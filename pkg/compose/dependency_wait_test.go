@@ -33,6 +33,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -340,8 +341,8 @@ func waitWithOwnTimeout(t *testing.T, svc *composeService, project *types.Projec
 	exec.waitTimeout = timeout
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
 	defer cancel()
-	return exec.execBoundedWaitCondition(ctx, Operation{
-		Type:       OpWaitCondition,
+	return exec.execBoundedWaitCondition(ctx, planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:db:" + condition,
 		Name:       "db",
 		Condition:  condition,

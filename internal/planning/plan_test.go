@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package planning
 
 import (
 	"testing"
@@ -54,12 +54,12 @@ func TestPlanStringEmpty(t *testing.T) {
 
 func TestPlanStringNoDeps(t *testing.T) {
 	p := &Plan{}
-	p.addNode(Operation{
+	p.AddNode(Operation{
 		Type:       OpCreateNetwork,
 		ResourceID: "network:default",
 		Cause:      "not found",
 	}, "")
-	p.addNode(Operation{
+	p.AddNode(Operation{
 		Type:       OpCreateVolume,
 		ResourceID: "volume:data",
 		Cause:      "not found",
@@ -73,17 +73,17 @@ func TestPlanStringNoDeps(t *testing.T) {
 
 func TestPlanStringWithDeps(t *testing.T) {
 	p := &Plan{}
-	nw := p.addNode(Operation{
+	nw := p.AddNode(Operation{
 		Type:       OpCreateNetwork,
 		ResourceID: "network:default",
 		Cause:      "not found",
 	}, "")
-	vol := p.addNode(Operation{
+	vol := p.AddNode(Operation{
 		Type:       OpCreateVolume,
 		ResourceID: "volume:data",
 		Cause:      "not found",
 	}, "")
-	p.addNode(Operation{
+	p.AddNode(Operation{
 		Type:       OpCreateContainer,
 		ResourceID: "service:db:1",
 		Cause:      "no existing container",
@@ -97,22 +97,22 @@ func TestPlanStringWithDeps(t *testing.T) {
 
 func TestPlanStringWithGroup(t *testing.T) {
 	p := &Plan{}
-	create := p.addNode(Operation{
+	create := p.AddNode(Operation{
 		Type:       OpCreateContainer,
 		ResourceID: "service:web:1",
 		Cause:      "config hash changed (tmpName)",
 	}, "recreate:web:1")
-	stop := p.addNode(Operation{
+	stop := p.AddNode(Operation{
 		Type:       OpStopContainer,
 		ResourceID: "service:web:1",
 		Cause:      "replaced by #1",
 	}, "recreate:web:1", create)
-	remove := p.addNode(Operation{
+	remove := p.AddNode(Operation{
 		Type:       OpRemoveContainer,
 		ResourceID: "service:web:1",
 		Cause:      "replaced by #1",
 	}, "recreate:web:1", stop)
-	p.addNode(Operation{
+	p.AddNode(Operation{
 		Type:       OpRenameContainer,
 		ResourceID: "service:web:1",
 		Cause:      "finalize recreate",
@@ -127,9 +127,9 @@ func TestPlanStringWithGroup(t *testing.T) {
 
 func TestPlanAddNodeAutoIncrements(t *testing.T) {
 	p := &Plan{}
-	n1 := p.addNode(Operation{Type: OpCreateNetwork, ResourceID: "a", Cause: "x"}, "")
-	n2 := p.addNode(Operation{Type: OpCreateVolume, ResourceID: "b", Cause: "y"}, "")
-	n3 := p.addNode(Operation{Type: OpCreateContainer, ResourceID: "c", Cause: "z"}, "", n1, n2)
+	n1 := p.AddNode(Operation{Type: OpCreateNetwork, ResourceID: "a", Cause: "x"}, "")
+	n2 := p.AddNode(Operation{Type: OpCreateVolume, ResourceID: "b", Cause: "y"}, "")
+	n3 := p.AddNode(Operation{Type: OpCreateContainer, ResourceID: "c", Cause: "z"}, "", n1, n2)
 
 	assert.Equal(t, n1.ID, 1)
 	assert.Equal(t, n2.ID, 2)

@@ -30,6 +30,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
@@ -703,7 +704,7 @@ func TestEmitRunningEvents(t *testing.T) {
 		}
 		events := &capturingEvents{}
 
-		emitRunningEvents(project, observed, &Plan{}, events)
+		emitRunningEvents(project, observed, &planning.Plan{}, events)
 
 		assert.Equal(t, len(events.resources), 2)
 		names := map[string]bool{}
@@ -734,7 +735,7 @@ func TestEmitRunningEvents(t *testing.T) {
 		}
 		events := &capturingEvents{}
 
-		emitRunningEvents(project, observed, &Plan{}, events)
+		emitRunningEvents(project, observed, &planning.Plan{}, events)
 
 		assert.Equal(t, len(events.resources), 0)
 	})
@@ -746,9 +747,9 @@ func TestEmitRunningEvents(t *testing.T) {
 		observed := &ObservedState{
 			Containers: map[string][]ObservedContainer{"web": {runningWeb}},
 		}
-		plan := &Plan{}
-		plan.addNode(Operation{
-			Type:      OpStopContainer,
+		plan := &planning.Plan{}
+		plan.AddNode(planning.Operation{
+			Type:      planning.OpStopContainer,
 			Container: &container.Summary{ID: runningWeb.ID},
 		}, "")
 		events := &capturingEvents{}
@@ -767,7 +768,7 @@ func TestEmitRunningEvents(t *testing.T) {
 		}
 		events := &capturingEvents{}
 
-		emitRunningEvents(project, observed, &Plan{}, events)
+		emitRunningEvents(project, observed, &planning.Plan{}, events)
 
 		assert.Equal(t, len(events.resources), 0)
 	})

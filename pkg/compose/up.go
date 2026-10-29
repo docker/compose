@@ -37,6 +37,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/desktop"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
@@ -102,7 +103,7 @@ func (s *composeService) upCreatePhase(ctx context.Context, project *types.Proje
 // prepareUp prepares the single Create+Start plan of an up, detached or
 // interactive, and the executor that runs it. It returns the plan's own
 // project, the one carrying what preparation resolved (see useAPISocket).
-func (s *composeService) prepareUp(ctx context.Context, project *types.Project, options api.UpOptions) (*types.Project, *planExecutor, *Plan, error) {
+func (s *composeService) prepareUp(ctx context.Context, project *types.Project, options api.UpOptions) (*types.Project, *planExecutor, *planning.Plan, error) {
 	project, observed, plan, err := s.preparePlan(ctx, project, options.Create, ScopeCreateStart)
 	if err != nil {
 		return nil, nil, nil, err
