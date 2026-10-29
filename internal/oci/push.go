@@ -69,26 +69,23 @@ var clientAuthStatusCodes = []int{
 }
 
 func DescriptorForComposeFile(path string, content []byte) v1.Descriptor {
-	return v1.Descriptor{
-		MediaType: ComposeYAMLMediaType,
-		Digest:    digest.FromString(string(content)),
-		Size:      int64(len(content)),
-		Annotations: map[string]string{
-			"com.docker.compose.version": api.ComposeVersion,
-			"com.docker.compose.file":    filepath.Base(path),
-		},
-		Data: content,
-	}
+	return descriptorFor(ComposeYAMLMediaType, "com.docker.compose.file", path, content)
 }
 
 func DescriptorForEnvFile(path string, content []byte) v1.Descriptor {
+	return descriptorFor(ComposeEnvFileMediaType, "com.docker.compose.envfile", path, content)
+}
+
+// descriptorFor describes a layer holding the content of the file at path, which
+// the given annotation names.
+func descriptorFor(mediaType, fileAnnotation, path string, content []byte) v1.Descriptor {
 	return v1.Descriptor{
-		MediaType: ComposeEnvFileMediaType,
+		MediaType: mediaType,
 		Digest:    digest.FromString(string(content)),
 		Size:      int64(len(content)),
 		Annotations: map[string]string{
 			"com.docker.compose.version": api.ComposeVersion,
-			"com.docker.compose.envfile": filepath.Base(path),
+			fileAnnotation:               filepath.Base(path),
 		},
 		Data: content,
 	}
