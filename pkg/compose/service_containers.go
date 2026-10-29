@@ -40,7 +40,7 @@ import (
 // This file gathers the per-service container helpers shared by the
 // plan-based engine (reconcile.go and the executor, entered through
 // create/up/start) and by the commands that still walk the dependency order
-// themselves (dependencies.go: restart, stop, down and the classic build). It
+// themselves (internal/depgraph: restart, stop, down and the classic build). It
 // covers container naming, resolution of service references (volumes_from,
 // network_mode/ipc/pid, links) and container creation through the Docker API;
 // the waits on depends_on conditions are in dependency_wait.go.
