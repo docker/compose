@@ -25,7 +25,7 @@ import (
 	"github.com/moby/moby/client"
 	"gotest.tools/v3/assert"
 
-	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -33,7 +33,7 @@ import (
 type fakeBackend struct {
 	listed []container.Summary
 
-	oneOff   inspect.OneOff
+	oneOff   engine.OneOff
 	all      bool
 	services []string
 	index    int
@@ -46,13 +46,13 @@ func (f *fakeBackend) Events() api.EventProcessor  { return nil }
 func (f *fakeBackend) DryRun() bool                { return false }
 func (f *fakeBackend) CLI() command.Cli            { return nil }
 
-func (f *fakeBackend) Containers(_ context.Context, _ string, oneOff inspect.OneOff, all bool, services ...string) ([]container.Summary, error) {
+func (f *fakeBackend) Containers(_ context.Context, _ string, oneOff engine.OneOff, all bool, services ...string) ([]container.Summary, error) {
 	f.asked = "Containers"
 	f.oneOff, f.all, f.services = oneOff, all, services
 	return f.listed, nil
 }
 
-func (f *fakeBackend) SpecifiedContainer(_ context.Context, _ string, oneOff inspect.OneOff, all bool, serviceName string, index int) (container.Summary, error) {
+func (f *fakeBackend) SpecifiedContainer(_ context.Context, _ string, oneOff engine.OneOff, all bool, serviceName string, index int) (container.Summary, error) {
 	f.asked = "SpecifiedContainer"
 	f.oneOff, f.all, f.services, f.index = oneOff, all, []string{serviceName}, index
 	return f.listed[0], nil
@@ -76,7 +76,7 @@ func TestCopyTargetsTheReplicaAskedFor(t *testing.T) {
 	assert.Equal(t, got[0].ID, "web2")
 	assert.Equal(t, backend.asked, "SpecifiedContainer")
 	assert.Equal(t, backend.index, 2)
-	assert.Equal(t, backend.oneOff, inspect.OneOffExclude)
+	assert.Equal(t, backend.oneOff, engine.OneOffExclude)
 	assert.Assert(t, backend.all)
 }
 
@@ -89,9 +89,9 @@ func TestCopyOneOffContainersOnlyWithAll(t *testing.T) {
 		assert.NilError(t, err)
 		assert.DeepEqual(t, backend.services, []string{"web"})
 		if all {
-			assert.Equal(t, backend.oneOff, inspect.OneOffInclude)
+			assert.Equal(t, backend.oneOff, engine.OneOffInclude)
 		} else {
-			assert.Equal(t, backend.oneOff, inspect.OneOffExclude)
+			assert.Equal(t, backend.oneOff, engine.OneOffExclude)
 		}
 	}
 }

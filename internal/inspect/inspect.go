@@ -19,36 +19,17 @@
 package inspect
 
 import (
-	"context"
 	"slices"
 
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
-)
-
-// OneOff tells whether the containers of `compose run` are part of a listing.
-type OneOff int
-
-const (
-	// OneOffInclude lists the one-off containers along with the services' ones.
-	OneOffInclude OneOff = iota
-	// OneOffExclude leaves the one-off containers out.
-	OneOffExclude
 )
 
 // Backend is what the operations need from the engine they report on.
 type Backend interface {
-	// APIClient talks to the Docker daemon.
-	APIClient() client.APIClient
-	// MaxConcurrency bounds the daemon calls made in parallel, 0 meaning no bound.
-	MaxConcurrency() int
-	// Containers lists the containers of a project, narrowed to services when given.
-	Containers(ctx context.Context, projectName string, oneOff OneOff, all bool, services ...string) ([]container.Summary, error)
-	// SpecifiedContainer returns the container of a service, the replica with
-	// the given index when it is above zero.
-	SpecifiedContainer(ctx context.Context, projectName string, oneOff OneOff, all bool, serviceName string, index int) (container.Summary, error)
+	engine.Backend
 }
 
 // Service runs the inspection operations on a Backend.

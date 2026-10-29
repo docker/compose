@@ -20,8 +20,6 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/inspect"
 	"github.com/docker/compose/v5/pkg/api"
@@ -31,7 +29,7 @@ import (
 // them by handing that package the engine it reports on.
 
 func (s *composeService) inspector() *inspect.Service {
-	return inspect.New(inspectBackend{s})
+	return inspect.New(engineBackend{s})
 }
 
 func (s *composeService) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
@@ -60,32 +58,4 @@ func (s *composeService) Events(ctx context.Context, projectName string, options
 
 func (s *composeService) Viz(ctx context.Context, project *types.Project, options api.VizOptions) (string, error) {
 	return s.inspector().Viz(ctx, project, options)
-}
-
-// inspectBackend is the engine of a composeService, as internal/inspect sees it.
-type inspectBackend struct {
-	s *composeService
-}
-
-func (b inspectBackend) APIClient() client.APIClient {
-	return b.s.apiClient()
-}
-
-func (b inspectBackend) MaxConcurrency() int {
-	return b.s.maxConcurrency
-}
-
-func (b inspectBackend) Containers(ctx context.Context, projectName string, oneOff inspect.OneOff, all bool, services ...string) ([]container.Summary, error) {
-	return b.s.getContainers(ctx, projectName, toOneOff(oneOff), all, services...)
-}
-
-func (b inspectBackend) SpecifiedContainer(ctx context.Context, projectName string, oneOff inspect.OneOff, all bool, serviceName string, index int) (container.Summary, error) {
-	return b.s.getSpecifiedContainer(ctx, projectName, toOneOff(oneOff), all, serviceName, index)
-}
-
-func toOneOff(v inspect.OneOff) oneOff {
-	if v == inspect.OneOffExclude {
-		return oneOffExclude
-	}
-	return oneOffInclude
 }

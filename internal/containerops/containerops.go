@@ -23,10 +23,9 @@ import (
 
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
-	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -37,21 +36,13 @@ import (
 // talks to the user does so (exec hands the whole CLI to the Docker CLI's own
 // implementation).
 type Backend interface {
-	// APIClient talks to the Docker daemon.
-	APIClient() client.APIClient
-	// MaxConcurrency bounds the daemon calls made in parallel, 0 meaning no bound.
-	MaxConcurrency() int
+	engine.Backend
 	// Events receives the progress of the operations.
 	Events() api.EventProcessor
 	// DryRun tells whether the operations only report what they would do.
 	DryRun() bool
 	// CLI is the Docker CLI Compose runs in, and the owner of the terminal streams.
 	CLI() command.Cli
-	// Containers lists the containers of a project, narrowed to services when given.
-	Containers(ctx context.Context, projectName string, oneOff inspect.OneOff, all bool, services ...string) ([]container.Summary, error)
-	// SpecifiedContainer returns the container of a service, the replica with
-	// the given index when it is above zero.
-	SpecifiedContainer(ctx context.Context, projectName string, oneOff inspect.OneOff, all bool, serviceName string, index int) (container.Summary, error)
 }
 
 // Service runs the container operations on a Backend.

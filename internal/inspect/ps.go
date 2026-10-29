@@ -25,15 +25,16 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *Service) Ps(ctx context.Context, projectName string, options api.PsOptions) ([]api.ContainerSummary, error) {
 	projectName = strings.ToLower(projectName)
-	oneOff := OneOffExclude
+	oneOff := engine.OneOffExclude
 	if options.All {
-		oneOff = OneOffInclude
+		oneOff = engine.OneOffInclude
 	}
 	containers, err := s.backend.Containers(ctx, projectName, oneOff, options.All, options.Services...)
 	if err != nil {

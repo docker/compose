@@ -23,13 +23,14 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
 func (s *Service) Top(ctx context.Context, projectName string, services []string) ([]api.ContainerProcSummary, error) {
 	projectName = strings.ToLower(projectName)
-	containers, err := s.backend.Containers(ctx, projectName, OneOffInclude, false)
+	containers, err := s.backend.Containers(ctx, projectName, engine.OneOffInclude, false)
 	if err != nil {
 		return nil, err
 	}

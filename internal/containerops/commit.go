@@ -22,7 +22,7 @@ import (
 
 	"github.com/moby/moby/client"
 
-	"github.com/docker/compose/v5/internal/inspect"
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -31,7 +31,7 @@ import (
 func (s *Service) Commit(ctx context.Context, projectName string, options api.CommitOptions) error {
 	projectName = strings.ToLower(projectName)
 
-	ctr, err := s.backend.SpecifiedContainer(ctx, projectName, inspect.OneOffInclude, false, options.Service, options.Index)
+	ctr, err := s.backend.SpecifiedContainer(ctx, projectName, engine.OneOffInclude, false, options.Service, options.Index)
 	if err != nil {
 		return err
 	}

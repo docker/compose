@@ -25,6 +25,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -34,7 +35,7 @@ type fakeBackend struct {
 	apiClient client.APIClient
 	listed    []container.Summary
 
-	oneOff   OneOff
+	oneOff   engine.OneOff
 	all      bool
 	services []string
 	index    int
@@ -43,12 +44,12 @@ type fakeBackend struct {
 func (f *fakeBackend) APIClient() client.APIClient { return f.apiClient }
 func (f *fakeBackend) MaxConcurrency() int         { return 2 }
 
-func (f *fakeBackend) Containers(_ context.Context, _ string, oneOff OneOff, all bool, services ...string) ([]container.Summary, error) {
+func (f *fakeBackend) Containers(_ context.Context, _ string, oneOff engine.OneOff, all bool, services ...string) ([]container.Summary, error) {
 	f.oneOff, f.all, f.services = oneOff, all, services
 	return f.listed, nil
 }
 
-func (f *fakeBackend) SpecifiedContainer(_ context.Context, _ string, oneOff OneOff, all bool, serviceName string, index int) (container.Summary, error) {
+func (f *fakeBackend) SpecifiedContainer(_ context.Context, _ string, oneOff engine.OneOff, all bool, serviceName string, index int) (container.Summary, error) {
 	f.oneOff, f.all, f.services, f.index = oneOff, all, []string{serviceName}, index
 	return f.listed[0], nil
 }
@@ -75,9 +76,9 @@ func TestPsOneOffContainersOnlyWithAll(t *testing.T) {
 		assert.Equal(t, got[0].Service, "web")
 		assert.Equal(t, backend.all, all)
 		if all {
-			assert.Equal(t, backend.oneOff, OneOffInclude)
+			assert.Equal(t, backend.oneOff, engine.OneOffInclude)
 		} else {
-			assert.Equal(t, backend.oneOff, OneOffExclude)
+			assert.Equal(t, backend.oneOff, engine.OneOffExclude)
 		}
 	}
 }
@@ -103,6 +104,6 @@ func TestPortsAsksForTheReplica(t *testing.T) {
 	assert.NilError(t, err)
 	assert.DeepEqual(t, backend.services, []string{"web"})
 	assert.Equal(t, backend.index, 2)
-	assert.Equal(t, backend.oneOff, OneOffInclude)
+	assert.Equal(t, backend.oneOff, engine.OneOffInclude)
 	assert.Equal(t, backend.all, false)
 }
