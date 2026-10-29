@@ -47,14 +47,3 @@ func buildingEvent(id string) api.Resource {
 func builtEvent(id string) api.Resource {
 	return progress.New("Image "+id, api.Done, api.StatusBuilt)
 }
-
-type ignore struct{}
-
-func (q *ignore) Start(_ context.Context, _ string) {
-}
-
-func (q *ignore) Done(_ string, _ bool) {
-}
-
-func (q *ignore) On(_ ...api.Resource) {
-}

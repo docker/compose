@@ -33,16 +33,10 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
-
-// noopEventProcessor discards all events.
-type noopEventProcessor struct{}
-
-func (noopEventProcessor) Start(_ context.Context, _ string) {}
-func (noopEventProcessor) On(_ ...api.Resource)              {}
-func (noopEventProcessor) Done(_ string, _ bool)             {}
 
 // peakConcurrencyTracker records the highest number of overlapping
 // enter()/leave() pairs seen, used to assert a --parallel bound was honored.
@@ -98,7 +92,7 @@ func newTestService(t *testing.T, opts ...Option) (*composeService, *mocks.MockA
 	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
-	svc, err := NewComposeService(cli, append([]Option{WithEventProcessor(noopEventProcessor{})}, opts...)...)
+	svc, err := NewComposeService(cli, append([]Option{WithEventProcessor(progress.Noop{})}, opts...)...)
 	assert.NilError(t, err)
 	return svc.(*composeService), apiClient
 }

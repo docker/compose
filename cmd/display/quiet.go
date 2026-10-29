@@ -17,8 +17,7 @@
 package display
 
 import (
-	"context"
-
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -26,13 +25,5 @@ func Quiet() api.EventProcessor {
 	return &quiet{}
 }
 
-type quiet struct{}
-
-func (q *quiet) Start(_ context.Context, _ string) {
-}
-
-func (q *quiet) Done(_ string, _ bool) {
-}
-
-func (q *quiet) On(_ ...api.Resource) {
-}
+// quiet reports nothing.
+type quiet struct{ progress.Noop }

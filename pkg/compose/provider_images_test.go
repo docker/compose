@@ -25,6 +25,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
@@ -72,7 +73,7 @@ func TestEnsureProviderImages_SkipsPureResourceProvider(t *testing.T) {
 	cli := mocks.NewMockCli(mockCtrl)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	cli.EXPECT().Client().Return(apiClient).AnyTimes()
-	svc, err := NewComposeService(cli, WithEventProcessor(noopEventProcessor{}))
+	svc, err := NewComposeService(cli, WithEventProcessor(progress.Noop{}))
 	assert.NilError(t, err)
 
 	project := &types.Project{
