@@ -479,6 +479,63 @@ volumes:
 			mounts: nil,
 		},
 		{
+			name: "mount volume, target with a colon",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: /foo/bar:baz
+volumes:
+  data:
+    name: my_volume
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:   "volume",
+					Source: "my_volume",
+					Target: "/foo/bar:baz",
+				},
+			},
+		},
+		{
+			name: "bind mount, target with a colon",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /foo/bar:baz
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:   "bind",
+					Source: filepath.Join(pwd, "data"),
+					Target: "/foo/bar:baz",
+				},
+			},
+		},
+		{
+			name: "mount volume, windows target keeps the bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: C:\data
+volumes:
+  data:
+    name: my_volume
+`,
+			binds:  []string{`my_volume:C:\data:rw`},
+			mounts: nil,
+		},
+		{
 			name: "mount volume subpath",
 			yaml: `
 services:
