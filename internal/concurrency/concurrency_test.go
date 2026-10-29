@@ -303,3 +303,13 @@ func TestForEach_AcquireFailureWhenContextCancelled(t *testing.T) {
 	assert.Assert(t, errors.Is(err, context.Canceled))
 	assert.Assert(t, !called)
 }
+
+func TestForEachBounded_VisitsEveryItem(t *testing.T) {
+	var sum atomic.Int64
+	err := ForEachBounded(t.Context(), 2, []int{1, 2, 3, 4, 5}, func(_ context.Context, n int) error {
+		sum.Add(int64(n))
+		return nil
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, sum.Load(), int64(15))
+}

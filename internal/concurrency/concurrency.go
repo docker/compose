@@ -104,3 +104,18 @@ func ForEach[T any](ctx context.Context, limiter *semaphore.Weighted, items []T,
 	}
 	return eg.Wait()
 }
+
+// ForEachBounded runs fn concurrently for each item, at most maxConcurrency at a
+// time (0 meaning no bound), and returns the first error, cancelling the context
+// passed to the other calls. Use ForEach instead when the concurrency budget must
+// be shared across several concurrently-dispatched calls, e.g. one per service
+// visited by InDependencyOrder.
+func ForEachBounded[T any](ctx context.Context, maxConcurrency int, items []T, fn func(context.Context, T) error) error {
+	eg, ctx := NewErrgroup(ctx, maxConcurrency)
+	for _, item := range items {
+		eg.Go(func() error {
+			return fn(ctx, item)
+		})
+	}
+	return eg.Wait()
+}
