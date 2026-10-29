@@ -38,6 +38,7 @@ import (
 	"gotest.tools/v3/assert"
 	is "gotest.tools/v3/assert/cmp"
 
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 )
 
@@ -103,7 +104,7 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 
 	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
 		All:     true,
-		Filters: projectFilter(name).Add("label", oneOffFilter(false), compose.ConfigHashLabel),
+		Filters: naming.ProjectFilter(name).Add("label", oneOffFilter(false), compose.ConfigHashLabel),
 	}).Return(
 		client.ContainerListResult{
 			Items: []containerType.Summary{
@@ -171,7 +172,7 @@ func TestComposeService_Logs_ServiceFiltering(t *testing.T) {
 
 	api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
 		All:     true,
-		Filters: projectFilter(name).Add("label", oneOffFilter(false), compose.ConfigHashLabel),
+		Filters: naming.ProjectFilter(name).Add("label", oneOffFilter(false), compose.ConfigHashLabel),
 	}).Return(
 		client.ContainerListResult{
 			Items: []containerType.Summary{

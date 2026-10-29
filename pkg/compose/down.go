@@ -34,6 +34,7 @@ import (
 	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
@@ -327,7 +328,7 @@ func (s *composeService) ensureNetworksDown(ctx context.Context, project *types.
 
 func (s *composeService) removeNetwork(ctx context.Context, composeNetworkName string, projectName string, name string) error {
 	res, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: projectFilter(projectName).Add("label", networkFilter(composeNetworkName)),
+		Filters: naming.ProjectFilter(projectName).Add("label", networkFilter(composeNetworkName)),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to list networks: %w", err)
@@ -580,13 +581,13 @@ func (s *composeService) getProjectWithResources(ctx context.Context, containers
 func (s *composeService) removePreStartHookContainers(ctx context.Context, projectName string, services []string) error {
 	var filters []client.Filters
 	if len(services) == 0 {
-		f := projectFilter(projectName)
+		f := naming.ProjectFilter(projectName)
 		f.Add("label", hookFilter(preStartHookType))
 		filters = []client.Filters{f}
 	} else {
 		for _, service := range services {
-			f := projectFilter(projectName)
-			f.Add("label", serviceFilter(service))
+			f := naming.ProjectFilter(projectName)
+			f.Add("label", naming.ServiceFilter(service))
 			f.Add("label", hookFilter(preStartHookType))
 			filters = append(filters, f)
 		}

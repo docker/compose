@@ -447,7 +447,7 @@ func increment(scale *int) *int {
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
 	options := client.VolumeListOptions{
-		Filters: projectFilter(projectName),
+		Filters: naming.ProjectFilter(projectName),
 	}
 	volumes, err := s.apiClient().VolumeList(ctx, options)
 	if err != nil {
@@ -467,7 +467,7 @@ func (s *composeService) actualVolumes(ctx context.Context, projectName string) 
 
 func (s *composeService) actualNetworks(ctx context.Context, projectName string) (types.Networks, error) {
 	networks, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: projectFilter(projectName),
+		Filters: naming.ProjectFilter(projectName),
 	})
 	if err != nil {
 		return nil, err

@@ -119,9 +119,9 @@ func validateStatsProjects(opts statsOptions, services []string) error {
 }
 
 func projectFilters(projectName string, services []string) client.Filters {
-	f := client.Filters{}.Add("label", fmt.Sprintf("%s=%s", api.ProjectLabel, projectName))
+	f := naming.ProjectFilter(projectName)
 	if len(services) > 0 {
-		f.Add("label", fmt.Sprintf("%s=%s", api.ServiceLabel, services[0]))
+		f.Add("label", naming.ServiceFilter(services[0]))
 	}
 	return f
 }

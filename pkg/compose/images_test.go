@@ -33,6 +33,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -45,7 +46,7 @@ func TestImages(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	args := projectFilter(strings.ToLower(testProject))
+	args := naming.ProjectFilter(strings.ToLower(testProject))
 	listOpts := client.ContainerListOptions{All: true, Filters: args}
 	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{APIVersion: "1.96"}, nil).AnyTimes()
 	api.EXPECT().ClientVersion().Return("1.96").AnyTimes()
@@ -108,7 +109,7 @@ func TestImagesMissingImageRecord(t *testing.T) {
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
-	args := projectFilter(strings.ToLower(testProject))
+	args := naming.ProjectFilter(strings.ToLower(testProject))
 	listOpts := client.ContainerListOptions{All: true, Filters: args}
 	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).Return(client.PingResult{APIVersion: "1.96"}, nil).AnyTimes()
 	api.EXPECT().ClientVersion().Return("1.96").AnyTimes()

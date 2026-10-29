@@ -38,6 +38,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -78,13 +79,13 @@ func TestDown(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{Items: []network.Summary{
 			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
 			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
@@ -100,7 +101,7 @@ func TestDown(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "789", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
 	}).Return(client.NetworkListResult{Items: []network.Summary{
 		{Network: network.Network{ID: "abc123", Name: "myProject_default"}},
 		{Network: network.Network{ID: "def456", Name: "myProject_default"}},
@@ -116,7 +117,7 @@ func TestDown(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
@@ -143,7 +144,7 @@ func TestDown_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("prj").Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter("prj").Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	apiClient.EXPECT().ContainerStop(gomock.Any(), gomock.Any(), gomock.Any()).
@@ -183,13 +184,13 @@ func TestDown_ImagePruningSharesConcurrencyBudgetAcrossOps(t *testing.T) {
 		Return(client.ContainerListResult{}, nil) // removePreStartHookContainers lookup
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:tag1", RepoTags: []string{"repo/tag1:latest"}},
 		{ID: "sha256:tag2", RepoTags: []string{"repo/tag2:latest"}},
 	}}, nil)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:dangling1"},
 		{ID: "sha256:dangling2"},
@@ -197,7 +198,7 @@ func TestDown_ImagePruningSharesConcurrencyBudgetAcrossOps(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("prj").Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter("prj").Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	tracker := &peakConcurrencyTracker{}
@@ -238,13 +239,13 @@ func TestDown_NetworkAndImageRemovalShareConcurrencyBudget(t *testing.T) {
 		Return(client.ContainerListResult{}, nil) // removePreStartHookContainers lookup
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:tag1", RepoTags: []string{"repo/tag1:latest"}},
 		{ID: "sha256:tag2", RepoTags: []string{"repo/tag2:latest"}},
 	}}, nil)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
 	tracker := &peakConcurrencyTracker{}
@@ -258,7 +259,7 @@ func TestDown_NetworkAndImageRemovalShareConcurrencyBudget(t *testing.T) {
 		Times(2)
 
 	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("prj").Add("label", networkFilter("default")),
+		Filters: naming.ProjectFilter("prj").Add("label", networkFilter("default")),
 	}).Return(client.NetworkListResult{Items: []network.Summary{
 		{Network: network.Network{ID: "net1", Name: "prj_default"}},
 	}}, nil)
@@ -274,7 +275,7 @@ func TestDown_NetworkAndImageRemovalShareConcurrencyBudget(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("prj").Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter("prj").Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	err := svc.down(t.Context(), "prj", compose.DownOptions{Project: project, Images: "local", RemoveOrphans: true})
@@ -301,13 +302,13 @@ func TestDownWithGivenServices(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{Items: []network.Summary{
 			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
 			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
@@ -318,7 +319,7 @@ func TestDownWithGivenServices(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
 	}).Return(client.NetworkListResult{Items: []network.Summary{
 		{Network: network.Network{ID: "abc123", Name: "myProject_default"}},
 	}}, nil)
@@ -327,7 +328,7 @@ func TestDownWithGivenServices(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt("service1")).Return(client.ContainerListResult{}, nil)
@@ -357,13 +358,13 @@ func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{}, nil)
 
 	// network names are not guaranteed to be unique, ensure Compose handles
 	// cleanup properly if duplicates are inadvertently created
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{Items: []network.Summary{
 			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
 			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
@@ -395,10 +396,10 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{
 			Items: []network.Summary{{
 				Network: network.Network{
@@ -424,7 +425,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	api.EXPECT().ContainerRemove(gomock.Any(), "654", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
 
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
 	}).Return(client.NetworkListResult{
 		Items: []network.Summary{{Network: network.Network{ID: "abc123", Name: "myProject_default"}}},
 	}, nil)
@@ -435,7 +436,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
@@ -459,14 +460,14 @@ func TestDownRemoveVolumes(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{
 			Items: []volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
 	api.EXPECT().VolumeInspect(gomock.Any(), "myProject_volume", gomock.Any()).
 		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "myProject_volume", Labels: map[string]string{compose.ProjectLabel: strings.ToLower(testProject)}}}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerStop(gomock.Any(), "123", client.ContainerStopOptions{}).Return(client.ContainerStopResult{}, nil)
@@ -476,7 +477,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
@@ -594,7 +595,7 @@ func TestDownRemoveImages(t *testing.T) {
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil).AnyTimes()
 
 	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "false"),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("dangling", "false"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{
 			Labels:   types.Labels{compose.ServiceLabel: "local-anonymous"},
@@ -607,7 +608,7 @@ func TestDownRemoveImages(t *testing.T) {
 	}}, nil).AnyTimes()
 
 	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "true"),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil).AnyTimes()
 
 	imagesToBeInspected := map[string]bool{
@@ -638,7 +639,7 @@ func TestDownRemoveImages(t *testing.T) {
 	// no relay-link network for this project (no provider service involved);
 	// down() runs twice in this test (--rmi=local then --rmi=all)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil).AnyTimes()
 
 	localImagesToBeRemoved := []string{
@@ -692,22 +693,22 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{
 			Items: []volume.Volume{{Name: "myProject_volume"}},
 		}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{}, nil)
 
 	// ImageList returns no images for the project since they were unlabeled
 	// (created by an older version of Compose)
 	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "false"),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, nil)
 
 	api.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("dangling", "true"),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
 	api.EXPECT().ImageInspect(gomock.Any(), "testproject-service1", gomock.Any()).Return(client.ImageInspectResult{}, nil)
@@ -718,7 +719,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt()).Return(client.ContainerListResult{}, nil)
@@ -732,14 +733,14 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 // whole project. The argument order must match the production code: project → service → hook.
 func hookFilterListOpt(services ...string) client.ContainerListOptions {
 	if len(services) == 0 {
-		f := projectFilter(strings.ToLower(testProject))
+		f := naming.ProjectFilter(strings.ToLower(testProject))
 		f.Add("label", hookFilter(preStartHookType))
 		return client.ContainerListOptions{Filters: f, All: true}
 	}
 	// For service-scoped calls there is one list per service; callers should pass a single service.
-	f := projectFilter(strings.ToLower(testProject))
+	f := naming.ProjectFilter(strings.ToLower(testProject))
 	for _, svc := range services {
-		f.Add("label", serviceFilter(svc))
+		f.Add("label", naming.ServiceFilter(svc))
 	}
 	f.Add("label", hookFilter(preStartHookType))
 	return client.ContainerListOptions{Filters: f, All: true}
@@ -777,10 +778,10 @@ func TestEnsureImagesDown_TaggedImageListingFailureStaysVisibleWithoutAbortingDo
 	project := &types.Project{Name: "prj"}
 	listErr := errors.New("connection refused")
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, listErr)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
 	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true}, nil)
@@ -830,7 +831,7 @@ func TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails(t *testing.T) {
 
 	project := &types.Project{Name: "prj"}
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:aaa", RepoTags: []string{"repo/a:latest"}},
 		{ID: "sha256:bbb", RepoTags: []string{"repo/b:latest"}},
@@ -881,10 +882,10 @@ func TestEnsureImagesDown_ReportsDanglingImagesAsOneGroupedEvent(t *testing.T) {
 
 	project := &types.Project{Name: "prj"}
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, nil)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:aaa"},
 		{ID: "sha256:bbb"},
@@ -932,10 +933,10 @@ func TestEnsureImagesDown_SparesDanglingImagesOfOrphanedServices(t *testing.T) {
 		},
 	}
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, nil)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:web-dangling", Labels: types.Labels{compose.ServiceLabel: "web"}},
 		{ID: "sha256:orphan-dangling", Labels: types.Labels{compose.ServiceLabel: "orphan"}},
@@ -970,10 +971,10 @@ func TestEnsureImagesDown_RemoveOrphansAlsoTakesDanglingImages(t *testing.T) {
 		},
 	}
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, nil)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:orphan-dangling", Labels: types.Labels{compose.ServiceLabel: "orphan"}},
 	}}, nil)
@@ -1001,7 +1002,7 @@ func newDanglingImagesFixture(t *testing.T) (*mocks.MockAPIClient, *composeServi
 	assert.NilError(t, err)
 
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "false"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "false"),
 	}).Return(client.ImageListResult{}, nil)
 
 	return apiClient, svcIface.(*composeService), rec, &types.Project{Name: "prj"}
@@ -1014,7 +1015,7 @@ func newDanglingImagesFixture(t *testing.T) (*mocks.MockAPIClient, *composeServi
 func TestEnsureImagesDown_NoDanglingImagesToRemove(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, nil)
 
 	ops := svc.ensureImagesDown(t.Context(), project, compose.DownOptions{Images: "local", RemoveOrphans: true}, nil)
@@ -1034,7 +1035,7 @@ func TestEnsureImagesDown_NoDanglingImagesToRemove(t *testing.T) {
 func TestEnsureImagesDown_AllDanglingImagesSparedStaysSilent(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:orphan-dangling", Labels: types.Labels{compose.ServiceLabel: "orphan"}},
 	}}, nil)
@@ -1061,7 +1062,7 @@ func TestEnsureImagesDown_DanglingListFailureStaysVisibleWithoutAbortingDown(t *
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	listErr := errors.New("connection refused")
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{}, listErr)
 
 	// ensureImagesDown itself must not fail: the listing error is only
@@ -1093,7 +1094,7 @@ func TestEnsureImagesDown_DanglingListFailureStaysVisibleWithoutAbortingDown(t *
 func TestEnsureImagesDown_PartialRemovalFailureStaysVisibleAlongsideRemoved(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:ok"},
 		{ID: "sha256:fails"},
@@ -1127,7 +1128,7 @@ func TestEnsureImagesDown_PartialRemovalFailureStaysVisibleAlongsideRemoved(t *t
 func TestEnsureImagesDown_TotalRemovalFailureReportsPlainError(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:fails"},
 	}}, nil)
@@ -1160,7 +1161,7 @@ func TestEnsureImagesDown_TotalRemovalFailureReportsPlainError(t *testing.T) {
 func TestEnsureImagesDown_TotalFailureAlsoMentionsStillInUse(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:in-use"},
 		{ID: "sha256:fails"},
@@ -1197,7 +1198,7 @@ func TestEnsureImagesDown_TotalFailureAlsoMentionsStillInUse(t *testing.T) {
 func TestEnsureImagesDown_AllEligibleStillInUseDoesNotClaimRemoved(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:in-use"},
 	}}, nil)
@@ -1228,7 +1229,7 @@ func TestEnsureImagesDown_AllEligibleStillInUseDoesNotClaimRemoved(t *testing.T)
 func TestEnsureImagesDown_MixedRemovedAndStillInUseKeepsBothVisible(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:removed"},
 		{ID: "sha256:in-use"},
@@ -1262,7 +1263,7 @@ func TestEnsureImagesDown_MixedRemovedAndStillInUseKeepsBothVisible(t *testing.T
 func TestEnsureImagesDown_PartialFailureAlsoMentionsStillInUse(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:removed"},
 		{ID: "sha256:in-use"},
@@ -1300,7 +1301,7 @@ func TestEnsureImagesDown_PartialFailureAlsoMentionsStillInUse(t *testing.T) {
 func TestEnsureImagesDown_AllEligibleAlreadyGoneReportsNoResourceFound(t *testing.T) {
 	apiClient, svc, rec, project := newDanglingImagesFixture(t)
 	apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
-		Filters: projectFilter("prj").Add("dangling", "true"),
+		Filters: naming.ProjectFilter("prj").Add("dangling", "true"),
 	}).Return(client.ImageListResult{Items: []image.Summary{
 		{ID: "sha256:already-gone"},
 	}}, nil)
@@ -1336,14 +1337,14 @@ func TestDownRemovesRetainedPreStartHookContainers(t *testing.T) {
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).
 		Return(client.ContainerListResult{}, nil)
 	api.EXPECT().VolumeList(gomock.Any(), client.VolumeListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 	}).Return(client.VolumeListResult{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 	}).Return(client.NetworkListResult{}, nil)
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	// Hook container scan finds one retained pre_start container.
@@ -1382,14 +1383,14 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).
 		Return(client.ContainerListResult{}, nil)
 	api.EXPECT().VolumeList(gomock.Any(), client.VolumeListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 	}).Return(client.VolumeListResult{}, nil)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 	}).Return(client.NetworkListResult{}, nil)
 	// no relay-link network for this project (no provider service involved)
 	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{}, nil)
 
 	// Hook scan finds one container.

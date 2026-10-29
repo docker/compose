@@ -61,10 +61,6 @@ func New(backend Backend) *Service {
 	return &Service{backend: backend}
 }
 
-func projectFilter(projectName string) client.Filters {
-	return make(client.Filters).Add("label", api.ProjectLabel+"="+projectName)
-}
-
 // inServices keeps the containers of the given services.
 func inServices(containers []container.Summary, services []string) []container.Summary {
 	var filtered []container.Summary

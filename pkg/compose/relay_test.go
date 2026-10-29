@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sync/semaphore"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -97,7 +98,7 @@ func TestEnsureRelayLinkNetworksDown(t *testing.T) {
 	}
 
 	apiMock.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
-		Filters: projectFilter("p").Add("label", api.RelayNetworkLabel),
+		Filters: naming.ProjectFilter("p").Add("label", api.RelayNetworkLabel),
 	}).Return(client.NetworkListResult{
 		Items: []network.Summary{{Network: network.Network{ID: "net-1", Name: "p_db_relay"}}},
 	}, nil)
