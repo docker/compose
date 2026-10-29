@@ -73,6 +73,16 @@ func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, ba
 	return project, err
 }
 
+// loadProject loads the project the config subcommand reports on, with a Compose
+// service of its own to resolve it.
+func (o *configOptions) loadProject(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	backend, err := compose.NewComposeService(dockerCli)
+	if err != nil {
+		return nil, err
+	}
+	return o.ToProject(ctx, dockerCli, backend, services, po...)
+}
+
 func (o *configOptions) ToModel(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (map[string]any, error) {
 	po = append(po, o.toProjectOptionsFns()...)
 	return o.ProjectOptions.ToModel(ctx, dockerCli, services, po...)
@@ -565,12 +575,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 		return nil
 	}
 
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.loadProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -583,12 +588,7 @@ func runServices(ctx context.Context, dockerCli command.Cli, opts configOptions)
 }
 
 func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.loadProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -599,12 +599,7 @@ func runVolumes(ctx context.Context, dockerCli command.Cli, opts configOptions) 
 }
 
 func runNetworks(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.loadProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -615,12 +610,7 @@ func runNetworks(ctx context.Context, dockerCli command.Cli, opts configOptions)
 }
 
 func runModels(ctx context.Context, dockerCli command.Cli, opts configOptions) error {
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.loadProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -638,12 +628,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 		services = append(services, strings.Split(opts.hash, ",")...)
 	}
 
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, nil, cli.WithoutEnvironmentResolution)
+	project, err := opts.loadProject(ctx, dockerCli, nil, cli.WithoutEnvironmentResolution)
 	if err != nil {
 		return err
 	}
@@ -686,12 +671,7 @@ func runHash(ctx context.Context, dockerCli command.Cli, opts configOptions) err
 func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
 	set := map[string]struct{}{}
 
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, services)
+	project, err := opts.loadProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
@@ -707,12 +687,7 @@ func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions,
 }
 
 func runConfigImages(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, services)
+	project, err := opts.loadProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
@@ -762,12 +737,7 @@ func runVariables(ctx context.Context, dockerCli command.Cli, opts configOptions
 }
 
 func runEnvironment(ctx context.Context, dockerCli command.Cli, opts configOptions, services []string) error {
-	backend, err := compose.NewComposeService(dockerCli)
-	if err != nil {
-		return err
-	}
-
-	project, err := opts.ToProject(ctx, dockerCli, backend, services)
+	project, err := opts.loadProject(ctx, dockerCli, services)
 	if err != nil {
 		return err
 	}
