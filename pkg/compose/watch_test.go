@@ -505,6 +505,28 @@ func TestWatchTriggerPaths_BindMountedPath(t *testing.T) {
 	}
 }
 
+func TestCheckIfPathAlreadyBindMounted(t *testing.T) {
+	hostDir := t.TempDir()
+	volumes := []types.ServiceVolumeConfig{
+		{Type: types.VolumeTypeBind, Source: hostDir, Bind: &types.ServiceVolumeBind{}},
+	}
+
+	for _, tt := range []struct {
+		name        string
+		path        string
+		bindMounted bool
+	}{
+		{name: "mount root", path: hostDir, bindMounted: true},
+		{name: "child", path: filepath.Join(hostDir, "subdir"), bindMounted: true},
+		{name: "child starting with two dots", path: filepath.Join(hostDir, "..local"), bindMounted: true},
+		{name: "sibling", path: filepath.Join(filepath.Dir(hostDir), "outside"), bindMounted: false},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, checkIfPathAlreadyBindMounted(tt.path, volumes), tt.bindMounted)
+		})
+	}
+}
+
 // initial_sync applies to every sync+x action, sync+exec included.
 func TestWatchTriggerPaths_InitialSyncExec(t *testing.T) {
 	hostDir := t.TempDir()
