@@ -66,6 +66,29 @@ func (s *Service) Generate(ctx context.Context, options api.GenerateOptions) (*t
 	return s.createProjectFromContainers(containers, options.ProjectName)
 }
 
+// ServiceOfContainer returns the name and the definition of the service a container
+// belongs to, within the services collected so far, with the container counted in
+// its scale. A container which is not from a Compose application is a service of its own.
+func ServiceOfContainer(services types.Services, ctr container.Summary) (string, types.ServiceConfig) {
+	// if the container is from a previous Compose application, use the existing service name
+	serviceLabel, ok := ctr.Labels[api.ServiceLabel]
+	if !ok {
+		serviceLabel = naming.CanonicalContainerName(ctr)
+	}
+	service, ok := services[serviceLabel]
+	if !ok {
+		service = types.ServiceConfig{
+			Name: serviceLabel,
+			ContainerSpec: types.ContainerSpec{
+				Image:  ctr.Image,
+				Labels: ctr.Labels,
+			},
+		}
+	}
+	service.Scale = increment(service.Scale)
+	return serviceLabel, service
+}
+
 func (s *Service) createProjectFromContainers(containers []container.Summary, projectName string) (*types.Project, error) {
 	project := &types.Project{}
 	services := types.Services{}
@@ -78,22 +101,7 @@ func (s *Service) createProjectFromContainers(containers []container.Summary, pr
 	}
 
 	for _, ctr := range containers {
-		// if the container is from a previous Compose application, use the existing service name
-		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
-		if !ok {
-			serviceLabel = naming.CanonicalContainerName(ctr)
-		}
-		service, ok := services[serviceLabel]
-		if !ok {
-			service = types.ServiceConfig{
-				Name: serviceLabel,
-				ContainerSpec: types.ContainerSpec{
-					Image:  ctr.Image,
-					Labels: ctr.Labels,
-				},
-			}
-		}
-		service.Scale = increment(service.Scale)
+		serviceLabel, service := ServiceOfContainer(services, ctr)
 
 		inspect, err := s.backend.APIClient().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
