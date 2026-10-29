@@ -37,6 +37,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/projectloader"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
@@ -377,21 +378,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	}
 	set := types.Services{}
 	for _, ctr := range containers {
-		serviceLabel, ok := ctr.Labels[api.ServiceLabel]
-		if !ok {
-			serviceLabel = naming.CanonicalContainerName(ctr)
-		}
-		service, ok := set[serviceLabel]
-		if !ok {
-			service = types.ServiceConfig{
-				Name: serviceLabel,
-				ContainerSpec: types.ContainerSpec{
-					Image:  ctr.Image,
-					Labels: ctr.Labels,
-				},
-			}
-		}
-		service.Scale = increment(service.Scale)
+		serviceLabel, service := projectloader.ServiceOfContainer(set, ctr)
 		set[serviceLabel] = service
 	}
 	for name, service := range set {
@@ -435,14 +422,6 @@ SERVICES:
 	}
 
 	return project, nil
-}
-
-func increment(scale *int) *int {
-	i := 1
-	if scale != nil {
-		i = *scale + 1
-	}
-	return &i
 }
 
 func (s *composeService) actualVolumes(ctx context.Context, projectName string) (types.Volumes, error) {
