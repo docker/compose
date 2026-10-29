@@ -37,6 +37,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/projectloader"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
@@ -90,7 +91,7 @@ func NewComposeService(dockerCli command.Cli, options ...Option) (api.Compose, e
 		}
 	}
 	if s.events == nil {
-		s.events = &ignore{}
+		s.events = progress.Noop{}
 	}
 
 	// If custom streams were provided, wrap the Docker CLI to use them

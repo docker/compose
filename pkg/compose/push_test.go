@@ -32,6 +32,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
 	"github.com/docker/compose/v5/pkg/mocks"
@@ -108,7 +109,7 @@ func TestPushIgnoreMissingSkipsImagesNotAvailableLocally(t *testing.T) {
 // Without the flag, nothing changes: an image missing locally is an error, and the local images are
 // not even looked up. The mock expects no ImageInspect.
 func TestPushWithoutIgnoreMissingFailsOnImageNotAvailableLocally(t *testing.T) {
-	svc, apiClient := newPushTestService(t, noopEventProcessor{})
+	svc, apiClient := newPushTestService(t, progress.Noop{})
 
 	project := pushProject()
 	delete(project.Services, "present")
@@ -121,7 +122,7 @@ func TestPushWithoutIgnoreMissingFailsOnImageNotAvailableLocally(t *testing.T) {
 
 // Only a missing image is skipped: any other failure to look it up is left to the push to report.
 func TestPushIgnoreMissingStillPushesWhenInspectFails(t *testing.T) {
-	svc, apiClient := newPushTestService(t, noopEventProcessor{})
+	svc, apiClient := newPushTestService(t, progress.Noop{})
 
 	project := pushProject()
 	delete(project.Services, "absent")

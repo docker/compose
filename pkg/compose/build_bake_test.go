@@ -36,6 +36,7 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -207,7 +208,7 @@ func TestPrepareBakeBuildGrants(t *testing.T) {
 		}}}},
 		Secrets: types.Secrets{"token": {File: secretFile}},
 	}
-	s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+	s := &composeService{proxyConfig: map[string]string{}, events: progress.Noop{}}
 	bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{})
 	assert.DeepEqual(t, bake.cfg.Targets["app"].Entitlements, []string{"network.host"})
 	assert.DeepEqual(t, bake.cfg.Targets["app"].Secrets, []string{"id=token,type=file,src=" + secretFile})
@@ -247,7 +248,7 @@ func TestPrepareBakeCWDGrants(t *testing.T) {
 					Context: tc.context, Dockerfile: dockerfile,
 				}}}},
 			}
-			s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+			s := &composeService{proxyConfig: map[string]string{}, events: progress.Noop{}}
 			bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{})
 			assert.Equal(t, bake.cfg.Targets["app"].Dockerfile, dockerfile)
 			assert.DeepEqual(t, bake.localPaths, []string{strings.TrimPrefix(tc.context, "cwd://"), tc.want})
@@ -335,7 +336,7 @@ func TestPrepareBakeSSHGrants(t *testing.T) {
 			project := &types.Project{Name: "ssh", Services: types.Services{"app": {
 				Name: "app", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: contextPath, SSH: tc.ssh}},
 			}}}
-			s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+			s := &composeService{proxyConfig: map[string]string{}, events: progress.Noop{}}
 			bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{SSHs: tc.cliSSH})
 			assert.DeepEqual(t, bake.cfg.Targets["app"].SSH, tc.wantSSH)
 			assert.DeepEqual(t, bake.cfg.Targets["app"].Entitlements, []string(nil))
@@ -417,7 +418,7 @@ func TestPrepareBakeCacheGrants(t *testing.T) {
 			CacheFrom: []string{"type=local,src=/cache/in"}, CacheTo: []string{"type=local,dest=/cache/out"},
 		}},
 	}}}
-	s := &composeService{proxyConfig: map[string]string{}, events: &ignore{}}
+	s := &composeService{proxyConfig: map[string]string{}, events: progress.Noop{}}
 	bake := s.prepareBakeBuild(project, project.Services, api.BuildOptions{})
 	assert.DeepEqual(t, bakeArgs(bake, "metadata.json", api.BuildOptions{}), []string{
 		"bake", "--file", "-", "--progress", "rawjson", "--metadata-file", "metadata.json",

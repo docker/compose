@@ -28,6 +28,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
@@ -54,7 +55,7 @@ esac
 	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{CLIPluginsExtraDirs: []string{dir}}).AnyTimes()
 	cli.EXPECT().CurrentContext().Return("default").AnyTimes()
 	cli.EXPECT().DockerEndpoint().Return(docker.Endpoint{}).AnyTimes()
-	s := &composeService{dockerCli: cli, dryRun: true, events: &ignore{}}
+	s := &composeService{dockerCli: cli, dryRun: true, events: progress.Noop{}}
 
 	// Environment and Models are promoted fields, which struct literals
 	// cannot set before go1.27

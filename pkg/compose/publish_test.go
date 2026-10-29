@@ -38,6 +38,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -753,7 +754,7 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	}
 	svc := &composeService{
 		prompt: declined,
-		events: &ignore{},
+		events: progress.Noop{},
 	}
 
 	err := svc.publish(t.Context(), project, "docker.io/myorg/myapp:latest", api.PublishOptions{})

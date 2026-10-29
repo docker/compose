@@ -30,6 +30,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -673,7 +674,7 @@ func TestWarnUnmanagedVolumes(t *testing.T) {
 }
 
 type capturingEvents struct {
-	noopEventProcessor
+	progress.Noop
 	resources []api.Resource
 }
 

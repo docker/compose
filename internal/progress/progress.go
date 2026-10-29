@@ -19,6 +19,8 @@
 package progress
 
 import (
+	"context"
+
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -98,3 +100,15 @@ func Skipped(id string, reason string) api.Resource {
 		Text:   "Skipped: " + reason,
 	}
 }
+
+// Noop is an api.EventProcessor that discards every event.
+type Noop struct{}
+
+// Start does nothing.
+func (Noop) Start(context.Context, string) {}
+
+// Done does nothing.
+func (Noop) Done(string, bool) {}
+
+// On does nothing.
+func (Noop) On(...api.Resource) {}

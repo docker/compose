@@ -30,6 +30,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -40,7 +41,7 @@ type testBackend struct {
 }
 
 func (b testBackend) APIClient() client.APIClient { return b.apiClient }
-func (testBackend) Events() api.EventProcessor    { return noopEvents{} }
+func (testBackend) Events() api.EventProcessor    { return progress.Noop{} }
 func (testBackend) IsDesktopIntegrationActive(context.Context) (bool, error) {
 	return false, nil
 }
@@ -50,12 +51,6 @@ type conflictError struct{}
 
 func (conflictError) Error() string { return "conflict" }
 func (conflictError) Conflict()     {}
-
-type noopEvents struct{}
-
-func (noopEvents) Start(context.Context, string) {}
-func (noopEvents) On(...api.Resource)            {}
-func (noopEvents) Done(string, bool)             {}
 
 func newTestRelay(mockCtrl *gomock.Controller) (*mocks.MockAPIClient, *Service) {
 	apiMock := mocks.NewMockAPIClient(mockCtrl)

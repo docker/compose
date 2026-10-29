@@ -26,6 +26,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/desktop"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -38,7 +39,7 @@ type testBackend struct {
 }
 
 func (b *testBackend) APIClient() client.APIClient { return b.apiClient }
-func (b *testBackend) Events() api.EventProcessor  { return noopEvents{} }
+func (b *testBackend) Events() api.EventProcessor  { return progress.Noop{} }
 func (b *testBackend) CLI() command.Cli            { return b.cli }
 func (b *testBackend) DryRun() bool                { return b.dryRun }
 func (b *testBackend) ProjectLock() sync.Locker    { return &b.mu }
@@ -52,12 +53,6 @@ func (b *testBackend) PrepareShellOut(_ context.Context, env types.Mapping, cmd 
 	cmd.Env = env.Values()
 	return nil
 }
-
-type noopEvents struct{}
-
-func (noopEvents) Start(context.Context, string) {}
-func (noopEvents) On(...api.Resource)            {}
-func (noopEvents) Done(string, bool)             {}
 
 // notFoundError implements the errdefs.ErrNotFound interface for test mocks.
 type notFoundError struct{}
