@@ -21,8 +21,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -385,24 +383,7 @@ func (s *composeService) projectFromName(containers Containers, projectName stri
 	for name, service := range set {
 		dependencies := service.Labels[api.DependenciesLabel]
 		if dependencies != "" {
-			service.DependsOn = types.DependsOnConfig{}
-			for dc := range strings.SplitSeq(dependencies, ",") {
-				dcArr := strings.Split(dc, ":")
-				condition := ServiceConditionRunningOrHealthy
-				// Let's restart the dependency by default if we don't have the info stored in the label
-				restart := true
-				required := true
-				dependency := dcArr[0]
-
-				// backward compatibility
-				if len(dcArr) > 1 {
-					condition = dcArr[1]
-					if len(dcArr) > 2 {
-						restart, _ = strconv.ParseBool(dcArr[2])
-					}
-				}
-				service.DependsOn[dependency] = types.ServiceDependency{Condition: condition, Restart: restart, Required: required}
-			}
+			service.DependsOn = decodeDependsOnLabel(dependencies)
 			set[name] = service
 		}
 	}

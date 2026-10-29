@@ -316,11 +316,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		// One-off containers are not indexed
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 	}
-	var dependencies []string
-	for dep, d := range service.DependsOn {
-		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", dep, d.Condition, d.Restart))
-	}
-	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
+	labels[api.DependenciesLabel] = encodeDependsOnLabel(service.DependsOn)
 
 	var runCmd, entrypoint []string
 	if service.Command != nil {
