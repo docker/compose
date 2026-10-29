@@ -28,6 +28,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -51,7 +52,7 @@ func (s *composeService) waitDependencies(ctx context.Context, project *types.Pr
 		}
 
 		waitingFor := containers.filter(isService(dep), isNotOneOff, isNotHookContainer)
-		s.events.On(containerEvents(waitingFor, waiting)...)
+		s.events.On(containerEvents(waitingFor, progress.Waiting)...)
 		if len(waitingFor) == 0 {
 			if config.Required {
 				return fmt.Errorf("%s is missing dependency %s", dependant, dep)
@@ -124,7 +125,7 @@ func (s *composeService) waitDependencyReached(ctx, origCtx context.Context, dep
 			// must still see.
 			if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 				if !config.Required && origCtx.Err() == nil {
-					s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+					s.events.On(containerReasonEvents(waitingFor, progress.Skipped,
 						fmt.Sprintf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition))...)
 					logrus.Warnf("optional dependency %q did not satisfy %q before the timeout", dep, config.Condition)
 					return true, nil
@@ -182,7 +183,7 @@ func (s *composeService) checkDependencyRunningOrHealthy(ctx context.Context, de
 			if ctx.Err() != nil {
 				return false, nil
 			}
-			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+			s.events.On(containerReasonEvents(waitingFor, progress.Skipped,
 				fmt.Sprintf("optional dependency %q is not running or is unhealthy", dep))...)
 			logrus.Warnf("optional dependency %q is not running or is unhealthy: %s", dep, err.Error())
 			return true, nil
@@ -190,7 +191,7 @@ func (s *composeService) checkDependencyRunningOrHealthy(ctx context.Context, de
 		return false, err
 	}
 	if isHealthy {
-		s.events.On(containerEvents(waitingFor, healthy)...)
+		s.events.On(containerEvents(waitingFor, progress.Healthy)...)
 	}
 	return isHealthy, nil
 }
@@ -202,7 +203,7 @@ func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string,
 			if ctx.Err() != nil {
 				return false, nil
 			}
-			s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+			s.events.On(containerReasonEvents(waitingFor, progress.Skipped,
 				fmt.Sprintf("optional dependency %q failed to start", dep))...)
 			logrus.Warnf("optional dependency %q failed to start: %s", dep, err.Error())
 			return true, nil
@@ -219,7 +220,7 @@ func (s *composeService) checkDependencyHealthy(ctx context.Context, dep string,
 		return false, fmt.Errorf("dependency failed to start: %w", err)
 	}
 	if isHealthy {
-		s.events.On(containerEvents(waitingFor, healthy)...)
+		s.events.On(containerEvents(waitingFor, progress.Healthy)...)
 	}
 	return isHealthy, nil
 }
@@ -233,14 +234,14 @@ func (s *composeService) checkDependencyCompleted(ctx context.Context, dep strin
 		return false, nil
 	}
 	if code == 0 {
-		s.events.On(containerEvents(waitingFor, exited)...)
+		s.events.On(containerEvents(waitingFor, progress.Exited)...)
 		return true, nil
 	}
 
 	messageSuffix := fmt.Sprintf("%q didn't complete successfully: exit %d", dep, code)
 	if !config.Required {
 		// optional -> mark as skipped & don't propagate error
-		s.events.On(containerReasonEvents(waitingFor, skippedEvent,
+		s.events.On(containerReasonEvents(waitingFor, progress.Skipped,
 			"optional dependency "+messageSuffix)...)
 		logrus.Warnf("optional dependency %s", messageSuffix)
 		return true, nil

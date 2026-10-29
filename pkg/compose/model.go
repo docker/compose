@@ -34,6 +34,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -156,7 +157,7 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 
 	err = cmd.Wait()
 	if err != nil {
-		events.On(errorEvent(model.Name, err.Error()))
+		events.On(progress.Error(model.Name, err.Error()))
 	}
 	events.On(api.Resource{
 		ID:     model.Name,
@@ -194,7 +195,7 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 	}
 	err = cmd.Run()
 	if err != nil {
-		events.On(errorEvent(config.Name, err.Error()))
+		events.On(progress.Error(config.Name, err.Error()))
 		return err
 	}
 	events.On(api.Resource{

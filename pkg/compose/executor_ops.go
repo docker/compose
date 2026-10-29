@@ -28,6 +28,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -244,7 +245,7 @@ func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op Ope
 		return nil
 	}
 
-	s.events.On(containerEvents(waitingFor, waiting)...)
+	s.events.On(containerEvents(waitingFor, progress.Waiting)...)
 	// The wait node is shared across every dependent awaiting the same
 	// (dependency, condition) pair (see waitConditionNode), so no single
 	// requester name would be accurate; op.ResourceID identifies the wait

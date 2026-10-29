@@ -43,6 +43,7 @@ import (
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
 	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -1519,7 +1520,7 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 	}
 
 	networkEventName := "Network " + n.Name
-	s.events.On(creatingEvent(networkEventName))
+	s.events.On(progress.Creating(networkEventName))
 
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
 		// A concurrent `docker compose up|run` may have created the same network
@@ -1527,13 +1528,13 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		// conflict as success rather than failing hard: the network we wanted
 		// exists.
 		if errdefs.IsConflict(err) {
-			s.events.On(createdEvent(networkEventName))
+			s.events.On(progress.Created(networkEventName))
 			return nil
 		}
-		s.events.On(errorEvent(networkEventName, err.Error()))
+		s.events.On(progress.Error(networkEventName, err.Error()))
 		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
-	s.events.On(createdEvent(networkEventName))
+	s.events.On(progress.Created(networkEventName))
 	return nil
 }
 
@@ -1590,7 +1591,7 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
 	eventName := "Volume " + volume.Name
-	s.events.On(creatingEvent(eventName))
+	s.events.On(progress.Creating(eventName))
 	hash, err := confighash.VolumeHash(volume)
 	if err != nil {
 		return err
@@ -1603,10 +1604,10 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		DriverOpts: volume.DriverOpts,
 	})
 	if err != nil {
-		s.events.On(errorEvent(eventName, err.Error()))
+		s.events.On(progress.Error(eventName, err.Error()))
 		return err
 	}
-	s.events.On(createdEvent(eventName))
+	s.events.On(progress.Created(eventName))
 	return nil
 }
 

@@ -74,3 +74,27 @@ func Stopping(id string) api.Resource {
 func Stopped(id string) api.Resource {
 	return New(id, api.Done, api.StatusStopped)
 }
+
+// Waiting is the event of a resource waiting for another one.
+func Waiting(id string) api.Resource {
+	return New(id, api.Working, api.StatusWaiting)
+}
+
+// Healthy is the event of a resource that became healthy.
+func Healthy(id string) api.Resource {
+	return New(id, api.Done, api.StatusHealthy)
+}
+
+// Exited is the event of a resource that exited.
+func Exited(id string) api.Resource {
+	return New(id, api.Done, api.StatusExited)
+}
+
+// Skipped is the event of a resource whose operation was skipped for the given reason.
+func Skipped(id string, reason string) api.Resource {
+	return api.Resource{
+		ID:     id,
+		Status: api.Warning,
+		Text:   "Skipped: " + reason,
+	}
+}

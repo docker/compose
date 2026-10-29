@@ -24,6 +24,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -102,13 +103,13 @@ func (s *composeService) remove(ctx context.Context, containers Containers, opti
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
-			s.events.On(removingEvent(eventName))
+			s.events.On(progress.Removing(eventName))
 			_, err := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})
 			if err == nil {
-				s.events.On(removedEvent(eventName))
+				s.events.On(progress.Removed(eventName))
 			}
 			return err
 		})

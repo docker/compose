@@ -32,6 +32,7 @@ import (
 	specs "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -183,7 +184,7 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 	name string, number int, options createOptions,
 ) (ctr container.Summary, err error) {
 	eventName := "Container " + name
-	s.events.On(creatingEvent(eventName))
+	s.events.On(progress.Creating(eventName))
 	ctr, err = s.createMobyContainer(ctx, project, service, name, number, nil, options)
 	if err != nil {
 		if ctx.Err() == nil {
@@ -195,7 +196,7 @@ func (s *composeService) createContainer(ctx context.Context, project *types.Pro
 		}
 		return ctr, err
 	}
-	s.events.On(createdEvent(eventName))
+	s.events.On(progress.Created(eventName))
 	return ctr, nil
 }
 

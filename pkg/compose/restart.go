@@ -25,6 +25,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -122,14 +123,14 @@ func (s *composeService) restartContainer(ctx context.Context, def types.Service
 		}
 	}
 	eventName := getContainerProgressName(ctr)
-	s.events.On(newEvent(eventName, api.Working, api.StatusRestarting))
+	s.events.On(progress.New(eventName, api.Working, api.StatusRestarting))
 	_, err := s.apiClient().ContainerRestart(ctx, ctr.ID, client.ContainerRestartOptions{
 		Timeout: utils.DurationSecondToInt(options.Timeout),
 	})
 	if err != nil {
 		return err
 	}
-	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+	s.events.On(progress.New(eventName, api.Done, api.StatusStarted))
 	if !relay {
 		for _, hook := range def.PostStart {
 			err := s.runHook(ctx, ctr, def, hook, nil)

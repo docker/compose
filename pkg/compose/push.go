@@ -32,6 +32,7 @@ import (
 	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -68,19 +69,19 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 		for _, tag := range tags {
 			eg.Go(func() error {
 				if options.IgnoreMissing && s.isMissingLocally(ctx, tag) {
-					s.events.On(newEvent(tag, api.Done, "Skipped", "No local image"))
+					s.events.On(progress.New(tag, api.Done, "Skipped", "No local image"))
 					return nil
 				}
-				s.events.On(newEvent(tag, api.Working, "Pushing"))
+				s.events.On(progress.New(tag, api.Working, "Pushing"))
 				err := s.pushServiceImage(ctx, tag, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
-						s.events.On(newEvent(tag, api.Error, err.Error()))
+						s.events.On(progress.New(tag, api.Error, err.Error()))
 						return err
 					}
-					s.events.On(newEvent(tag, api.Warning, err.Error()))
+					s.events.On(progress.New(tag, api.Warning, err.Error()))
 				} else {
-					s.events.On(newEvent(tag, api.Done, "Pushed"))
+					s.events.On(progress.New(tag, api.Done, "Pushed"))
 				}
 				return nil
 			})

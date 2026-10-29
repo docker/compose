@@ -37,6 +37,7 @@ import (
 
 	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/desktop"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -451,7 +452,7 @@ func (u *upSession) runEventLoop(ctx context.Context) error {
 	first := true
 	gracefulTeardown := func() {
 		first = false
-		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
+		u.events.On(progress.New(api.ResourceCompose, api.Working, api.StatusStopping, "Gracefully Stopping... press Ctrl+C again to force"))
 		// set before stopApplication's listing so stopLateStarters is armed
 		// no later than the sweep it must catch stragglers for.
 		u.isTerminated.Store(true)
@@ -533,7 +534,7 @@ func (u *upSession) stopOnFirstExit() api.ContainerEventListener {
 		}
 		once = false
 		u.exitCode = event.ExitCode
-		u.events.On(newEvent(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
+		u.events.On(progress.New(api.ResourceCompose, api.Working, api.StatusStopping, "Aborting on container exit..."))
 		// set before stopApplication's listing so stopLateStarters is armed
 		// no later than the sweep it must catch stragglers for.
 		u.isTerminated.Store(true)
