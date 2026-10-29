@@ -205,65 +205,45 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 	if !lk.IsDockerDesktopActive {
 		return
 	}
-	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				link := "docker-desktop://dashboard/apps/" + project.Name
-				err := open.Run(link)
-				if err != nil {
-					err = errors.New("could not open Docker Desktop")
-					lk.keyboardError("View", err)
-				}
-				return err
-			})()
-	}()
+	lk.openLink(ctx, "menu/gui", "View", "docker-desktop://dashboard/apps/"+project.Name, func(error) error {
+		return errors.New("could not open Docker Desktop")
+	})
 }
 
 func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Project) {
 	if !lk.IsDockerDesktopActive {
 		return
 	}
-	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/composeview", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				link := "docker-desktop://dashboard/docker-compose/" + project.Name
-				err := open.Run(link)
-				if err != nil {
-					err = errors.New("could not open Docker Desktop Compose UI")
-					lk.keyboardError("View Config", err)
-				}
-				return err
-			})()
-	}()
+	lk.openLink(ctx, "menu/gui/composeview", "View Config", "docker-desktop://dashboard/docker-compose/"+project.Name, func(error) error {
+		return errors.New("could not open Docker Desktop Compose UI")
+	})
 }
 
 func (lk *LogKeyboard) openDDLogsView(ctx context.Context, project *types.Project) {
 	if !lk.IsLogsViewEnabled {
 		return
 	}
-	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/logsview", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				link := desktop.BuildLogsURL(project.Name)
-				err := open.Run(link)
-				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop Logs view: %w", err)
-					lk.keyboardError("View Logs", err)
-				}
-				return err
-			})()
-	}()
+	lk.openLink(ctx, "menu/gui/logsview", "View Logs", desktop.BuildLogsURL(project.Name), func(err error) error {
+		return fmt.Errorf("could not open Docker Desktop Logs view: %w", err)
+	})
 }
 
 func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Project) {
+	lk.openLink(ctx, "menu/gui/watch", "Watch Docs", fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name), func(error) error {
+		return errors.New("could not open Docker Desktop Compose UI")
+	})
+}
+
+// openLink opens link in the background, within a span of the given name. When it
+// fails, the error given by failure is shown in the menu under the given prefix.
+func (lk *LogKeyboard) openLink(ctx context.Context, span, prefix, link string, failure func(error) error) {
 	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/watch", tracing.SpanOptions{},
+		_ = tracing.EventWrapFuncForErrGroup(ctx, span, tracing.SpanOptions{},
 			func(ctx context.Context) error {
-				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
 				err := open.Run(link)
 				if err != nil {
-					err = errors.New("could not open Docker Desktop Compose UI")
-					lk.keyboardError("Watch Docs", err)
+					err = failure(err)
+					lk.keyboardError(prefix, err)
 				}
 				return err
 			})()
