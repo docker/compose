@@ -935,30 +935,21 @@ func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
 			Weight: b.Weight,
 		})
 	}
-	for _, b := range blkio.DeviceReadBps {
-		resources.BlkioDeviceReadBps = append(resources.BlkioDeviceReadBps, &blkiodev.ThrottleDevice{
+	resources.BlkioDeviceReadBps = append(resources.BlkioDeviceReadBps, toThrottleDevices(blkio.DeviceReadBps)...)
+	resources.BlkioDeviceReadIOps = append(resources.BlkioDeviceReadIOps, toThrottleDevices(blkio.DeviceReadIOps)...)
+	resources.BlkioDeviceWriteBps = append(resources.BlkioDeviceWriteBps, toThrottleDevices(blkio.DeviceWriteBps)...)
+	resources.BlkioDeviceWriteIOps = append(resources.BlkioDeviceWriteIOps, toThrottleDevices(blkio.DeviceWriteIOps)...)
+}
+
+func toThrottleDevices(devices []types.ThrottleDevice) []*blkiodev.ThrottleDevice {
+	var out []*blkiodev.ThrottleDevice
+	for _, b := range devices {
+		out = append(out, &blkiodev.ThrottleDevice{
 			Path: b.Path,
 			Rate: uint64(b.Rate),
 		})
 	}
-	for _, b := range blkio.DeviceReadIOps {
-		resources.BlkioDeviceReadIOps = append(resources.BlkioDeviceReadIOps, &blkiodev.ThrottleDevice{
-			Path: b.Path,
-			Rate: uint64(b.Rate),
-		})
-	}
-	for _, b := range blkio.DeviceWriteBps {
-		resources.BlkioDeviceWriteBps = append(resources.BlkioDeviceWriteBps, &blkiodev.ThrottleDevice{
-			Path: b.Path,
-			Rate: uint64(b.Rate),
-		})
-	}
-	for _, b := range blkio.DeviceWriteIOps {
-		resources.BlkioDeviceWriteIOps = append(resources.BlkioDeviceWriteIOps, &blkiodev.ThrottleDevice{
-			Path: b.Path,
-			Rate: uint64(b.Rate),
-		})
-	}
+	return out
 }
 
 func buildContainerPorts(s types.ServiceConfig) (network.PortSet, error) {

@@ -526,3 +526,21 @@ volumes:
 		})
 	}
 }
+
+func TestSetBlkio(t *testing.T) {
+	resources := &container.Resources{}
+	setBlkio(&composetypes.BlkioConfig{
+		Weight:         300,
+		WeightDevice:   []composetypes.WeightDevice{{Path: "/dev/sda", Weight: 400}},
+		DeviceReadBps:  []composetypes.ThrottleDevice{{Path: "/dev/sda", Rate: 1}},
+		DeviceReadIOps: []composetypes.ThrottleDevice{{Path: "/dev/sdb", Rate: 2}},
+		DeviceWriteBps: []composetypes.ThrottleDevice{{Path: "/dev/sdc", Rate: 3}},
+	}, resources)
+	assert.Equal(t, resources.BlkioWeight, uint16(300))
+	assert.Equal(t, len(resources.BlkioWeightDevice), 1)
+	assert.Equal(t, resources.BlkioDeviceReadBps[0].Path, "/dev/sda")
+	assert.Equal(t, resources.BlkioDeviceReadBps[0].Rate, uint64(1))
+	assert.Equal(t, resources.BlkioDeviceReadIOps[0].Rate, uint64(2))
+	assert.Equal(t, resources.BlkioDeviceWriteBps[0].Rate, uint64(3))
+	assert.Assert(t, resources.BlkioDeviceWriteIOps == nil)
+}
