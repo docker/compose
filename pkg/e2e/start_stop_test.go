@@ -18,14 +18,7 @@
 
 package e2e
 
-import (
-	"fmt"
-	"strings"
-	"testing"
-
-	"gotest.tools/v3/assert"
-	"gotest.tools/v3/icmd"
-)
+import "testing"
 
 func TestStartStop(t *testing.T) {
 	s := NewScenario(t, "stop must halt the project's containers in place, start must bring the same ones back")
@@ -117,66 +110,49 @@ func TestStartStopWithOneOffs(t *testing.T) {
 }
 
 func TestStartAlreadyRunning(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-already-running",
-		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
-	t.Cleanup(func() {
-		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
-	})
-
-	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
-
-	res := cli.RunDockerComposeCmd(t, "start", "simple")
-	assert.Equal(t, res.Stdout(), "", "No output should have been written to stdout")
+	NewScenario(t, "start on an already running service must be a silent no-op").
+		Step("up starts the service and waits for it",
+			ComposeCmd("up", "-d", "--wait"),
+			ServiceState("simple", "running")).
+		Step("start leaves the running container alone and writes nothing to stdout",
+			ComposeCmd("start", "simple"),
+			StdoutEmpty(),
+			ServiceState("simple", "running"),
+			NotRecreated("simple"))
 }
 
 func TestStopAlreadyStopped(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-already-stopped",
-		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
-	t.Cleanup(func() {
-		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
-	})
-
-	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
-
-	// stop the container
-	cli.RunDockerComposeCmd(t, "stop", "simple")
-
-	// attempt to stop it again
-	res := cli.RunDockerComposeCmdNoCheck(t, "stop", "simple")
-	// TODO: for consistency, this should NOT write any output because the
-	// 		container is already stopped
-	res.Assert(t, icmd.Expected{
-		ExitCode: 0,
-		Err:      "Container e2e-start-stop-svc-already-stopped-simple-1 Stopped",
-	})
+	s := NewScenario(t, "stop on an already stopped service must succeed and leave it stopped")
+	s.Step("up starts the services and waits for them",
+		ComposeCmd("up", "-d", "--wait"),
+		ServiceState("simple", "running")).
+		Step("stop halts the service",
+			ComposeCmd("stop", "simple"),
+			ServiceState("simple", "exited")).
+		Step("stopping it again succeeds and leaves it stopped",
+			ComposeCmd("stop", "simple"),
+			ServiceState("simple", "exited"),
+			NotRecreated("simple"),
+			// TODO: for consistency, this should NOT write any output because the
+			// 		container is already stopped
+			StderrContains("Container "+s.Project()+"-simple-1 Stopped"))
 }
 
 func TestStartStopMultipleServices(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv(
-		"COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple",
-		"COMPOSE_FILE=./fixtures/start-stop/compose.yaml"))
-	t.Cleanup(func() {
-		cli.RunDockerComposeCmd(t, "down", "--remove-orphans", "-v", "-t", "0")
-	})
-
-	cli.RunDockerComposeCmd(t, "up", "-d", "--wait")
-
-	res := cli.RunDockerComposeCmd(t, "stop", "simple", "another")
-	services := []string{"simple", "another"}
-	for _, svc := range services {
-		stopMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1 Stopped", svc)
-		assert.Assert(t, strings.Contains(res.Stderr(), stopMsg),
-			fmt.Sprintf("Missing stop message for %s\n%s", svc, res.Combined()))
-	}
-
-	res = cli.RunDockerComposeCmd(t, "start", "simple", "another")
-	for _, svc := range services {
-		startMsg := fmt.Sprintf("Container e2e-start-stop-svc-multiple-%s-1 Started", svc)
-		assert.Assert(t, strings.Contains(res.Stderr(), startMsg),
-			fmt.Sprintf("Missing start message for %s\n%s", svc, res.Combined()))
-	}
+	NewScenario(t, "stop and start must act on every service named on the command line").
+		Step("up starts the services and waits for them",
+			ComposeCmd("up", "-d", "--wait"),
+			ServiceState("simple", "running"),
+			ServiceState("another", "running")).
+		Step("stop halts both named services",
+			ComposeCmd("stop", "simple", "another"),
+			ServiceState("simple", "exited"),
+			ServiceState("another", "exited")).
+		Step("start brings both named services back, reusing their containers",
+			ComposeCmd("start", "simple", "another"),
+			ServiceState("simple", "running"),
+			ServiceState("another", "running"),
+			NotRecreated("simple", "another"))
 }
 
 func TestStartSingleServiceAndDependency(t *testing.T) {
@@ -198,17 +174,23 @@ func TestStartSingleServiceAndDependency(t *testing.T) {
 }
 
 func TestStartStopMultipleFiles(t *testing.T) {
-	cli := NewParallelCLI(t, WithEnv("COMPOSE_PROJECT_NAME=e2e-start-stop-svc-multiple-files"))
-	t.Cleanup(func() {
-		cli.RunDockerComposeCmd(t, "-p", "e2e-start-stop-svc-multiple-files", "down", "--remove-orphans")
-	})
-
-	cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "up", "-d")
-	cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/other.yaml", "up", "-d")
-
-	res := cli.RunDockerComposeCmd(t, "-f", "./fixtures/start-stop/compose.yaml", "stop")
-	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-simple-1 Stopped"), res.Combined())
-	assert.Assert(t, strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-another-1 Stopped"), res.Combined())
-	assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-a-different-one-1 Stopped"), res.Combined())
-	assert.Assert(t, !strings.Contains(res.Combined(), "Container e2e-start-stop-svc-multiple-files-and-another-one-1 Stopped"), res.Combined())
+	s := NewScenario(t, "stop must only act on the services of the compose file it is given, in a project spanning several files")
+	s.Step("up starts the services of the first file",
+		ComposeCmd("up", "-d"),
+		ServiceState("simple", "running"),
+		ServiceState("another", "running"))
+	s.FromFile("other.yaml").
+		Step("up of a second file adds its services to the same project",
+			ComposeCmd("up", "-d"),
+			ServiceState("simple", "running"),
+			ServiceState("another", "running"),
+			ServiceState("a-different-one", "running"),
+			ServiceState("and-another-one", "running"))
+	s.FromFile("compose.yaml").
+		Step("stop with the first file halts its services only",
+			ComposeCmd("stop"),
+			ServiceState("simple", "exited"),
+			ServiceState("another", "exited"),
+			ServiceState("a-different-one", "running"),
+			ServiceState("and-another-one", "running"))
 }
