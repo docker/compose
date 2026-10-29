@@ -24,25 +24,7 @@ import (
 
 // ReplaceExtendsFile changes value for service.extends.file in input yaml stream, preserving formatting
 func ReplaceExtendsFile(in []byte, serviceName string, value string) ([]byte, error) {
-	var doc yaml.Node
-	err := yaml.Unmarshal(in, &doc)
-	if err != nil {
-		return nil, err
-	}
-	if doc.Kind != yaml.DocumentNode {
-		return nil, fmt.Errorf("expected document kind %v, got %v", yaml.DocumentNode, doc.Kind)
-	}
-	root := doc.Content[0]
-	if root.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected document root to be a mapping, got %v", root.Kind)
-	}
-
-	services, err := getMapping(root, "services")
-	if err != nil {
-		return nil, err
-	}
-
-	target, err := getMapping(services, serviceName)
+	target, err := loadService(in, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -63,25 +45,7 @@ func ReplaceExtendsFile(in []byte, serviceName string, value string) ([]byte, er
 
 // ReplaceEnvFile changes value for service.extends.env_file in input yaml stream, preserving formatting
 func ReplaceEnvFile(in []byte, serviceName string, i int, value string) ([]byte, error) {
-	var doc yaml.Node
-	err := yaml.Unmarshal(in, &doc)
-	if err != nil {
-		return nil, err
-	}
-	if doc.Kind != yaml.DocumentNode {
-		return nil, fmt.Errorf("expected document kind %v, got %v", yaml.DocumentNode, doc.Kind)
-	}
-	root := doc.Content[0]
-	if root.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected document root to be a mapping, got %v", root.Kind)
-	}
-
-	services, err := getMapping(root, "services")
-	if err != nil {
-		return nil, err
-	}
-
-	target, err := getMapping(services, serviceName)
+	target, err := loadService(in, serviceName)
 	if err != nil {
 		return nil, err
 	}
@@ -104,6 +68,29 @@ func ReplaceEnvFile(in []byte, serviceName string, i int, value string) ([]byte,
 	} else {
 		return replace(in, envFile.Line, envFile.Column, value), nil
 	}
+}
+
+// loadService parses the yaml stream and returns the node of the given service.
+func loadService(in []byte, serviceName string) (*yaml.Node, error) {
+	var doc yaml.Node
+	err := yaml.Unmarshal(in, &doc)
+	if err != nil {
+		return nil, err
+	}
+	if doc.Kind != yaml.DocumentNode {
+		return nil, fmt.Errorf("expected document kind %v, got %v", yaml.DocumentNode, doc.Kind)
+	}
+	root := doc.Content[0]
+	if root.Kind != yaml.MappingNode {
+		return nil, fmt.Errorf("expected document root to be a mapping, got %v", root.Kind)
+	}
+
+	services, err := getMapping(root, "services")
+	if err != nil {
+		return nil, err
+	}
+
+	return getMapping(services, serviceName)
 }
 
 func getMapping(root *yaml.Node, key string) (*yaml.Node, error) {
