@@ -74,12 +74,9 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	project := options.Project
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return err
-		}
+	project, err := s.projectOrFromResources(ctx, options.Project, containers, projectName)
+	if err != nil {
+		return err
 	}
 
 	// keep only the requested services that exist in the model
@@ -536,6 +533,15 @@ func (s *composeService) downService(ctx context.Context, project *types.Project
 		return s.runPlugin(ctx, project, serv, "down")
 	}
 	return nil
+}
+
+// projectOrFromResources returns the project the command was given, or else the one
+// rebuilt from the resources the containers and the engine hold.
+func (s *composeService) projectOrFromResources(ctx context.Context, project *types.Project, containers Containers, projectName string) (*types.Project, error) {
+	if project != nil {
+		return project, nil
+	}
+	return s.getProjectWithResources(ctx, containers, projectName)
 }
 
 func (s *composeService) getProjectWithResources(ctx context.Context, containers Containers, projectName string) (*types.Project, error) {

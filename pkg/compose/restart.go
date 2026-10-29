@@ -71,13 +71,9 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 // prepareRestartProject resolves the project restart applies to, restricted
 // to the requested services and the depends_on relations with restart: true
 func (s *composeService) prepareRestartProject(ctx context.Context, containers Containers, projectName string, options api.RestartOptions) (*types.Project, error) {
-	project := options.Project
-	var err error
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return nil, err
-		}
+	project, err := s.projectOrFromResources(ctx, options.Project, containers, projectName)
+	if err != nil {
+		return nil, err
 	}
 
 	if options.NoDeps {

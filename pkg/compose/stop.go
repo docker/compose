@@ -37,12 +37,9 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	project := options.Project
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return err
-		}
+	project, err := s.projectOrFromResources(ctx, options.Project, containers, projectName)
+	if err != nil {
+		return err
 	}
 
 	if len(options.Services) == 0 {
