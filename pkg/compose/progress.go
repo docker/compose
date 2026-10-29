@@ -18,7 +18,12 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
+
+	"github.com/moby/moby/api/types/jsonstream"
 
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
@@ -46,4 +51,29 @@ func buildingEvent(id string) api.Resource {
 // builtEvent creates a new built (done) Resource
 func builtEvent(id string) api.Resource {
 	return progress.New("Image "+id, api.Done, api.StatusBuilt)
+}
+
+// decodeProgressStream reads the JSON messages the daemon streams while pulling or
+// pushing an image, handing each of them to onMessage. It stops at the first
+// message carrying an error, which it returns.
+func decodeProgressStream(stream io.Reader, onMessage func(jsonstream.Message)) error {
+	dec := json.NewDecoder(stream)
+	for {
+		var jm jsonstream.Message
+		if err := dec.Decode(&jm); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		if jm.Error != nil {
+			return errors.New(jm.Error.Message)
+		}
+		onMessage(jm)
+	}
+}
+
+// progressPercent is how far current is from total, which must be positive, in percent.
+func progressPercent(current, total int64) int {
+	return min(int(current*100/total), 100)
 }

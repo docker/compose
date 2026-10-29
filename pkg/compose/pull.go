@@ -18,10 +18,8 @@ package compose
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -355,21 +353,12 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	dec := json.NewDecoder(stream)
-	for {
-		var jm jsonstream.Message
-		if err := dec.Decode(&jm); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return err
-		}
-		if jm.Error != nil {
-			return errors.New(jm.Error.Message)
-		}
+	if err := decodeProgressStream(stream, func(jm jsonstream.Message) {
 		if !quietPull {
 			toPullProgressEvent(resource, jm, s.events)
 		}
+	}); err != nil {
+		return err
 	}
 	s.events.On(progress.New(resource, api.Done, api.StatusPulled))
 
@@ -626,7 +615,7 @@ func toPullProgressEvent(parent string, jm jsonstream.Message, events api.EventP
 			current = jm.Progress.Current
 			total = jm.Progress.Total
 			if jm.Progress.Total > 0 {
-				percent = min(int(jm.Progress.Current*100/jm.Progress.Total), 100)
+				percent = progressPercent(jm.Progress.Current, jm.Progress.Total)
 			}
 		}
 	case DownloadCompletePhase, AlreadyExistsPhase, PullCompletePhase:
