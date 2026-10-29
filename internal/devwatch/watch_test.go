@@ -139,27 +139,33 @@ func (s stdLogger) Status(containerName, msg string) {
 
 func TestWatch_Sync(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
-		// we expect the image to be pruned
-		var pruned atomic.Int32
+		// the Backend calls below run on the rebuild's goroutine, where a failed
+		// assertion must not abort the goroutine (FailNow is for the test's own
+		// goroutine): they record what they observe, checked once the rebuild
+		// has settled.
+		type prune struct {
+			projectName string
+			keep        [2]bool
+		}
+		var (
+			pruned     atomic.Int32
+			created    atomic.Pointer[api.CreateOptions]
+			lastPruned atomic.Pointer[prune]
+		)
 		backend := &fakeBackend{
 			t: t,
 			build: func(context.Context, *types.Project, api.BuildOptions) (map[string]string, error) {
 				return map[string]string{}, nil
 			},
 			createAndStart: func(_ context.Context, _ *types.Project, options api.CreateOptions) error {
-				assert.DeepEqual(t, options, api.CreateOptions{
-					Services:      []string{"test"},
-					Inherit:       true,
-					Recreate:      api.RecreateForce,
-					SkipProviders: true,
-				})
+				created.Store(&options)
 				return nil
 			},
 			removeDanglingImages: func(_ context.Context, projectName string, keep func(image.Summary) bool) error {
-				assert.Equal(t, projectName, "myProjectName")
-				// nothing was just built: no dangling image is spared
-				assert.Assert(t, !keep(image.Summary{ID: "123"}))
-				assert.Assert(t, !keep(image.Summary{ID: "456"}))
+				lastPruned.Store(&prune{
+					projectName: projectName,
+					keep:        [2]bool{keep(image.Summary{ID: "123"}), keep(image.Summary{ID: "456"})},
+				})
 				pruned.Add(1)
 				return nil
 			},
@@ -235,7 +241,18 @@ func TestWatch_Sync(t *testing.T) {
 			{HostPath: "/sync/changed", ContainerPath: "/work/changed"},
 		}
 		assert.DeepEqual(t, expected, actual)
+		// we expect the image to be pruned
 		assert.Equal(t, pruned.Load(), int32(1))
+		assert.DeepEqual(t, *created.Load(), api.CreateOptions{
+			Services:      []string{"test"},
+			Inherit:       true,
+			Recreate:      api.RecreateForce,
+			SkipProviders: true,
+		})
+		got := lastPruned.Load()
+		assert.Equal(t, got.projectName, "myProjectName")
+		// nothing was just built: no dangling image is spared
+		assert.Equal(t, got.keep, [2]bool{false, false})
 	})
 }
 
