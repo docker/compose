@@ -33,7 +33,8 @@ import (
 
 	"github.com/moby/go-archive"
 	"github.com/moby/moby/api/types/container"
-	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/internal/concurrency"
 )
 
 type archiveEntry struct {
@@ -92,15 +93,14 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 		deleteCmd = append([]string{"rm", "-rf"}, pathsToDelete...)
 	}
 
+	// no fail-fast: every container's errors are collected, so the context the
+	// group derives is not used.
+	eg, _ := concurrency.NewErrgroup(ctx, t.maxConcurrency)
 	var (
-		eg    errgroup.Group
 		errMu sync.Mutex
 		errs  = make([]error, 0, len(containers)*2) // max 2 errs per container
 	)
 
-	if t.maxConcurrency > 0 {
-		eg.SetLimit(t.maxConcurrency)
-	}
 	for i := range containers {
 		containerID := containers[i].ID
 		tarReader := tarArchive(pathsToCopy, keepImpliedDirectories)

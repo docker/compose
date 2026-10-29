@@ -24,6 +24,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -51,7 +52,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	// post_start hook) — a per-service bound alone allows as many
 	// independent services to run at once as the graph permits, each with
 	// its own maxConcurrency budget
-	limiter := newOptionalLimiter(s.maxConcurrency)
+	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
 	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		config := project.Services[service]
@@ -60,7 +61,7 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 			return err
 		}
 
-		return forEachWithLimiter(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
+		return concurrency.ForEach(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
 			return s.restartContainer(ctx, project.Services[service], ctr, options)
 		})
 	})

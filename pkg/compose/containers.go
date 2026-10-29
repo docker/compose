@@ -27,6 +27,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -206,12 +207,11 @@ func (containers Containers) filter(predicates ...containerPredicate) Containers
 }
 
 // forEachContainerConcurrent runs fn for every container concurrently and
-// waits for all goroutines. Use forEachWithLimiter (compose.go)
-// instead when the concurrency budget must be shared across several
-// concurrently-dispatched calls, e.g. one per service visited by
-// InDependencyOrder.
+// waits for all goroutines. Use concurrency.ForEach instead when the
+// concurrency budget must be shared across several concurrently-dispatched
+// calls, e.g. one per service visited by InDependencyOrder.
 func forEachContainerConcurrent(ctx context.Context, maxConcurrency int, containers Containers, fn func(context.Context, container.Summary) error) error {
-	eg, ctx := newLimitedErrgroup(ctx, maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return fn(ctx, ctr)

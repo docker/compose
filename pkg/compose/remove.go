@@ -23,6 +23,7 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -97,7 +98,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 }
 
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)

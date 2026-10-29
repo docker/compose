@@ -37,6 +37,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	compose "github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -843,7 +844,7 @@ func TestRemoveTaggedImagesOp_ContinuesAfterOneImageFails(t *testing.T) {
 	apiClient.EXPECT().ImageRemove(liveCtx{}, "repo/c:latest", client.ImageRemoveOptions{}).
 		Return(client.ImageRemoveResult{}, nil)
 
-	opErr := svc.removeTaggedImagesOp(t.Context(), project, ImagePruneOptions{Mode: ImagePruneLocal, RemoveOrphans: true}, newOptionalLimiter(1))
+	opErr := svc.removeTaggedImagesOp(t.Context(), project, ImagePruneOptions{Mode: ImagePruneLocal, RemoveOrphans: true}, concurrency.NewLimiter(1))
 	assert.ErrorContains(t, opErr, daemonErr.Error())
 
 	// dispatch order across images is no longer deterministic now that the

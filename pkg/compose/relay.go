@@ -24,6 +24,7 @@ import (
 	"github.com/moby/moby/client"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	relaymgr "github.com/docker/compose/v5/internal/relay" // not "relay": a test type of this package already goes by that name
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -56,10 +57,10 @@ func (s *composeService) ensureRelayLinkNetworksDown(ctx context.Context, projec
 	ops := make([]downOp, 0, len(networks))
 	for _, n := range networks {
 		ops = append(ops, func() error {
-			if err := acquireSlot(ctx, limiter); err != nil {
+			if err := concurrency.Acquire(ctx, limiter); err != nil {
 				return err
 			}
-			defer releaseSlot(limiter)
+			defer concurrency.Release(limiter)
 			return relays.RemoveLinkNetwork(ctx, n)
 		})
 	}

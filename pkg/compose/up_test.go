@@ -33,6 +33,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -257,7 +258,7 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 	u := &upSession{
 		composeService: svc,
 		globalCtx:      t.Context(),
-		logOpenLimiter: newOptionalLimiter(1),
+		logOpenLimiter: concurrency.NewLimiter(1),
 		options:        api.UpOptions{Start: api.StartOptions{Attach: &testLogConsumer{}}},
 	}
 

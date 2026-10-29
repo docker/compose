@@ -24,6 +24,7 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -43,7 +44,7 @@ func (s *Service) Ps(ctx context.Context, projectName string, options api.PsOpti
 		containers = inServices(containers, options.Services)
 	}
 	summary := make([]api.ContainerSummary, len(containers))
-	eg, ctx := limitedGroup(ctx, s.backend.MaxConcurrency())
+	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())
 	for i, ctr := range containers {
 		eg.Go(func() error {
 			var err error

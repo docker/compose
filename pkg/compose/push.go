@@ -31,6 +31,7 @@ import (
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -45,7 +46,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 }
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 
 	for _, service := range project.Services {
 		if service.Build == nil || service.Image == "" {

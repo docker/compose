@@ -35,6 +35,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/desktop"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
@@ -277,7 +278,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		menu:           navigationMenu,
 		globalCtx:      globalCtx,
 		cancel:         cancel,
-		logOpenLimiter: newOptionalLimiter(s.maxConcurrency),
+		logOpenLimiter: concurrency.NewLimiter(s.maxConcurrency),
 		signalChan:     signalChan,
 	}
 

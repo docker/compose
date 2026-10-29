@@ -40,6 +40,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	pathutil "github.com/docker/compose/v5/internal/paths"
 	"github.com/docker/compose/v5/internal/sync"
 	"github.com/docker/compose/v5/internal/tracing"
@@ -596,7 +597,7 @@ func (s *composeService) handleWatchBatch(ctx context.Context, project *types.Pr
 			fmt.Sprintf("service(s) %q restarted", services))
 	}
 
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	for service, rulesToExec := range exec {
 		slices.Sort(rulesToExec)
 		for _, i := range slices.Compact(rulesToExec) {

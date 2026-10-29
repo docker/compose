@@ -33,6 +33,7 @@ import (
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -48,7 +49,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	defer mdlAPI.Close()
 	availableModels, err := mdlAPI.ListModels(ctx)
 
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
 		return mdlAPI.SetModelVariables(ctx, project)
 	})

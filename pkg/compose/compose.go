@@ -36,8 +36,6 @@ import (
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
-	"golang.org/x/sync/errgroup"
-	"golang.org/x/sync/semaphore"
 
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
@@ -167,79 +165,6 @@ func WithMaxConcurrency(maxConcurrency int) Option {
 		s.maxConcurrency = maxConcurrency
 		return nil
 	}
-}
-
-// newLimitedErrgroup returns an errgroup.Group bounded to maxConcurrency
-// concurrent goroutines. maxConcurrency<=0 (including the Go zero-value)
-// leaves it unlimited, since errgroup.SetLimit(0) means "allow zero
-// goroutines", not "unlimited".
-func newLimitedErrgroup(ctx context.Context, maxConcurrency int) (*errgroup.Group, context.Context) {
-	eg, ctx := errgroup.WithContext(ctx)
-	if maxConcurrency > 0 {
-		eg.SetLimit(maxConcurrency)
-	}
-	return eg, ctx
-}
-
-// newOptionalLimiter returns a semaphore bounding concurrency to
-// maxConcurrency, or nil when maxConcurrency<=0 (unlimited). Use it, with
-// acquireSlot/releaseSlot, to gate only part of a goroutine's work — e.g. an
-// indefinite stream's opening call, not the stream itself — where
-// newLimitedErrgroup's whole-goroutine bound doesn't apply.
-func newOptionalLimiter(maxConcurrency int) *semaphore.Weighted {
-	if maxConcurrency <= 0 {
-		return nil
-	}
-	return semaphore.NewWeighted(int64(maxConcurrency))
-}
-
-// acquireSlot acquires a slot from limiter, or is a no-op when limiter is nil.
-func acquireSlot(ctx context.Context, limiter *semaphore.Weighted) error {
-	if limiter == nil {
-		return nil
-	}
-	return limiter.Acquire(ctx, 1)
-}
-
-// releaseSlot releases a slot acquired via acquireSlot, or is a no-op when
-// limiter is nil.
-func releaseSlot(limiter *semaphore.Weighted) {
-	if limiter != nil {
-		limiter.Release(1)
-	}
-}
-
-// panicSafeReleaseSlot is deferred by callers that release a slot earlier
-// than function exit on the success path (see inspectWithSlot and
-// doLogContainer) to avoid leaking it if the guarded call panics before
-// reaching that point. It is a no-op unless the deferring goroutine is
-// unwinding from a panic, in which case it releases the slot and re-panics.
-func panicSafeReleaseSlot(limiter *semaphore.Weighted) {
-	if p := recover(); p != nil {
-		releaseSlot(limiter)
-		panic(p)
-	}
-}
-
-// forEachWithLimiter runs fn concurrently for each item, bounded by limiter.
-// Unlike newLimitedErrgroup, limiter is built by the caller and can be
-// shared across several concurrently-dispatched calls (e.g. one per service
-// visited by InDependencyOrder, or one per sibling down op), so the combined
-// concurrency across all of them never exceeds the configured budget.
-// Use forEachContainerConcurrent (containers.go) instead when the call is
-// standalone and doesn't need to share its budget with any other call.
-func forEachWithLimiter[T any](ctx context.Context, limiter *semaphore.Weighted, items []T, fn func(context.Context, T) error) error {
-	eg, ctx := errgroup.WithContext(ctx)
-	for _, item := range items {
-		eg.Go(func() error {
-			if err := acquireSlot(ctx, limiter); err != nil {
-				return err
-			}
-			defer releaseSlot(limiter)
-			return fn(ctx, item)
-		})
-	}
-	return eg.Wait()
 }
 
 // WithDryRun configure Compose to run without actually applying changes

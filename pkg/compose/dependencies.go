@@ -26,6 +26,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/types"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -145,7 +146,7 @@ func (t *graphTraversal) visit(ctx context.Context, g *Graph) error {
 	if t.maxConcurrency > 0 {
 		limit = t.maxConcurrency + 1
 	}
-	eg, ctx := newLimitedErrgroup(ctx, limit)
+	eg, ctx := concurrency.NewErrgroup(ctx, limit)
 	nodeCh := make(chan *Vertex, expect)
 	defer close(nodeCh)
 	// nodeCh need to allow n=expect writers while reader goroutine could have returner after ctx.Done

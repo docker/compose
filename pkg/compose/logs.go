@@ -31,6 +31,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -56,9 +57,9 @@ func (s *composeService) Logs(
 	var limiter *semaphore.Weighted
 	if options.Follow {
 		eg, ctx = errgroup.WithContext(ctx)
-		limiter = newOptionalLimiter(s.maxConcurrency)
+		limiter = concurrency.NewLimiter(s.maxConcurrency)
 	} else {
-		eg, ctx = newLimitedErrgroup(ctx, s.maxConcurrency)
+		eg, ctx = concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	}
 	for _, ctr := range containers {
 		eg.Go(func() error {
@@ -112,13 +113,13 @@ func (s *composeService) selectLogsContainers(ctx context.Context, projectName s
 // releasing the slot on error since no caller reaches doLogContainer (which
 // owns the slot from here on) in that case.
 func (s *composeService) inspectWithSlot(ctx context.Context, limiter *semaphore.Weighted, id string) (container.InspectResponse, error) {
-	if err := acquireSlot(ctx, limiter); err != nil {
+	if err := concurrency.Acquire(ctx, limiter); err != nil {
 		return container.InspectResponse{}, err
 	}
-	defer panicSafeReleaseSlot(limiter)
+	defer concurrency.PanicSafeRelease(limiter)
 	res, err := s.apiClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
-		releaseSlot(limiter)
+		concurrency.Release(limiter)
 		return container.InspectResponse{}, err
 	}
 	return res.Container, nil
@@ -262,8 +263,8 @@ func logsSinceLastRun(ctr container.InspectResponse) string {
 
 // doLogContainer opens the container's log stream and copies it to consumer
 // until it ends. The caller must have already acquired limiter's slot (see
-// acquireSlot); it is released here right after ContainerLogs returns, so a
-// long-lived --follow stream never keeps blocking new connections or the
+// concurrency.Acquire); it is released here right after ContainerLogs returns,
+// so a long-lived --follow stream never keeps blocking new connections or the
 // monitor.
 //
 // cur, when not nil, is the container's logCursor: the stream then starts after
@@ -286,12 +287,12 @@ func (s *composeService) doLogContainer(
 		options.Since = cur.since(options.Since)
 		options.Timestamps = true
 	}
-	// Scoped to a closure so panicSafeReleaseSlot's defer only guards the
-	// acquire-to-release window: releaseSlot below is unconditional once
+	// Scoped to a closure so concurrency.PanicSafeRelease's defer only guards the
+	// acquire-to-release window: concurrency.Release below is unconditional once
 	// ContainerLogs returns, so a panic during the copy loop that follows
 	// must not re-trigger it and release the same slot twice.
 	r, err := func() (io.ReadCloser, error) {
-		defer panicSafeReleaseSlot(limiter)
+		defer concurrency.PanicSafeRelease(limiter)
 		r, err := s.apiClient().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
@@ -301,7 +302,7 @@ func (s *composeService) doLogContainer(
 			Tail:       options.Tail,
 			Timestamps: options.Timestamps,
 		})
-		releaseSlot(limiter)
+		concurrency.Release(limiter)
 		return r, err
 	}()
 	if err != nil {

@@ -28,6 +28,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -237,7 +238,7 @@ func (exec *planExecutor) begin(plan *Plan) (*planRun, error) {
 		failedDependency: failedDependency,
 		groups:           groups,
 		events:           events,
-		limiter:          newOptionalLimiter(exec.compose.maxConcurrency),
+		limiter:          concurrency.NewLimiter(exec.compose.maxConcurrency),
 	}
 
 	var createNodes, startNodes []*PlanNode
@@ -385,10 +386,10 @@ func acquireNodeSlot(ctx context.Context, limiter *semaphore.Weighted, node *Pla
 	if node.Operation.Type == OpWaitCondition {
 		return func() {}, nil
 	}
-	if err := acquireSlot(ctx, limiter); err != nil {
+	if err := concurrency.Acquire(ctx, limiter); err != nil {
 		return nil, err
 	}
-	return func() { releaseSlot(limiter) }, nil
+	return func() { concurrency.Release(limiter) }, nil
 }
 
 // runState carries the per-planRun state every node's goroutine shares: the

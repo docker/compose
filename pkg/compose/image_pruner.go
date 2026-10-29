@@ -31,6 +31,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/semaphore"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -188,7 +189,7 @@ func (s *composeService) removeImages(ctx context.Context, images []image.Summar
 	// as in removeTaggedImagesOp, a single image failure must not cancel the
 	// shared errgroup ctx, so fn always returns nil and collects into the
 	// buckets below instead.
-	_ = forEachWithLimiter(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
+	_ = concurrency.ForEach(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
 		if _, err := s.apiClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
 			mu.Lock()
 			defer mu.Unlock()
@@ -244,7 +245,7 @@ func (s *composeService) removeDanglingImages(ctx context.Context, projectName s
 	if err != nil {
 		return nil, err
 	}
-	removed, _, err := s.removeImages(ctx, eligible, newOptionalLimiter(s.maxConcurrency))
+	removed, _, err := s.removeImages(ctx, eligible, concurrency.NewLimiter(s.maxConcurrency))
 	return removed, err
 }
 
@@ -279,7 +280,7 @@ func (p *ImagePruner) filterImagesByExistence(ctx context.Context, imageNames []
 	var mu sync.Mutex
 	var ret []string
 
-	err := forEachWithLimiter(ctx, p.limiter, imageNames, func(ctx context.Context, img string) error {
+	err := concurrency.ForEach(ctx, p.limiter, imageNames, func(ctx context.Context, img string) error {
 		_, err := p.client.ImageInspect(ctx, img)
 		if errdefs.IsNotFound(err) {
 			// err on the side of caution: only skip if we successfully

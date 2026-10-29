@@ -24,8 +24,8 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
-	"golang.org/x/sync/errgroup"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/inspect"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -67,10 +67,7 @@ func New(backend Backend) *Service {
 // forEachContainerConcurrent runs fn for every container concurrently, at most
 // maxConcurrency at a time (0 meaning no bound), and waits for all of them.
 func forEachContainerConcurrent(ctx context.Context, maxConcurrency int, containers []container.Summary, fn func(context.Context, container.Summary) error) error {
-	eg, ctx := errgroup.WithContext(ctx)
-	if maxConcurrency > 0 {
-		eg.SetLimit(maxConcurrency)
-	}
+	eg, ctx := concurrency.NewErrgroup(ctx, maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			return fn(ctx, ctr)

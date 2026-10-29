@@ -22,6 +22,7 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -36,7 +37,7 @@ func (s *Service) Top(ctx context.Context, projectName string, services []string
 		containers = inServices(containers, services)
 	}
 	summary := make([]api.ContainerProcSummary, len(containers))
-	eg, ctx := limitedGroup(ctx, s.backend.MaxConcurrency())
+	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())
 	for i, ctr := range containers {
 		eg.Go(func() error {
 			topContent, err := s.backend.APIClient().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{
