@@ -20,7 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"sync"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -314,11 +315,6 @@ func normalizeAndDedupeImages(images []string) []string {
 		}
 		seen[img] = struct{}{}
 	}
-	ret := make([]string, 0, len(seen))
-	for v := range seen {
-		ret = append(ret, v)
-	}
 	// ensure a deterministic return result - the actual ordering is not useful
-	sort.Strings(ret)
-	return ret
+	return slices.Sorted(maps.Keys(seen))
 }

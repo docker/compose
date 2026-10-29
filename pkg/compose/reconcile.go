@@ -20,6 +20,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -227,7 +228,7 @@ func reconcile(_ context.Context, project *types.Project, observed *ObservedStat
 // warned so they can clean up, and selection stays deterministic across runs.
 func (r *reconciler) resolveObserved() {
 	r.resolvedNetworks = make(map[string]ObservedNetwork, len(r.project.Networks))
-	for _, key := range sortedKeys(r.project.Networks) {
+	for _, key := range slices.Sorted(maps.Keys(r.project.Networks)) {
 		selected, orphans, ok := r.observed.selectNetwork(key, r.project.Networks[key].Name)
 		if !ok {
 			continue
@@ -239,7 +240,7 @@ func (r *reconciler) resolveObserved() {
 		}
 	}
 	r.resolvedVolumes = make(map[string]ObservedVolume, len(r.project.Volumes))
-	for _, key := range sortedKeys(r.project.Volumes) {
+	for _, key := range slices.Sorted(maps.Keys(r.project.Volumes)) {
 		selected, orphans, ok := r.observed.selectVolume(key, r.project.Volumes[key].Name)
 		if !ok {
 			continue
@@ -270,7 +271,7 @@ func (r *reconciler) resolveObserved() {
 // leaving it dangling) is safe and keeps subsequent runs deterministic.
 func (r *reconciler) reconcileNetworks() error {
 	var diverged []string
-	for _, key := range sortedKeys(r.project.Networks) {
+	for _, key := range slices.Sorted(maps.Keys(r.project.Networks)) {
 		desired := r.project.Networks[key]
 		if desired.External {
 			continue
@@ -430,7 +431,7 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 // from deliberate manual setup, and volumes carry data.
 func (r *reconciler) reconcileVolumes() error {
 	var diverged []string
-	for _, key := range sortedKeys(r.project.Volumes) {
+	for _, key := range slices.Sorted(maps.Keys(r.project.Volumes)) {
 		desired := r.project.Volumes[key]
 		if desired.External {
 			continue
@@ -527,7 +528,7 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 			serviceSet[serviceName] = true
 		}
 	}
-	services := sortedKeys(serviceSet)
+	services := slices.Sorted(maps.Keys(serviceSet))
 	containers := r.containersForServices(services)
 
 	// Stop then remove every affected container.
@@ -603,7 +604,7 @@ func (r *reconciler) servicesUsingNetwork(networkKey string) []string {
 // compose network key, sorted.
 func networkConsumers(services types.Services, networkKey string) []string {
 	var names []string
-	for _, key := range sortedKeys(services) {
+	for _, key := range slices.Sorted(maps.Keys(services)) {
 		service := services[key]
 		if _, ok := service.Networks[networkKey]; ok {
 			names = append(names, service.Name)
@@ -648,7 +649,7 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 func volumeConsumers(services types.Services, volumeKey string) []string {
 	inSet := map[string]bool{}
 	// Seed with services that mount the volume directly.
-	for _, key := range sortedKeys(services) {
+	for _, key := range slices.Sorted(maps.Keys(services)) {
 		service := services[key]
 		for _, v := range service.Volumes {
 			if v.Source == volumeKey {
@@ -662,7 +663,7 @@ func volumeConsumers(services types.Services, volumeKey string) []string {
 	// the set (references to external containers carry no compose dependency).
 	for {
 		added := false
-		for _, key := range sortedKeys(services) {
+		for _, key := range slices.Sorted(maps.Keys(services)) {
 			service := services[key]
 			if inSet[service.Name] {
 				continue
@@ -683,7 +684,7 @@ func volumeConsumers(services types.Services, volumeKey string) []string {
 			break
 		}
 	}
-	return sortedKeys(inSet)
+	return slices.Sorted(maps.Keys(inSet))
 }
 
 // containersForServices returns all observed containers belonging to the given
@@ -727,7 +728,7 @@ func (r *reconciler) serviceGraph() (*Graph, error) {
 func (r *reconciler) visitInDependencyOrder(g *Graph, visit func(types.ServiceConfig) error) error {
 	visited := map[string]bool{}
 	// Sort vertex keys for deterministic plan output in tests
-	keys := sortedKeys(g.Vertices)
+	keys := slices.Sorted(maps.Keys(g.Vertices))
 	for {
 		// Find a vertex whose all children are visited
 		var next *Vertex
@@ -1090,7 +1091,7 @@ func serviceHashWithResolvedRefs(service types.ServiceConfig, containers map[str
 
 // hasNetworkMismatch checks if the container is not connected to all expected networks.
 func (r *reconciler) hasNetworkMismatch(expected types.ServiceConfig, oc ObservedContainer) bool {
-	for _, net := range sortedKeys(expected.Networks) {
+	for _, net := range slices.Sorted(maps.Keys(expected.Networks)) {
 		expectedID := ""
 		if obs, ok := r.resolvedNetworks[net]; ok {
 			expectedID = obs.ID
@@ -1329,7 +1330,7 @@ func (r *reconciler) startPhaseReplicas(service types.ServiceConfig) (replicas [
 // hard failure.
 func (r *reconciler) startPhaseDependencies(service types.ServiceConfig) ([]*PlanNode, error) {
 	var depNodes []*PlanNode
-	for _, dep := range sortedKeys(service.DependsOn) {
+	for _, dep := range slices.Sorted(maps.Keys(service.DependsOn)) {
 		cfg := service.DependsOn[dep]
 		targets := r.startChainEnds[dep]
 		if len(targets) == 0 {
@@ -1737,7 +1738,7 @@ func (r *reconciler) planStopDependents(service types.ServiceConfig) []*PlanNode
 func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode {
 	var deps []*PlanNode
 	// Sort map keys for deterministic plan output in tests
-	for _, net := range sortedKeys(service.Networks) {
+	for _, net := range slices.Sorted(maps.Keys(service.Networks)) {
 		if node, ok := r.networkNodes[net]; ok {
 			deps = append(deps, node)
 		}
@@ -1749,7 +1750,7 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 			}
 		}
 	}
-	for _, depName := range sortedKeys(service.DependsOn) {
+	for _, depName := range slices.Sorted(maps.Keys(service.DependsOn)) {
 		if node, ok := r.serviceNodes[depName]; ok && node != nil {
 			deps = append(deps, node)
 		}
@@ -1814,15 +1815,4 @@ func (r *reconciler) observedSummaries(serviceName string) []container.Summary {
 		result[i] = observedContainer.Summary
 	}
 	return result
-}
-
-// sortedKeys returns the keys of a map sorted alphabetically.
-// This ensures deterministic iteration order for reproducible plan output in tests.
-func sortedKeys[V any](m map[string]V) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }

@@ -21,8 +21,10 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"maps"
 	"net"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -139,12 +141,7 @@ func Networks(project *types.Project, service types.ServiceConfig) []string {
 			set["default"] = true
 		}
 	}
-	keys := make([]string, 0, len(set))
-	for key := range set {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
-	return keys
+	return slices.Sorted(maps.Keys(set))
 }
 
 // InfoAnswer is the get-relay-info reply: the network the relay

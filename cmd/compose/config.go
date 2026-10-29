@@ -22,8 +22,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -699,12 +700,7 @@ func runProfiles(ctx context.Context, dockerCli command.Cli, opts configOptions,
 			set[p] = struct{}{}
 		}
 	}
-	profiles := make([]string, 0, len(set))
-	for p := range set {
-		profiles = append(profiles, p)
-	}
-	sort.Strings(profiles)
-	for _, p := range profiles {
+	for _, p := range slices.Sorted(maps.Keys(set)) {
 		_, _ = fmt.Fprintln(dockerCli.Out(), p)
 	}
 	return nil

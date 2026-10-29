@@ -19,8 +19,8 @@ package inspect
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/moby/moby/api/types/container"
@@ -94,18 +94,11 @@ func containerToState(containers []container.Summary) []string {
 
 func combinedStatus(statuses []string) string {
 	nbByStatus := map[string]int{}
-	keys := []string{}
 	for _, status := range statuses {
-		nb, ok := nbByStatus[status]
-		if !ok {
-			nb = 0
-			keys = append(keys, status)
-		}
-		nbByStatus[status] = nb + 1
+		nbByStatus[status]++
 	}
-	sort.Strings(keys)
 	result := ""
-	for _, status := range keys {
+	for _, status := range slices.Sorted(maps.Keys(nbByStatus)) {
 		nb := nbByStatus[status]
 		if result != "" {
 			result += ", "
@@ -117,20 +110,12 @@ func combinedStatus(statuses []string) string {
 
 func groupContainerByLabel(containers []container.Summary, labelName string) (map[string][]container.Summary, []string, error) {
 	containersByLabel := map[string][]container.Summary{}
-	keys := []string{}
 	for _, ctr := range containers {
 		label, ok := ctr.Labels[labelName]
 		if !ok {
 			return nil, nil, fmt.Errorf("no label %q set on container %q of compose project", labelName, ctr.ID)
 		}
-		labelContainers, ok := containersByLabel[label]
-		if !ok {
-			labelContainers = []container.Summary{}
-			keys = append(keys, label)
-		}
-		labelContainers = append(labelContainers, ctr)
-		containersByLabel[label] = labelContainers
+		containersByLabel[label] = append(containersByLabel[label], ctr)
 	}
-	sort.Strings(keys)
-	return containersByLabel, keys, nil
+	return containersByLabel, slices.Sorted(maps.Keys(containersByLabel)), nil
 }
