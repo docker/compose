@@ -17,5 +17,5 @@ ignore:
   - "docs"
   - "bin"
   - "e2e"
-  - "pkg/e2e"
+  - "internal/e2e"
   - "**/*_test.go"
