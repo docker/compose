@@ -1,0 +1,19 @@
+services:
+  app:
+    image: alpine
+    command: sleep infinity
+    init: true
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          propagation: rshared
+      - type: volume
+        source: cache
+        target: /media
+        volume:
+          nocopy: true
+
+volumes:
+  cache:

@@ -637,6 +637,49 @@ func BindMountSource(service, target, wantSource string) Check {
 	}
 }
 
+// BindMountPropagation expects the service's bind mount at target to have the
+// given propagation, as the engine reports it for the running container.
+func BindMountPropagation(service, target, want string) Check {
+	return Check{
+		name: fmt.Sprintf("service %q mount %q has propagation %s", service, target, want),
+		fn: func(ctx *CheckContext) error {
+			containers := ctx.curr.service(service)
+			if len(containers) == 0 {
+				return errors.New("service has no container")
+			}
+			for _, c := range containers {
+				res := icmd.RunCmd(ctx.scenario.cli.NewDockerCmd(ctx.scenario.t, "inspect", "--format", "{{json .Mounts}}", c.ID))
+				if res.ExitCode != 0 {
+					return fmt.Errorf("inspect failed: %s", res.Combined())
+				}
+				var mounts []struct {
+					Type        string
+					Destination string
+					Propagation string
+				}
+				if err := json.Unmarshal([]byte(strings.TrimSpace(res.Stdout())), &mounts); err != nil {
+					return err
+				}
+				found := false
+				for _, m := range mounts {
+					if m.Type != "bind" || m.Destination != target {
+						continue
+					}
+					found = true
+					if m.Propagation != want {
+						return fmt.Errorf("container %s mount %s has propagation %q, want %q", c.Name, target, m.Propagation, want)
+					}
+					break
+				}
+				if !found {
+					return fmt.Errorf("container %s has no bind mount at %s", c.Name, target)
+				}
+			}
+			return nil
+		},
+	}
+}
+
 // LabelSet expects every container of the service to carry a non-empty label.
 func LabelSet(service, key string) Check {
 	return Check{

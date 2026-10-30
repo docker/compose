@@ -479,6 +479,100 @@ volumes:
 			mounts: nil,
 		},
 		{
+			name: "bind mount propagation is part of the bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          propagation: rshared
+`,
+			binds:  []string{filepath.Join(pwd, "data") + ":/data:rw,rshared"},
+			mounts: nil,
+		},
+		{
+			name: "bind mount propagation, selinux and read only share the bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        read_only: true
+        bind:
+          selinux: z
+          propagation: rshared
+`,
+			binds:  []string{filepath.Join(pwd, "data") + ":/data:ro,z,rshared"},
+			mounts: nil,
+		},
+		{
+			name: "bind mount recursive requires the mount API",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          recursive: disabled
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:        "bind",
+					Source:      filepath.Join(pwd, "data"),
+					Target:      "/data",
+					BindOptions: &mountTypes.BindOptions{CreateMountpoint: true, NonRecursive: true},
+				},
+			},
+		},
+		{
+			name: "mount volume nocopy is part of the bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - data:/data:nocopy
+volumes:
+  data:
+    name: my_volume
+`,
+			binds:  []string{"my_volume:/data:rw,nocopy"},
+			mounts: nil,
+		},
+		{
+			name: "mount volume labels require the mount API",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: /data
+        volume:
+          labels:
+            tier: cache
+volumes:
+  data:
+    name: my_volume
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:          "volume",
+					Source:        "my_volume",
+					Target:        "/data",
+					VolumeOptions: &mountTypes.VolumeOptions{Labels: map[string]string{"tier": "cache"}},
+				},
+			},
+		},
+		{
 			name: "mount volume subpath",
 			yaml: `
 services:

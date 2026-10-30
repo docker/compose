@@ -1137,8 +1137,6 @@ func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
 		return false
 	case !bool(bind.CreateHostPath):
 		return true
-	case bind.Propagation != "":
-		return true
 	case bind.Recursive != "":
 		return true
 	default:
@@ -1155,8 +1153,6 @@ func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
 	case len(vol.Labels) > 0:
 		return true
 	case vol.Subpath != "":
-		return true
-	case vol.NoCopy:
 		return true
 	default:
 		return false

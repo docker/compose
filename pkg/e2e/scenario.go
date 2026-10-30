@@ -649,6 +649,24 @@ func ContainerdImageStore(t testing.TB, c *CLI) string {
 	return ""
 }
 
+// SharedBindPropagation requires an engine that accepts the `rshared` bind
+// propagation for a host directory, which needs the host path to sit on a
+// shared mount: not the case when host paths reach the engine through the
+// file-sharing mount of a VM (Docker Desktop), or when the root mount is
+// private (docker-in-docker, rootless engines). It probes with the Mount API,
+// so that a failure of the API a scenario goes through is not skipped.
+func SharedBindPropagation(t testing.TB, c *CLI) string {
+	t.Helper()
+	res := icmd.RunCmd(c.NewDockerCmd(t, "run", "--rm",
+		"--mount", "type=bind,src="+t.TempDir()+",dst=/probe,bind-propagation=rshared",
+		"alpine", "true"))
+	if res.ExitCode != 0 {
+		reason, _, _ := strings.Cut(strings.TrimSpace(res.Combined()), "\n")
+		return "the engine does not support the rshared propagation here: " + reason
+	}
+	return ""
+}
+
 // EngineAPIVersionAtLeast requires a minimum Engine API version (for example
 // "1.56"), the unit in which the daemon's features are versioned.
 func EngineAPIVersionAtLeast(minimum string) Requirement {
