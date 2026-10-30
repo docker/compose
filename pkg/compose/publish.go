@@ -200,7 +200,7 @@ func (s *composeService) createLayers(ctx context.Context, project *types.Projec
 	for _, file := range project.ComposeFiles {
 		data, err := processFile(ctx, file, project, extFiles, envFiles)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to process compose file %s: %w", file, err)
 		}
 
 		layerDescriptor := oci.DescriptorForComposeFile(file, data)
@@ -236,7 +236,7 @@ func processExtends(ctx context.Context, project *types.Project, extFiles map[st
 	for xf, hash := range extFiles {
 		data, err := processFile(ctx, xf, project, moreExtFiles, envFiles)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to process compose file %s: %w", xf, err)
 		}
 
 		layerDescriptor := oci.DescriptorForComposeFile(hash, data)
