@@ -25,6 +25,8 @@ import (
 	"github.com/docker/cli/cli/command"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/resource"
 
 	"github.com/docker/compose/v5/cmd/cmdtrace"
 	"github.com/docker/compose/v5/cmd/compatibility"
@@ -33,6 +35,11 @@ import (
 	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/internal"
 	"github.com/docker/compose/v5/pkg/compose"
+)
+
+var (
+	serviceNameKey    = attribute.Key("service.name")
+	serviceVersionKey = attribute.Key("service.version")
 )
 
 func pluginMain() {
@@ -79,6 +86,12 @@ func pluginMain() {
 			Version:       internal.Version,
 		},
 		command.WithUserAgent("compose/"+internal.Version),
+		command.WithResourceOptions(
+			resource.WithAttributes(
+				serviceNameKey.String("compose"),
+				serviceVersionKey.String(internal.Version),
+			),
+		),
 	)
 }
 
