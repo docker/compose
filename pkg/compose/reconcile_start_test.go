@@ -1307,3 +1307,84 @@ func TestPlanStart_DefaultScopeIsInert(t *testing.T) {
 	}
 	assert.Equal(t, plan.String(), "[] -> #1 service:app:1, CreateContainer, no existing container\n")
 }
+
+// A wait node is ordered after the start of the dependency it waits for: the
+// condition is only worth checking once the dependency's container has been
+// started. Here a single dependent uses the wait, so nothing but the node's
+// own prerequisites can order it (a second dependent would add them to the
+// shared node).
+func TestPlanStart_WaitFollowsTheDependencyStart(t *testing.T) {
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"db": {Name: "db"},
+			"web": serviceWithDeps("web", types.DependsOnConfig{
+				"db": {Condition: types.ServiceConditionHealthy, Required: true},
+			}),
+		},
+	}
+
+	plan, err := reconcile(t.Context(), project, emptyObserved(), startScopeOptions(ScopeCreateStart), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:1, CreateContainer, no existing container
+[1] -> #2 service:web:1, CreateContainer, no existing container
+[1] -> #3 service:db:1, StartContainer, start [start:db:1] {start}
+[3] -> #4 wait:db:service_healthy, WaitCondition, depends_on condition {start}
+[2,4] -> #5 service:web:1, StartContainer, start [start:web:1] {start}
+`)+"\n")
+}
+
+// A project whose services all have scale: 0 has no container to start, and
+// that is not an error: `compose start` has nothing to do.
+func TestPlanStart_ScaleZeroServiceWithoutAnyContainerIsNotAnError(t *testing.T) {
+	zero := 0
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"app": {Name: "app", Scale: &zero}},
+	}
+
+	plan, err := reconcile(t.Context(), project, emptyObserved(), startScopeOptions(ScopeStart), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, len(plan.Nodes), 0, "nothing to plan:\n%s", plan)
+}
+
+// The Start phase covers every service of the project the plan is built for,
+// whichever services the create options select: Services only decides the
+// services whose containers may be recreated (see api.ScaleOptions.Services),
+// so scaling a service starts, with the replicas it creates, the stopped
+// containers of the project's other services. The CLI hands the plan a
+// project narrowed to the services it names and their dependencies, which is
+// why a user doesn't meet it. Starting only what was selected would be a
+// decision of its own (#14081, "scale start scope"), not the side effect of
+// another change: this pins the behavior as it stands.
+func TestPlanStart_StartPhaseCoversEveryServiceOfTheProject(t *testing.T) {
+	two := 2
+	db := types.ServiceConfig{Name: "db", Scale: &two}
+	web := serviceWithDeps("web", types.DependsOnConfig{"db": {Condition: types.ServiceConditionStarted, Required: true}})
+	other := types.ServiceConfig{Name: "other"}
+	project := &types.Project{Name: "myproject", Services: types.Services{"db": db, "web": web, "other": other}}
+	observed := emptyObserved()
+	for _, service := range []types.ServiceConfig{db, web, other} {
+		hash, err := serviceHashWithResolvedRefs(service, nil)
+		assert.NilError(t, err)
+		state := container.StateExited
+		if service.Name == "db" {
+			state = container.StateRunning
+		}
+		observed.Containers[service.Name] = []ObservedContainer{observedServiceContainer(service.Name, 1, state, hash)}
+	}
+	options := startScopeOptions(ScopeCreateStart)
+	options.Services = []string{"db"}
+
+	plan, err := reconcile(t.Context(), project, observed, options, noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db:2, CreateContainer, no existing container
+[1] -> #2 service:db:2, StartContainer, start [start:db:2] {start}
+[] -> #3 service:other:1, StartContainer, start [start:other:1] {start}
+[2] -> #4 service:web:1, StartContainer, start [start:web:1] {start}
+`)+"\n")
+}

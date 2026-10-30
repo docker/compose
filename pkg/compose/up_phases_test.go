@@ -23,6 +23,8 @@ import (
 	"context"
 	"errors"
 	"io"
+	"net"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,6 +32,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	dockercli "github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/docker/cli/cli/streams"
 	"github.com/moby/moby/api/types/container"
@@ -74,12 +77,60 @@ type interactiveUpDaemon struct {
 	slowSubscription bool
 	started          chan struct{}
 	startedOnce      sync.Once
+	// neverExits keeps the container running once started: no die event
+	neverExits bool
+	// startGate, when set, holds ContainerStart (after recording
+	// "start-requested") until it is closed, and then fails it with startErr
+	// if that is set
+	startGate chan struct{}
+	startErr  error
+	// signals closes, the first time a call is recorded, the channel
+	// callSignal hands out for it
+	signals map[string]chan struct{}
+	// listErr, when set, fails the container listings made once the container
+	// is created
+	listErr error
+	// inspectState is the state the engine reports for the container; it
+	// reports it exited when unset
+	inspectState *container.State
+	// stopEndsStartedContainer makes the engine report the container dead when
+	// it is stopped once started; stopEndsContainer, whatever its state
+	stopEndsStartedContainer bool
+	stopEndsContainer        bool
+	// exitCode is the exit code of the container when it exits, "0" if unset
+	exitCode string
+}
+
+// callSignal returns a channel closed once call has been recorded, to wait for
+// an engine call without polling.
+func (d *interactiveUpDaemon) callSignal(call string) <-chan struct{} {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.signalLocked(call)
+}
+
+func (d *interactiveUpDaemon) signalLocked(call string) chan struct{} {
+	if d.signals == nil {
+		d.signals = map[string]chan struct{}{}
+	}
+	ch, ok := d.signals[call]
+	if !ok {
+		ch = make(chan struct{})
+		d.signals[call] = ch
+	}
+	return ch
 }
 
 func (d *interactiveUpDaemon) record(call string) {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.calls = append(d.calls, call)
+	ch := d.signalLocked(call)
+	select {
+	case <-ch:
+	default:
+		close(ch)
+	}
 }
 
 func (d *interactiveUpDaemon) recorded() []string {
@@ -120,6 +171,9 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			if !d.created {
 				return client.ContainerListResult{}, nil
 			}
+			if d.listErr != nil {
+				return client.ContainerListResult{}, d.listErr
+			}
 			return client.ContainerListResult{Items: []container.Summary{{
 				ID: "c1", Names: []string{"/test-web-1"}, Labels: labels, State: container.StateCreated,
 			}}}, nil
@@ -143,13 +197,19 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			return client.ContainerCreateResult{ID: "c1"}, nil
 		})
 	apiClient.EXPECT().ContainerInspect(gomock.Any(), "c1", gomock.Any()).AnyTimes().
-		Return(client.ContainerInspectResult{Container: container.InspectResponse{
-			ID:              "c1",
-			Name:            "/test-web-1",
-			Config:          &container.Config{Labels: labels},
-			State:           &container.State{Status: container.StateExited},
-			NetworkSettings: &container.NetworkSettings{},
-		}}, nil)
+		DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
+			state := d.inspectState
+			if state == nil {
+				state = &container.State{Status: container.StateExited}
+			}
+			return client.ContainerInspectResult{Container: container.InspectResponse{
+				ID:              "c1",
+				Name:            "/test-web-1",
+				Config:          &container.Config{Labels: labels},
+				State:           state,
+				NetworkSettings: &container.NetworkSettings{},
+			}}, nil
+		})
 
 	// no attach endpoint: the log stream falls back to the logs API, which
 	// the monitor-less assertions below don't read
@@ -191,31 +251,68 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 		})
 
 	// a teardown (the test giving up on a hung up) must not trip the mock
-	apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).AnyTimes().Return(client.ContainerStopResult{}, nil)
+	apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).AnyTimes().
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			d.record("stop")
+			if d.stopEndsContainer {
+				d.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": "143"}))
+			} else if d.stopEndsStartedContainer {
+				select {
+				case <-d.started:
+					d.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": "143"}))
+				default:
+				}
+			}
+			return client.ContainerStopResult{}, nil
+		})
 	apiClient.EXPECT().ContainerKill(gomock.Any(), "c1", gomock.Any()).AnyTimes().Return(client.ContainerKillResult{}, nil)
 
 	// the container exits right after it starts
 	apiClient.EXPECT().ContainerStart(gomock.Any(), "c1", gomock.Any()).AnyTimes().
 		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
-			if d.startWaitsForEvents {
-				select {
-				case <-d.eventsSeen:
-				case <-time.After(5 * time.Second):
-					d.startedWithoutMonitor.Store(true)
-				}
-			}
-			d.record("start")
-			defer d.startedOnce.Do(func() { close(d.started) })
-			d.eventLog.emit(containerMessage(events.ActionStart, "c1", "test-web-1", "web", labels))
-			// The engine reports the exit some time after the start call, not
-			// within it.
-			timer := time.AfterFunc(containerExitDelay, func() {
-				d.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": "0"}))
-			})
-			t.Cleanup(func() { timer.Stop() })
-			return client.ContainerStartResult{}, nil
+			return client.ContainerStartResult{}, d.containerStart(t, labels)
 		})
 	return d
+}
+
+// containerStart is the engine starting the container: once the events
+// subscription is open, if the test wants it so, and the start gate lifted,
+// when it is set; it then emits the start event and, unless the container is
+// to run for good, schedules its exit.
+func (d *interactiveUpDaemon) containerStart(t *testing.T, labels map[string]string) error {
+	if d.startWaitsForEvents {
+		select {
+		case <-d.eventsSeen:
+		case <-time.After(5 * time.Second):
+			d.startedWithoutMonitor.Store(true)
+		}
+	}
+	if d.startGate != nil {
+		d.record("start-requested")
+		<-d.startGate
+		if d.startErr != nil {
+			return d.startErr
+		}
+	}
+	d.record("start")
+	// before the start event: whoever reacts to it (the session stopping a
+	// late starter) finds the container started
+	d.startedOnce.Do(func() { close(d.started) })
+	d.eventLog.emit(containerMessage(events.ActionStart, "c1", "test-web-1", "web", labels))
+	if d.neverExits {
+		return nil
+	}
+	// The engine reports the exit some time after the start call, not
+	// within it.
+	exitCode := d.exitCode
+	if exitCode == "" {
+		exitCode = "0"
+	}
+	timer := time.AfterFunc(containerExitDelay, func() {
+		d.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": exitCode}))
+	})
+	t.Cleanup(func() { timer.Stop() })
+	return nil
 }
 
 // progressRecorder records the lifetime of the progress scopes ("up") in the
@@ -234,6 +331,9 @@ type interactiveUpHarness struct {
 	svc    *composeService
 	daemon *interactiveUpDaemon
 	out    *bytes.Buffer
+	// api is the engine's client, for the expectations a test adds to the
+	// daemon's
+	api *mocks.MockAPIClient
 }
 
 func newInteractiveUpHarness(t *testing.T) *interactiveUpHarness {
@@ -254,7 +354,7 @@ func newInteractiveUpHarness(t *testing.T) *interactiveUpHarness {
 	daemon := expectInteractiveUpDaemon(t, apiClient)
 	svc, err := NewComposeService(cli, WithEventProcessor(progressRecorder{daemon}))
 	assert.NilError(t, err)
-	return &interactiveUpHarness{svc: svc.(*composeService), daemon: daemon, out: out}
+	return &interactiveUpHarness{svc: svc.(*composeService), daemon: daemon, out: out, api: apiClient}
 }
 
 func interactiveUpProject() *types.Project {
@@ -281,8 +381,14 @@ func (h *interactiveUpHarness) up(t *testing.T) error {
 // upWith is up on a context the test owns, to cancel it at a given point.
 func (h *interactiveUpHarness) upWith(t *testing.T, ctx context.Context, cancel context.CancelFunc) error {
 	t.Helper()
+	return h.upWithOptions(t, ctx, cancel, interactiveUpOptions())
+}
+
+// upWithOptions is upWith for given options.
+func (h *interactiveUpHarness) upWithOptions(t *testing.T, ctx context.Context, cancel context.CancelFunc, options api.UpOptions) error {
+	t.Helper()
 	done := make(chan error, 1)
-	go func() { done <- h.svc.Up(ctx, interactiveUpProject(), interactiveUpOptions()) }()
+	go func() { done <- h.svc.Up(ctx, interactiveUpProject(), options) }()
 	select {
 	case err := <-done:
 		return err
@@ -495,4 +601,266 @@ func TestUpInteractiveCreatePhaseCarriesThePlanProject(t *testing.T) {
 	assert.Assert(t, plan, "the plan's project carries the use_api_socket config")
 	_, caller := project.Configs["#apisocket"]
 	assert.Assert(t, !caller, "the caller's project is not transformed")
+}
+
+// TestUpInteractiveFailsOnTheStartPhaseErrorOfAnUninterruptedUp pins that
+// nothing excuses a Start phase failing in an up nobody interrupted: it is the
+// up's error (see TestUpInteractiveIgnoresTheStartPhaseErrorOfAnInterruptedUp
+// for the case it is not).
+func TestUpInteractiveFailsOnTheStartPhaseErrorOfAnUninterruptedUp(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.daemon.startGate = make(chan struct{})
+	h.daemon.startErr = errors.New("cannot start the container")
+	close(h.daemon.startGate)
+
+	err := h.up(t)
+	assert.ErrorContains(t, err, "cannot start the container")
+}
+
+// TestUpInteractiveWatchesTheServicesItTargets pins which containers the
+// session follows, and so ends with: those of the services the up targets
+// (Start.Services) when it has some, those it attaches to otherwise. The
+// container here never exits, and what is watched is a service with no
+// container: the session ends as soon as the Start phase is over. Were the
+// monitor watching the container too, the up would hang with it.
+func TestUpInteractiveWatchesTheServicesItTargets(t *testing.T) {
+	tests := []struct {
+		name     string
+		services []string
+		attachTo []string
+	}{
+		{name: "the targeted services, not the attached ones", services: []string{"other"}, attachTo: []string{"web"}},
+		{name: "the attached services when none is targeted", attachTo: []string{"other"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h := newInteractiveUpHarness(t)
+			h.daemon.neverExits = true
+			options := interactiveUpOptions()
+			options.Start.Services = tt.services
+			options.Start.AttachTo = tt.attachTo
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			assert.NilError(t, h.upWithOptions(t, ctx, cancel, options))
+		})
+	}
+}
+
+// TestUpReportsTheContainersItLeavesRunning pins that an up reports as Running
+// the containers its plan won't touch, so that the progress display accounts
+// for the whole project: the plan holds nothing for them. It is the
+// preparation of the plan, which a detached and an interactive up share, that
+// does it.
+func TestUpReportsTheContainersItLeavesRunning(t *testing.T) {
+	svc, apiClient, recorder := newStartPhaseTestService(t)
+	apiClient.EXPECT().ImageInspect(gomock.Any(), "alpine", gomock.Any()).AnyTimes().
+		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:alpine"}}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).AnyTimes().Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).AnyTimes().Return(client.VolumeListResult{}, nil)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{Items: []container.Summary{{
+		ID:    "c1",
+		Names: []string{"/test-web-1"},
+		State: container.StateRunning,
+		Labels: map[string]string{
+			api.ProjectLabel:         "test",
+			api.ServiceLabel:         "web",
+			api.OneoffLabel:          "False",
+			api.ContainerNumberLabel: "1",
+			api.ConfigHashLabel:      "whatever",
+		},
+	}}}, nil).AnyTimes()
+
+	// never recreate: the running container stays whatever its configuration
+	options := api.UpOptions{Create: api.CreateOptions{Recreate: api.RecreateNever}}
+	_, _, plan, err := svc.prepareUp(t.Context(), interactiveUpProject(), options)
+
+	assert.NilError(t, err)
+	assert.Equal(t, len(plan.Nodes), 0, "the plan leaves the running container alone:\n%s", plan)
+	assert.DeepEqual(t, recorder.byID["Container test-web-1"], []string{api.StatusRunning})
+}
+
+// createdUpOf builds by hand what an interactive up carries from its Create
+// phase to its Start phase, for a plan the test writes itself: a Create phase
+// with nothing to do, and the Start phase of plan. It also returns the
+// executor, to give it what the daemon's listing would have.
+func (h *interactiveUpHarness) createdUpOf(t *testing.T, project *types.Project, plan *Plan) (*createdUp, *planExecutor) {
+	t.Helper()
+	exec := h.svc.newPlanExecutor(project, emptyObservedState(project.Name))
+	run, err := exec.begin(plan)
+	assert.NilError(t, err)
+	assert.NilError(t, run.runCreate(t.Context()))
+	return &createdUp{project: project, run: run}, exec
+}
+
+// runInteractiveUp runs the session of created, failing the test instead of
+// hanging when it doesn't return.
+func (h *interactiveUpHarness) runInteractiveUp(t *testing.T, created *createdUp) error {
+	t.Helper()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- h.svc.runInteractiveUp(ctx, created, interactiveUpOptions()) }()
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(10 * time.Second):
+		cancel()
+		t.Fatalf("the session did not return; calls so far: %v", h.daemon.recorded())
+		return nil
+	}
+}
+
+func webContainerSummary() container.Summary {
+	return container.Summary{ID: "c1", Names: []string{"/test-web-1"}, Labels: map[string]string{api.ServiceLabel: "web"}}
+}
+
+// TestUpInteractiveShowsTheHookLogsInTheSession pins that what the post_start
+// hook of a service prints during an interactive up's Start phase reaches the
+// session's log consumer, as the output of a container does: the session's
+// printer is the listener the Start phase is given.
+func TestUpInteractiveShowsTheHookLogsInTheSession(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	project := interactiveUpProject()
+	web := project.Services["web"]
+	web.PostStart = []types.ServiceHook{{Command: types.ShellCommand{"/notify.sh"}}}
+	project.Services["web"] = web
+	ctr := webContainerSummary()
+
+	serverConn, clientConn := net.Pipe()
+	t.Cleanup(func() {
+		serverConn.Close() //nolint:errcheck
+		clientConn.Close() //nolint:errcheck
+	})
+	// The write error is handed back to the test goroutine: reporting it from
+	// here could hit a test that has already finished.
+	writeErr := make(chan error, 1)
+	go func() {
+		writeErr <- writeStdcopyFrame(serverConn, 1, "hook says hello\n")
+		serverConn.Close() //nolint:errcheck
+	}()
+	h.api.EXPECT().ExecCreate(gomock.Any(), "c1", gomock.Any()).Return(client.ExecCreateResult{ID: "exec1"}, nil)
+	h.api.EXPECT().ExecAttach(gomock.Any(), "exec1", gomock.Any()).
+		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
+	h.api.EXPECT().ExecInspect(gomock.Any(), "exec1", gomock.Any()).Return(client.ExecInspectResult{ExitCode: 0}, nil)
+
+	plan := &Plan{}
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &web, Container: &ctr}, "start:web:1")
+	start.Phase = PhaseStart
+	post := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "service:web:1", Cause: "post_start hooks", Service: &web, Container: &ctr}, "start:web:1", start)
+	post.Phase = PhaseStart
+	created, _ := h.createdUpOf(t, project, plan)
+
+	consumer := &testLogConsumer{}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	options := interactiveUpOptions()
+	options.Start.Attach = consumer
+	done := make(chan error, 1)
+	go func() { done <- h.svc.runInteractiveUp(ctx, created, options) }()
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatalf("the session did not return; calls so far: %v", h.daemon.recorded())
+	}
+	assert.NilError(t, <-writeErr)
+
+	var logged []string
+	for _, lines := range consumer.logs {
+		logged = append(logged, lines...)
+	}
+	assert.Assert(t, slices.Contains(logged, "hook says hello"), "the hook's output did not reach the session: %v", consumer.logs)
+}
+
+// TestUpInteractiveTranslatesAWaitTimeout pins what a depends_on wait that
+// outlasts --wait-timeout makes of an interactive up: the dependency timeout
+// the other commands report, not the composite error the executor builds to
+// tell that wait's own deadline from any other.
+func TestUpInteractiveTranslatesAWaitTimeout(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	project := interactiveUpProject()
+	web := project.Services["web"]
+	ctr := webContainerSummary()
+	h.api.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).AnyTimes().
+		Return(client.ContainerInspectResult{Container: container.InspectResponse{
+			ID:     "db-id",
+			Name:   "/test-db-1",
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+			State:  &container.State{Status: container.StateRunning, Health: &container.Health{Status: container.Starting}},
+		}}, nil)
+
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	wait.Phase = PhaseStart
+	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &web, Container: &ctr}, "start:web:1", wait)
+	start.Phase = PhaseStart
+	created, exec := h.createdUpOf(t, project, plan)
+	exec.waitTimeout = 50 * time.Millisecond
+	exec.containersByService["db"] = Containers{{ID: "db-id", Names: []string{"/test-db-1"}, Labels: map[string]string{api.ServiceLabel: "db"}}}
+
+	err := h.runInteractiveUp(t, created)
+
+	assert.Error(t, err, "timeout waiting for dependencies")
+	assert.Equal(t, h.daemon.indexOf("start"), -1, "web must not start before its dependency is healthy: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveFailedAttachEndsTheSession pins that an interactive up whose
+// session cannot attach to the created containers fails with that error, starts
+// nothing, and returns rather than waiting on the session it had begun to set
+// up.
+func TestUpInteractiveFailedAttachEndsTheSession(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.daemon.listErr = errors.New("cannot list the containers to attach to")
+
+	err := h.up(t)
+
+	assert.ErrorContains(t, err, "cannot list the containers to attach to")
+	assert.Equal(t, h.daemon.indexOf("start"), -1, "nothing may start: %v", h.daemon.recorded())
+}
+
+// TestPrepareUpBoundsEveryWaitByTheWaitTimeout pins that --wait-timeout reaches
+// the executor of an up, detached or interactive: it bounds each depends_on
+// wait of the plan, even without --wait.
+func TestPrepareUpBoundsEveryWaitByTheWaitTimeout(t *testing.T) {
+	svc, apiClient, _ := newStartPhaseTestService(t)
+	apiClient.EXPECT().ImageInspect(gomock.Any(), "alpine", gomock.Any()).AnyTimes().
+		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:alpine"}}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).AnyTimes().Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).AnyTimes().Return(client.VolumeListResult{}, nil)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().Return(client.ContainerListResult{}, nil)
+
+	options := api.UpOptions{Start: api.StartOptions{WaitTimeout: 42 * time.Second}}
+	_, exec, _, err := svc.prepareUp(t.Context(), interactiveUpProject(), options)
+
+	assert.NilError(t, err)
+	assert.Equal(t, exec.waitTimeout, 42*time.Second)
+}
+
+// TestUpInteractiveExitsWithTheExitCodeOfTheServiceItIsToldTo pins what
+// --exit-code-from does to an interactive up: the up ends with the exit code
+// the container of the named service exited with, as a status error, where
+// without it the up succeeds whatever the containers exited with.
+func TestUpInteractiveExitsWithTheExitCodeOfTheServiceItIsToldTo(t *testing.T) {
+	t.Run("with --exit-code-from", func(t *testing.T) {
+		h := newInteractiveUpHarness(t)
+		h.daemon.exitCode = "3"
+		options := interactiveUpOptions()
+		options.Start.ExitCodeFrom = "web"
+		ctx, cancel := context.WithCancel(t.Context())
+		defer cancel()
+
+		err := h.upWithOptions(t, ctx, cancel, options)
+
+		var status dockercli.StatusError
+		assert.Assert(t, errors.As(err, &status), "err: %v", err)
+		assert.Equal(t, status.StatusCode, 3)
+	})
+
+	t.Run("without it", func(t *testing.T) {
+		h := newInteractiveUpHarness(t)
+		h.daemon.exitCode = "3"
+
+		assert.NilError(t, h.up(t))
+	})
 }
