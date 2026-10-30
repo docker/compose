@@ -123,13 +123,18 @@ func isUnderAnyOf(path tree.Path, removed map[tree.Path]string) bool {
 // not values), so they stay hand-written regardless of how
 // presenceUnsupportedAttributes evolves.
 //
-// ports[].mode, volumes[].type and the two file-reference checks target the
-// whole node (the map compose-go hands back for that path), not a scalar
-// leaf: identifying which port/volume/reference triggered the finding needs
-// a sibling field (target/protocol, source) only visible from that node — a
-// list index collapses to the literal token "[]" in the reported Path,
-// losing identity, unlike a map key (a service or dependency name), which
-// stays.
+// ports[].mode and volumes[].type target the whole node (the map compose-go
+// hands back for that path), not a scalar leaf: identifying which port or
+// volume triggered the finding needs a sibling field (target/protocol,
+// source) only visible from that node — a list index collapses to the
+// literal token "[]" in the reported Path, losing identity, unlike a map key
+// (a service or dependency name), which stays.
+//
+// uid/gid/mode on a service-level configs:/secrets: reference have no entry
+// here either: whether they are ignored depends on how the referenced object
+// is materialized (a bind-mounted file ignores them, injected content and
+// environment values honor them), which the loader cannot know and which is
+// only settled once the container is created — see warnIgnoredFileReferences.
 //
 // depends_on.*.condition has no entry here even though it's the same kind
 // of "only some values are supported" case: the compose-spec schema itself
@@ -174,52 +179,6 @@ var valueConditionalAttributes = []struct {
 			return []api.UnsupportedAttribute{{Path: path, Reason: "volumes[].type: cluster (CSI) volumes are only supported in Swarm mode"}}
 		},
 	},
-	{
-		Pattern: tree.NewPath("services", "*", "configs", "[]"),
-		Detect:  hasFileReferenceOverride,
-		Report:  fileReferenceReport("configs"),
-	},
-	{
-		Pattern: tree.NewPath("services", "*", "secrets", "[]"),
-		Detect:  hasFileReferenceOverride,
-		Report:  fileReferenceReport("secrets"),
-	},
-}
-
-func hasFileReferenceOverride(v any) bool {
-	ref, _ := v.(map[string]any)
-	return ref["uid"] != nil || ref["gid"] != nil || ref["mode"] != nil
-}
-
-// fileReferenceReport drives the configs/secrets entries above: uid/gid/mode
-// on a service-level configs:/secrets: reference are silently ignored
-// outside Swarm mode. Each non-nil sub-field on the matched reference
-// produces its own finding, identified by the reference's source, so
-// multiple references — or multiple flagged sub-fields on the same one —
-// stay distinguishable.
-func fileReferenceReport(kind string) func(loader.UnsupportedAttribute) []api.UnsupportedAttribute {
-	return func(finding loader.UnsupportedAttribute) []api.UnsupportedAttribute {
-		ref, _ := finding.Value.(map[string]any)
-		// source is schema-optional on the long form (compose-spec's
-		// service_config_or_secret has no "required"), so a malformed
-		// reference like `configs: [{uid: "1000"}]` is valid enough to
-		// reach here without one.
-		source, _ := ref["source"].(string)
-		if source == "" {
-			source = "(anonymous)"
-		}
-		var findings []api.UnsupportedAttribute
-		for _, field := range []string{"uid", "gid", "mode"} {
-			if ref[field] == nil {
-				continue
-			}
-			findings = append(findings, api.UnsupportedAttribute{
-				Path:   fmt.Sprintf("%s.%s.%s", kind, source, field),
-				Reason: field + " is not supported outside Swarm mode and will be ignored",
-			})
-		}
-		return findings
-	}
 }
 
 // splitServicePath splits a "services.<name>...." finding into its service
