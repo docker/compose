@@ -381,6 +381,11 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		_ = u.eg.Wait()
 		return err
 	}
+	if err != nil {
+		// The Start phase gave up on the containers it had not started, and
+		// stopping them emits no die event: the monitor must not wait for them.
+		monitor.dropUnstarted()
+	}
 
 	_ = u.eg.Wait()
 	err = errors.Join(u.errs...)

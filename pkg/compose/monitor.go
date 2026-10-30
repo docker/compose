@@ -46,6 +46,9 @@ type monitor struct {
 	// sinceRead tells readDaemonTime has been through, whether it found a
 	// point or had to do without one (since is then empty)
 	sinceRead bool
+	// unstarted carries the requests of dropUnstarted to the loop of Start,
+	// which owns the set of containers being followed
+	unstarted chan struct{}
 }
 
 func newMonitor(apiClient client.APIClient, project string) *monitor {
@@ -53,7 +56,46 @@ func newMonitor(apiClient client.APIClient, project string) *monitor {
 		apiClient: apiClient,
 		project:   project,
 		services:  map[string]bool{},
+		unstarted: make(chan struct{}, 1),
 	}
+}
+
+// dropUnstarted tells Start to stop waiting for the containers that were
+// created and never started. The Start phase of an up calls it when it gave up
+// on the containers it had not started yet because the application is being
+// terminated: such a container never runs, so it never dies either, and
+// following it would keep Start from returning. A container that starts later,
+// whoever starts it, is followed again by its start event. It does not block,
+// and does nothing once Start has returned.
+func (c *monitor) dropUnstarted() {
+	select {
+	case c.unstarted <- struct{}{}:
+	default: // a request is already pending
+	}
+}
+
+// dropCreated removes from containers those that exist but never ran
+func (c *monitor) dropCreated(ctx context.Context, containers utils.Set[string]) error {
+	created, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{
+		All: true,
+		Filters: naming.ProjectFilter(c.project).Add("status", "created").Add("label",
+			oneOffFilter(false),
+			api.ConfigHashLabel,
+		),
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			// interrupted, not failed: the loop of Start ends quietly on its
+			// own canceled context
+			return nil
+		}
+		return err
+	}
+	for _, ctr := range created.Items {
+		logrus.Debugf("container %s was never started, not waiting for it", ctr.ID)
+		containers.Remove(ctr.ID)
+	}
+	return nil
 }
 
 func (c *monitor) withServices(services []string) {
@@ -186,6 +228,10 @@ func (c *monitor) Start(ctx context.Context) error {
 			return nil
 		case err := <-res.Err:
 			return err
+		case <-c.unstarted:
+			if err := c.dropCreated(ctx, containers); err != nil {
+				return err
+			}
 		case event := <-res.Messages:
 			if !c.watched(event.Actor.Attributes[api.ServiceLabel]) {
 				continue

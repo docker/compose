@@ -953,3 +953,135 @@ func TestMonitorReadDaemonTimeOnce(t *testing.T) {
 
 	assert.DeepEqual(t, log.since, []string{"981153306.789012345"})
 }
+
+// monitorUnstartedFixture follows a started container ("123") and one that was
+// created and never started ("456"), the way an up that gave up on the second
+// one leaves them. It returns the events to feed the monitor and a channel
+// telling each event the listeners were notified of.
+func monitorUnstartedFixture(t *testing.T) (*monitor, *mocks.MockAPIClient, chan events.Message, <-chan api.ContainerEvent) {
+	t.Helper()
+	ignoreExisting := goleak.IgnoreCurrent()
+	t.Cleanup(func() {
+		goleak.VerifyNone(t, ignoreExisting)
+	})
+	mockCtrl := gomock.NewController(t)
+	t.Cleanup(mockCtrl.Finish)
+	apiMock := mocks.NewMockAPIClient(mockCtrl)
+
+	messages, _ := expectEventStream(apiMock, []container.Summary{
+		testContainer("service1", "123", false),
+		testContainer("service1", "456", false),
+	}, 10)
+
+	m := newMonitor(apiMock, strings.ToLower(testProject))
+	notified := make(chan api.ContainerEvent, 10)
+	m.withListener(func(e api.ContainerEvent) { notified <- e })
+	return m, apiMock, messages, notified
+}
+
+// expectCreatedList makes the next listing of the never started containers
+// report the given IDs, and checks it asks for the created ones. The returned
+// channel is closed when the monitor has listed them.
+func expectCreatedList(t *testing.T, apiMock *mocks.MockAPIClient, ids ...string) <-chan struct{} {
+	t.Helper()
+	listed := make(chan struct{})
+	apiMock.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, opts client.ContainerListOptions) (client.ContainerListResult, error) {
+			defer close(listed)
+			assert.Assert(t, opts.Filters["status"]["created"], "filters: %v", opts.Filters)
+			var items []container.Summary
+			for _, id := range ids {
+				items = append(items, testContainer("service1", id, false))
+			}
+			return client.ContainerListResult{Items: items}, nil
+		})
+	return listed
+}
+
+// waitNotified waits for the monitor to have notified an event
+func waitNotified(t *testing.T, notified <-chan api.ContainerEvent) api.ContainerEvent {
+	t.Helper()
+	select {
+	case e := <-notified:
+		return e
+	case <-time.After(10 * time.Second):
+		t.Fatal("the monitor notified no event")
+		return api.ContainerEvent{}
+	}
+}
+
+// stillRunning tells the monitor has not returned yet, after giving it the
+// time to do so
+func stillRunning(done <-chan error) bool {
+	select {
+	case err := <-done:
+		_ = err // what is asserted is that the monitor returned, not what it returned
+		return false
+	case <-time.After(200 * time.Millisecond):
+		return true
+	}
+}
+
+// TestMonitorStopsWaitingForUnstartedContainers is the #14426 repro: an up
+// aborting on the exit of a dependency stops the application while a container
+// was created and never started. That one emits no die event, so the monitor
+// would wait for it forever once every other container is gone, unless it is
+// told to drop the containers that never ran.
+func TestMonitorStopsWaitingForUnstartedContainers(t *testing.T) {
+	m, apiMock, messages, notified := monitorUnstartedFixture(t)
+	apiMock.EXPECT().ContainerInspect(gomock.Any(), "123", gomock.Any()).
+		Return(inspectResult(false, false), nil)
+
+	done := make(chan error, 1)
+	go func() { done <- m.Start(t.Context()) }()
+
+	messages <- monitorDieEvent(3)
+	assert.Equal(t, waitNotified(t, notified).Type, api.ContainerEventExited)
+	assert.Assert(t, stillRunning(done), "the monitor still waits for the container which never started")
+
+	expectCreatedList(t, apiMock, "456")
+	m.dropUnstarted()
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the monitor still waits for a container which never started")
+	}
+}
+
+// TestMonitorFollowsADroppedContainerThatStartsLater pins that dropping a
+// container which never ran does not blind the monitor to it: if something
+// starts it afterwards, its start event makes the monitor follow it again.
+func TestMonitorFollowsADroppedContainerThatStartsLater(t *testing.T) {
+	m, apiMock, messages, notified := monitorUnstartedFixture(t)
+	apiMock.EXPECT().ContainerInspect(gomock.Any(), "123", gomock.Any()).
+		Return(inspectResult(false, false), nil)
+	apiMock.EXPECT().ContainerInspect(gomock.Any(), "456", gomock.Any()).
+		Return(inspectResult(false, false), nil)
+
+	done := make(chan error, 1)
+	go func() { done <- m.Start(t.Context()) }()
+
+	listed := expectCreatedList(t, apiMock, "456")
+	m.dropUnstarted()
+	<-listed
+
+	start := monitorEvent(events.ActionStart)
+	start.Actor.ID = "456"
+	messages <- start
+	assert.Equal(t, waitNotified(t, notified).Type, api.ContainerEventStarted)
+
+	messages <- monitorDieEvent(0)
+	assert.Equal(t, waitNotified(t, notified).Type, api.ContainerEventExited)
+	assert.Assert(t, stillRunning(done), "the container 456 started, it is followed again")
+
+	die := monitorDieEvent(0)
+	die.Actor.ID = "456"
+	messages <- die
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("the monitor did not stop once every container was gone")
+	}
+}
