@@ -416,7 +416,8 @@ func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolu
 	for _, volume := range volumes {
 		if volume.Bind != nil {
 			relPath, err := filepath.Rel(volume.Source, watchPath)
-			if err == nil && !strings.HasPrefix(relPath, "..") {
+			// A child name such as "..local" is local despite starting with two dots.
+			if err == nil && filepath.IsLocal(relPath) {
 				return true
 			}
 		}
