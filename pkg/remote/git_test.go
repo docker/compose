@@ -17,8 +17,11 @@
 package remote
 
 import (
+	"os/exec"
+	"strings"
 	"testing"
 
+	gitutil "github.com/moby/buildkit/frontend/dockerfile/dfgitutil"
 	"gotest.tools/v3/assert"
 )
 
@@ -172,4 +175,64 @@ func TestValidateGitSubDirSecurityScenarios(t *testing.T) {
 		err := validateGitSubDir(base, validPath)
 		assert.NilError(t, err)
 	})
+}
+
+func TestResolveGitRefPicksExactRef(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	repo := t.TempDir()
+	git := func(args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", append([]string{"-c", "user.name=test", "-c", "user.email=test@example.com"}, args...)...)
+		cmd.Dir = repo
+		out, err := cmd.CombinedOutput()
+		assert.NilError(t, err, string(out))
+		return strings.TrimSpace(string(out))
+	}
+	git("init", "-q", "-b", "main")
+	git("commit", "-q", "--allow-empty", "-m", "on main")
+	// ls-remote matches "main" against the tail of every ref, and
+	// refs/heads/feature/main sorts before refs/heads/main.
+	git("checkout", "-q", "-b", "feature/main")
+	git("commit", "-q", "--allow-empty", "-m", "on feature/main")
+	git("tag", "v1")
+	git("checkout", "-q", "main")
+	git("commit", "-q", "--allow-empty", "-m", "on release/v1")
+	git("branch", "release/v1")
+	mainSHA := git("rev-parse", "main")
+	tagSHA := git("rev-parse", "v1")
+
+	tests := []struct {
+		ref  string
+		want string
+	}{
+		{ref: "main", want: mainSHA},
+		{ref: "refs/heads/main", want: mainSHA},
+		{ref: "v1", want: tagSHA},
+	}
+	for _, tt := range tests {
+		t.Run(tt.ref, func(t *testing.T) {
+			ref := &gitutil.GitRef{Remote: repo, Ref: tt.ref}
+			err := gitRemoteLoader{}.resolveGitRef(t.Context(), repo+"#"+tt.ref, ref)
+			assert.NilError(t, err)
+			assert.Equal(t, ref.Ref, tt.want)
+		})
+	}
+}
+
+func TestMatchLsRemoteRef(t *testing.T) {
+	out := "1111111111111111111111111111111111111111\trefs/heads/feature/main\n" +
+		"2222222222222222222222222222222222222222\trefs/heads/main\n" +
+		"3333333333333333333333333333333333333333\trefs/tags/main\n"
+	sha, err := matchLsRemoteRef(out, "main")
+	assert.NilError(t, err)
+	assert.Equal(t, sha, "3333333333333333333333333333333333333333", "git prefers a tag over a branch with the same name")
+
+	sha, err = matchLsRemoteRef(out, "refs/heads/main")
+	assert.NilError(t, err)
+	assert.Equal(t, sha, "2222222222222222222222222222222222222222")
+
+	_, err = matchLsRemoteRef(out, "feature")
+	assert.ErrorContains(t, err, "unexpected git command output")
 }
