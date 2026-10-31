@@ -84,7 +84,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 
 	err = p.pullServiceImages(ctx)
 	if err == nil {
-		err = p.pullHookImages(ctx)
+		err = p.pullDependentImages(ctx)
 	}
 	if err != nil {
 		// join already-scheduled pulls before returning: bailing out with
@@ -135,10 +135,12 @@ func (p *imagePuller) pullServiceImages(ctx context.Context) error {
 		}
 		if !pullRequired {
 			p.eventSkippedPull("Image "+service.Image, skipReason)
+			p.scheduled[service.Image] = service.Name
 			continue
 		}
 		if service.Build != nil && p.opts.IgnoreBuildable {
 			p.eventSkippedPull("Image "+service.Image, "Image can be built")
+			p.scheduled[service.Image] = service.Name
 			continue
 		}
 		if _, ok := p.scheduled[service.Image]; ok {
@@ -179,44 +181,64 @@ func (p *imagePuller) runServicePull(ctx context.Context, idx int, service types
 	return nil
 }
 
-// pullHookImages schedules pulls for pre_start hook images, which run as
-// ephemeral init containers with their own registry image. They have no pull
-// policy of their own, so we inherit the parent service's policy for skip
-// decisions — through the same shouldPullImage decision as the service image.
-// Unlike the service image, a hook image can't be built, so `build` falls
-// back to pull-if-missing instead of exempting it from pulling.
-func (p *imagePuller) pullHookImages(ctx context.Context) error {
+// pullDependentImages schedules pulls for dependent images (pre_start hooks
+// and type=image volume sources). They have no pull policy of their own, so we
+// inherit the parent service's policy for skip decisions — through the same
+// shouldPullImage decision as the service image. A dependent image that is
+// produced by a buildable service in the project is skipped when
+// --ignore-buildable is set, consistent with how service images are handled.
+func (p *imagePuller) pullDependentImages(ctx context.Context) error {
 	for name, service := range p.project.Services {
 		hookPolicy := service.PullPolicy
 		if hookPolicy == types.PullPolicyBuild {
 			hookPolicy = types.PullPolicyMissing
 		}
 		for _, img := range api.GetDependentImages(service, p.project.Name) {
-			pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img, PullPolicy: hookPolicy}}, p.images)
-			if err != nil {
+			if err := p.scheduleDependentImagePull(ctx, name, img, hookPolicy); err != nil {
 				return err
 			}
-			if !pullRequired {
-				if skipReason != "" {
-					p.eventSkippedPull("Image "+img, skipReason)
-				}
-				continue
-			}
-			if _, ok := p.scheduled[img]; ok {
-				continue
-			}
-			p.scheduled[img] = name
-			hookService := types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img}}
-			p.eg.Go(func() error {
-				err := p.pullServiceImage(ctx, hookService, p.opts.Quiet, p.project.Environment["DOCKER_DEFAULT_PLATFORM"])
-				if err != nil && !p.opts.IgnoreFailures {
-					// fail fast: a hook image can't be built as a fallback
-					return err
-				}
-				return nil
-			})
 		}
 	}
+	return nil
+}
+
+// scheduleDependentImagePull decides whether a single dependent image should be
+// pulled and, if so, enqueues it on the errgroup.
+func (p *imagePuller) scheduleDependentImagePull(ctx context.Context, serviceName, img, policy string) error {
+	if isServiceImage(img, p.project.Services) {
+		return nil
+	}
+	pullRequired, skipReason, err := shouldPullImage(types.ServiceConfig{Name: serviceName, ContainerSpec: types.ContainerSpec{Image: img, PullPolicy: policy}}, p.images)
+	if err != nil {
+		return err
+	}
+	if !pullRequired {
+		if skipReason != "" {
+			p.eventSkippedPull("Image "+img, skipReason)
+		}
+		return nil
+	}
+	if p.opts.IgnoreBuildable && isServiceImageToBuild(types.ServiceConfig{ContainerSpec: types.ContainerSpec{Image: img}}, p.project.Services) {
+		p.eventSkippedPull("Image "+img, "Image can be built")
+		return nil
+	}
+	if _, ok := p.scheduled[img]; ok {
+		return nil
+	}
+	p.scheduled[img] = serviceName
+	depService := types.ServiceConfig{Name: serviceName, ContainerSpec: types.ContainerSpec{Image: img}}
+	p.eg.Go(func() error {
+		pullErr := p.pullServiceImage(ctx, depService, p.opts.Quiet, p.project.Environment["DOCKER_DEFAULT_PLATFORM"])
+		if pullErr != nil && !p.opts.IgnoreFailures {
+			if isServiceImageToBuild(depService, p.project.Services) {
+				// image can be built, so we can ignore pull failure
+				return nil
+			}
+			// fail fast: dependent image can't be built as a fallback
+			return pullErr
+		}
+		return nil
+	})
 	return nil
 }
 
@@ -411,24 +433,13 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		if pull {
 			needPull[name] = service
-			scheduled[service.Image] = true
 		}
-		for i, vol := range service.Volumes {
-			if vol.Type == types.VolumeTypeImage {
-				if _, ok := images[vol.Source]; !ok {
-					// Hack: create a fake ServiceConfig so we pull missing volume image
-					n := fmt.Sprintf("%s:volume %d", name, i)
-					needPull[n] = types.ServiceConfig{
-						Name:          n,
-						ContainerSpec: types.ContainerSpec{Image: vol.Source},
-					}
-					scheduled[vol.Source] = true
-				}
-			}
+		if service.Image != "" {
+			scheduled[service.Image] = true
 		}
 	}
 
-	if err := addPreStartHookPulls(project, images, needPull, scheduled); err != nil {
+	if err := addDependentImagePulls(project, images, needPull, scheduled); err != nil {
 		return err
 	}
 
@@ -495,16 +506,13 @@ func (s *composeService) resolvePulledImages(ctx context.Context, needPull map[s
 	return errs
 }
 
-// addPreStartHookPulls schedules pulls for pre_start hook images.
-// pre_start hooks run as ephemeral init containers with their own registry
-// image; they have no pull policy of their own, so they inherit the parent
-// service's — interpreted by the same mustPull the service image goes
-// through, so `up` and `compose pull` agree on hook images too. A hook image
-// can't be built, so `build` falls back to pull-if-missing instead of
-// exempting it from pulling; only `never` skips entirely. Running as a second
-// pass over the services keeps the dedup against service/volume images (via
-// scheduled) independent of service iteration order.
-func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, scheduled map[string]bool) error {
+// addDependentImagePulls schedules pulls for dependent images (pre_start hooks
+// and type=image volume sources) that are not yet present locally. Dependent
+// images that are produced by a buildable service in the project are skipped,
+// as they will be created during the build step. Running as a second pass over
+// the services keeps the dedup against service images (via scheduled)
+// independent of service iteration order.
+func addDependentImagePulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, scheduled map[string]bool) error {
 	for name, service := range project.Services {
 		if service.PullPolicy == types.PullPolicyNever {
 			continue
@@ -514,6 +522,12 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 			hookPolicy = types.PullPolicyMissing
 		}
 		for i, img := range api.GetDependentImages(service, project.Name) {
+			if isServiceImage(img, project.Services) {
+				continue
+			}
+			if isServiceImageToBuild(types.ServiceConfig{ContainerSpec: types.ContainerSpec{Image: img}}, project.Services) {
+				continue
+			}
 			pull, err := mustPull(types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img, PullPolicy: hookPolicy}}, images)
 			if err != nil {
 				return err
@@ -522,8 +536,8 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 				continue
 			}
 			scheduled[img] = true
-			// Hack: create a fake ServiceConfig so we pull missing pre_start hook image
-			n := fmt.Sprintf("%s:pre_start %d", name, i)
+			// Hack: create a fake ServiceConfig so we pull the dependent image
+			n := fmt.Sprintf("%s:dependent %d", name, i)
 			needPull[n] = types.ServiceConfig{
 				Name:          n,
 				ContainerSpec: types.ContainerSpec{Image: img},
@@ -560,6 +574,15 @@ func mustPull(service types.ServiceConfig, images map[string]api.ImageSummary) (
 		_, ok := images[service.Image]
 		return !ok, nil
 	}
+}
+
+func isServiceImage(image string, services types.Services) bool {
+	for _, svc := range services {
+		if svc.Image == image {
+			return true
+		}
+	}
+	return false
 }
 
 func isServiceImageToBuild(service types.ServiceConfig, services types.Services) bool {
