@@ -1,4 +1,3 @@
-*"This contribution was prepared by an AI agent acting on a human's behalf.
-The human submitter may not have independently reviewed or tested the change."*
+*"This contribution was prepared by help of an AI agent, tested and reviews by a Human(me).
 
 2026-10-31
