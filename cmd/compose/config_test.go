@@ -17,17 +17,21 @@
 package compose
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/config/configfile"
+	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
 	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
@@ -306,4 +310,53 @@ func TestLockModel(t *testing.T) {
 			},
 		},
 	})
+}
+
+func TestUseRunningProjectFiles(t *testing.T) {
+	projectDir := t.TempDir()
+	composeFile := filepath.Join(projectDir, "compose.base.yml")
+	assert.NilError(t, os.WriteFile(composeFile, []byte("services:\n  web:\n    image: nginx\n"), 0o600))
+	// no compose file to be found from where the command runs
+	t.Chdir(t.TempDir())
+	t.Setenv("COMPOSE_FILE", "")
+	assert.NilError(t, os.Unsetenv("COMPOSE_FILE"))
+
+	mockCtrl := gomock.NewController(t)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(apiClient).AnyTimes()
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ any, opts client.ContainerListOptions) (client.ContainerListResult, error) {
+			assert.Assert(t, opts.All)
+			assert.DeepEqual(t, opts.Filters, make(client.Filters).Add("label", api.ProjectLabel+"=stacks"))
+			return client.ContainerListResult{Items: []container.Summary{{
+				Labels: map[string]string{
+					api.ProjectLabel:     "stacks",
+					api.ConfigFilesLabel: composeFile,
+					api.WorkingDirLabel:  projectDir,
+				},
+			}}}, nil
+		})
+
+	opts := configOptions{ProjectOptions: &ProjectOptions{ProjectName: "stacks"}}
+	model, err := opts.ToModel(t.Context(), cli, nil)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, opts.ConfigPaths, []string{composeFile})
+	assert.Equal(t, opts.ProjectDir, projectDir)
+	assert.Equal(t, model["name"], "stacks")
+	assert.Assert(t, model["services"].(map[string]any)["web"] != nil)
+}
+
+func TestUseRunningProjectFilesPrefersLocalComposeFile(t *testing.T) {
+	dir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "compose.yaml"), []byte("services: {}\n"), 0o600))
+	t.Chdir(dir)
+	t.Setenv("COMPOSE_FILE", "")
+	assert.NilError(t, os.Unsetenv("COMPOSE_FILE"))
+
+	// no expectation on the engine: a compose file found locally is used as before
+	cli := mocks.NewMockCli(gomock.NewController(t))
+	opts := configOptions{ProjectOptions: &ProjectOptions{ProjectName: "stacks"}}
+	assert.NilError(t, opts.useRunningProjectFiles(t.Context(), cli))
+	assert.Equal(t, len(opts.ConfigPaths), 0)
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/compose-spec/compose-go/v2/template"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"go.yaml.in/yaml/v4"
@@ -68,6 +69,9 @@ type configOptions struct {
 // ToProject always warns: every config subcommand renders the resolved
 // model to the user, so any unsupported-attribute finding is relevant here.
 func (o *configOptions) ToProject(ctx context.Context, dockerCli command.Cli, backend api.ProjectLoader, services []string, po ...cli.ProjectOptionsFn) (*types.Project, error) {
+	if err := o.useRunningProjectFiles(ctx, dockerCli); err != nil {
+		return nil, err
+	}
 	po = append(po, o.toProjectOptionsFns()...)
 	project, _, err := o.ProjectOptions.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, po...)
 	return project, err
@@ -84,8 +88,52 @@ func (o *configOptions) loadProject(ctx context.Context, dockerCli command.Cli, 
 }
 
 func (o *configOptions) ToModel(ctx context.Context, dockerCli command.Cli, services []string, po ...cli.ProjectOptionsFn) (map[string]any, error) {
+	if err := o.useRunningProjectFiles(ctx, dockerCli); err != nil {
+		return nil, err
+	}
 	po = append(po, o.toProjectOptionsFns()...)
 	return o.ProjectOptions.ToModel(ctx, dockerCli, services, po...)
+}
+
+// useRunningProjectFiles lets `config -p <name>` report on a project started
+// from another directory: when no compose file is set nor found from the
+// working directory, it loads the files the project's containers were created
+// from, as recorded in their labels (the CONFIG FILES column of `ls`).
+func (o *configOptions) useRunningProjectFiles(ctx context.Context, dockerCli command.Cli) error {
+	if o.ProjectName == "" || len(o.ConfigPaths) > 0 {
+		return nil
+	}
+	options, err := o.toProjectOptions()
+	if err != nil {
+		return err
+	}
+	if len(options.ConfigPaths) > 0 {
+		return nil
+	}
+
+	list, err := dockerCli.Client().ContainerList(ctx, client.ContainerListOptions{
+		All:     true,
+		Filters: make(client.Filters).Add("label", api.ProjectLabel+"="+o.ProjectName),
+	})
+	if err != nil {
+		return err
+	}
+	for _, ctr := range list.Items {
+		files := ctr.Labels[api.ConfigFilesLabel]
+		if files == "" {
+			continue
+		}
+		o.ConfigPaths = strings.Split(files, ",")
+		if o.ProjectDir == "" {
+			o.ProjectDir = ctr.Labels[api.WorkingDirLabel]
+		}
+		if envFiles := ctr.Labels[api.EnvironmentFileLabel]; len(o.EnvFiles) == 0 && envFiles != "" {
+			o.EnvFiles = strings.Split(envFiles, ",")
+		}
+		return nil
+	}
+	// no container to learn the files from: let the load report the missing compose file
+	return nil
 }
 
 // toProjectOptionsFns converts config options to cli.ProjectOptionsFn
