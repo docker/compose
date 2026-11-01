@@ -57,6 +57,12 @@ func (s *composeService) propagateDockerEndpoint() ([]string, func(), error) {
 	env[command.EnvOverrideContext] = s.dockerCli.CurrentContext()
 	env["USER_AGENT"] = "compose/" + internal.Version
 
+	// The child resolves a named context itself; DOCKER_HOST would take
+	// precedence and lose per-context state such as the selected buildx builder.
+	if s.dockerCli.CurrentContext() != command.DefaultContextName {
+		return env.Values(), cleanup, nil
+	}
+
 	endpoint := s.dockerCli.DockerEndpoint()
 	env[client.EnvOverrideHost] = endpoint.Host
 	if endpoint.TLSData != nil {
