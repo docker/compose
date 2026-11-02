@@ -40,12 +40,12 @@ import (
 
 func TestBuildBindMount(t *testing.T) {
 	project := composetypes.Project{}
-	volume := composetypes.ServiceVolumeConfig{
+	volume := composetypes.ServiceMountConfig{
 		Type:   composetypes.VolumeTypeBind,
 		Source: "",
 		Target: "/data",
 	}
-	mount, err := buildMount(project, volume)
+	mount, err := buildServiceMount(project, volume)
 	assert.NilError(t, err)
 	assert.Assert(t, filepath.IsAbs(mount.Source))
 	_, err = os.Stat(mount.Source)
@@ -55,12 +55,12 @@ func TestBuildBindMount(t *testing.T) {
 
 func TestBuildNamedPipeMount(t *testing.T) {
 	project := composetypes.Project{}
-	volume := composetypes.ServiceVolumeConfig{
+	volume := composetypes.ServiceMountConfig{
 		Type:   composetypes.VolumeTypeNamedPipe,
 		Source: "\\\\.\\pipe\\docker_engine_windows",
 		Target: "\\\\.\\pipe\\docker_engine",
 	}
-	mount, err := buildMount(project, volume)
+	mount, err := buildServiceMount(project, volume)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Type, mountTypes.TypeNamedPipe)
 }
@@ -74,12 +74,12 @@ func TestBuildVolumeMount(t *testing.T) {
 			},
 		}),
 	}
-	volume := composetypes.ServiceVolumeConfig{
+	volume := composetypes.ServiceMountConfig{
 		Type:   composetypes.VolumeTypeVolume,
 		Source: "myVolume",
 		Target: "/data",
 	}
-	mount, err := buildMount(project, volume)
+	mount, err := buildServiceMount(project, volume)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Source, "myProject_myVolume")
 	assert.Equal(t, mount.Type, mountTypes.TypeVolume)
@@ -103,42 +103,48 @@ func TestPrepareNetworkLabels(t *testing.T) {
 	}))
 }
 
-func TestBuildContainerMountOptions(t *testing.T) {
+func TestBuildContainerVolumesInherit(t *testing.T) {
 	project := composetypes.Project{
 		Name: "myProject",
 		Services: composetypes.Services{
 			"myService": {
-				Name: "myService", ContainerSpec: composetypes.ContainerSpec{Volumes: []composetypes.ServiceVolumeConfig{
-					{
-						Type:   composetypes.VolumeTypeVolume,
-						Target: "/var/myvolume1",
-					},
-					{
-						Type:   composetypes.VolumeTypeVolume,
-						Target: "/var/myvolume2",
-					},
-					{
-						Type:   composetypes.VolumeTypeVolume,
-						Source: "myVolume3",
-						Target: "/var/myvolume3",
-						Volume: &composetypes.ServiceVolumeVolume{
-							Subpath: "etc",
+				Name: "myService", ContainerSpec: composetypes.ContainerSpec{
+					Volumes: []composetypes.ServiceVolumeConfig{
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Target: "/var/myvolume1",
+						},
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Target: "/var/myvolume2",
+						},
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Source: "myVolume4",
+							Target: "/var/myvolume4",
 						},
 					},
-					{
-						Type:   composetypes.VolumeTypeNamedPipe,
-						Source: "\\\\.\\pipe\\docker_engine_windows",
-						Target: "\\\\.\\pipe\\docker_engine",
+					Mounts: []composetypes.ServiceMountConfig{
+						{
+							Type:   composetypes.VolumeTypeVolume,
+							Source: "myVolume3",
+							Target: "/var/myvolume3",
+							Volume: &composetypes.ServiceMountVolume{
+								Subpath: "etc",
+							},
+						},
+						{
+							Type:   composetypes.VolumeTypeNamedPipe,
+							Source: "\\\\.\\pipe\\docker_engine_windows",
+							Target: "\\\\.\\pipe\\docker_engine",
+						},
 					},
-				}},
+				},
 			},
 		},
 		Volumes: composetypes.Volumes(map[string]composetypes.VolumeConfig{
-			"myVolume1": {
-				Name: "myProject_myVolume1",
-			},
-			"myVolume2": {
-				Name: "myProject_myVolume2",
+			"myVolume4": {
+				Name: "myProject_myVolume4",
 			},
 		}),
 	}
@@ -147,10 +153,12 @@ func TestBuildContainerMountOptions(t *testing.T) {
 		Mounts: []container.MountPoint{
 			{
 				Type:        composetypes.VolumeTypeVolume,
+				Name:        "previous1",
 				Destination: "/var/myvolume1",
 			},
 			{
 				Type:        composetypes.VolumeTypeVolume,
+				Name:        "previous2",
 				Destination: "/var/myvolume2",
 			},
 		},
@@ -165,29 +173,33 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	}
 	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(client.ImageInspectResult{}, nil)
 
-	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
-	sort.Slice(mounts, func(i, j int) bool {
-		return mounts[i].Target < mounts[j].Target
-	})
-	assert.NilError(t, err)
-	assert.Assert(t, len(mounts) == 4)
-	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
-	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
-	assert.Equal(t, mounts[2].Target, "/var/myvolume3")
-	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
-	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
+	// the volumes are sent as bind strings and the mounts as they are, the anonymous volumes being the previous container's
+	for range 2 {
+		binds, mounts, err := s.buildContainerVolumes(t.Context(), project, project.Services["myService"], inherit)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, binds, []string{"myProject_myVolume4:/var/myvolume4:rw"})
+		sort.Slice(mounts, func(i, j int) bool {
+			return mounts[i].Target < mounts[j].Target
+		})
+		assert.Assert(t, len(mounts) == 4)
+		assert.Equal(t, mounts[0].Target, "/var/myvolume1")
+		assert.Equal(t, mounts[0].Source, "previous1")
+		assert.Equal(t, mounts[1].Target, "/var/myvolume2")
+		assert.Equal(t, mounts[1].Source, "previous2")
+		assert.Equal(t, mounts[2].Target, "/var/myvolume3")
+		assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
+		assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
+	}
+}
 
-	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
-	sort.Slice(mounts, func(i, j int) bool {
-		return mounts[i].Target < mounts[j].Target
-	})
-	assert.NilError(t, err)
-	assert.Assert(t, len(mounts) == 4)
-	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
-	assert.Equal(t, mounts[1].Target, "/var/myvolume2")
-	assert.Equal(t, mounts[2].Target, "/var/myvolume3")
-	assert.Equal(t, mounts[2].VolumeOptions.Subpath, "etc")
-	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
+func TestBuildContainerVolumesRejectsVolumeOfMountAPI(t *testing.T) {
+	project := composetypes.Project{}
+	service := composetypes.ServiceConfig{ContainerSpec: composetypes.ContainerSpec{Volumes: []composetypes.ServiceVolumeConfig{
+		{Type: composetypes.VolumeTypeTmpfs, Target: "/run", Tmpfs: &composetypes.ServiceVolumeTmpfs{}},
+	}}}
+
+	_, _, err := (&composeService{}).buildContainerVolumes(t.Context(), project, service, nil)
+	assert.ErrorContains(t, err, "can't be sent as a bind string")
 }
 
 func TestDefaultNetworkSettings(t *testing.T) {
@@ -504,6 +516,41 @@ volumes:
 			},
 		},
 		{
+			name: "anonymous volume goes through the Mount API, the Binds API has no string for it",
+			yaml: `
+services:
+  test:
+    volumes:
+      - /data
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:          "volume",
+					Target:        "/data",
+					VolumeOptions: &mountTypes.VolumeOptions{},
+				},
+			},
+		},
+		{
+			name: "bind with propagation and named volume with nocopy and SELinux label are bind strings",
+			yaml: `
+services:
+  test:
+    volumes:
+      - ./data:/data:ro,rshared
+      - cache:/cache:z,nocopy
+volumes:
+  cache:
+    name: my_cache
+`,
+			binds: []string{
+				filepath.Join(pwd, "data") + ":/data:ro,rshared",
+				"my_cache:/cache:rw,z,nocopy",
+			},
+			mounts: nil,
+		},
+		{
 			name: "mounts: bind creating its source",
 			yaml: `
 services:
@@ -600,29 +647,6 @@ services:
 			},
 		},
 		{
-			name: "mounts prevail over volumes at the same target, with their own options",
-			yaml: `
-services:
-  test:
-    volumes:
-      - ./data:/data
-    mounts:
-      - type: bind
-        source: ./other
-        target: /data
-        read_only: true
-`,
-			binds: nil,
-			mounts: []mountTypes.Mount{
-				{
-					Type:     "bind",
-					Source:   filepath.Join(pwd, "other"),
-					Target:   "/data",
-					ReadOnly: true,
-				},
-			},
-		},
-		{
 			name: "mounts: tmpfs",
 			yaml: `
 services:
@@ -646,6 +670,7 @@ services:
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			p, err := composeloader.LoadWithContext(t.Context(), composetypes.ConfigDetails{
+				WorkingDir: pwd,
 				ConfigFiles: []composetypes.ConfigFile{
 					{
 						Filename: "test",
@@ -655,6 +680,7 @@ services:
 			}, func(options *composeloader.Options) {
 				options.SkipValidation = true
 				options.SkipConsistencyCheck = true
+				options.ConvertVolumesToMounts = true
 			})
 			assert.NilError(t, err)
 			s := &composeService{}
@@ -702,4 +728,37 @@ func TestWithoutAnonymousMount(t *testing.T) {
 	kept, found = withoutAnonymousMount(mounts, "/tmp")
 	assert.Assert(t, !found)
 	assert.DeepEqual(t, kept, mounts)
+}
+
+// the last entry declared for a target prevails, `mounts` coming after `volumes`, and what is declared prevails over
+// what is inherited and over secrets and configs
+func TestBuildContainerVolumesOnePerTarget(t *testing.T) {
+	project := composetypes.Project{
+		Name: "myProject",
+		Secrets: composetypes.Secrets{
+			"s": {File: "/secrets/s"},
+		},
+	}
+	service := composetypes.ServiceConfig{Name: "myService", ContainerSpec: composetypes.ContainerSpec{
+		Volumes: []composetypes.ServiceVolumeConfig{
+			{Type: composetypes.VolumeTypeBind, Source: "/first", Target: "/a"},
+			{Type: composetypes.VolumeTypeBind, Source: "/second", Target: "/a"},
+			{Type: composetypes.VolumeTypeBind, Source: "/volume", Target: "/b"},
+		},
+		Mounts: []composetypes.ServiceMountConfig{
+			{Type: composetypes.VolumeTypeBind, Source: "/mount", Target: "/b"},
+			{Type: composetypes.VolumeTypeBind, Source: "/mount-over-secret", Target: "/run/secrets/s"},
+		},
+		Secrets: []composetypes.ServiceSecretConfig{{Source: "s"}},
+	}}
+
+	binds, mounts, err := (&composeService{}).buildContainerVolumes(t.Context(), project, service, nil)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, binds, []string{"/second:/a:rw"})
+	targets := map[string]string{}
+	for _, m := range mounts {
+		targets[m.Target] = m.Source
+	}
+	assert.DeepEqual(t, targets, map[string]string{"/b": "/mount", "/run/secrets/s": "/mount-over-secret"})
+	assert.Equal(t, len(mounts), 2)
 }

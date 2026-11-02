@@ -51,3 +51,16 @@ func TestMountsVolumeDriverOpts(t *testing.T) {
 		ServiceState("app", "running"),
 		ExecOutputContains("app", "grep ' /scratch ' /proc/mounts", "tmpfs /scratch tmpfs"))
 }
+
+func TestVolumesConvertedToMounts(t *testing.T) {
+	s := NewScenario(t, "the volumes the short syntax can't say must be mounted through the Mount API, and the model rendered as declared")
+
+	s.Step("config renders the volumes as they are declared",
+		ComposeCmd("config"),
+		OutputNotContains("mounts:")).
+		Step("up mounts the tmpfs, the named volume and the anonymous one",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			ServiceState("app", "running"),
+			ExecOutputContains("app", "grep ' /scratch ' /proc/mounts", "tmpfs /scratch tmpfs"),
+			ExecOutputContains("app", "grep -c -E ' /(data|anonymous) ' /proc/mounts", "2"))
+}
