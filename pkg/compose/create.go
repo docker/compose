@@ -1202,7 +1202,7 @@ func (s *composeService) inheritedMounts(ctx context.Context, p types.Project, s
 		return nil, service, nil
 	}
 	var imageVolumes map[string]struct{}
-	if len(inherit.Mounts) > 0 {
+	if slices.ContainsFunc(inherit.Mounts, func(m container.MountPoint) bool { return m.Type != "tmpfs" }) {
 		img, err := s.apiClient().ImageInspect(ctx, api.GetImageNameOrDefault(service, p.Name))
 		if err != nil {
 			return nil, service, err

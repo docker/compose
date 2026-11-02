@@ -648,7 +648,7 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 // mountsVolume tells whether the service mounts the compose volume directly, by `volumes` or by `mounts`.
 func mountsVolume(service types.ServiceConfig, volumeKey string) bool {
 	return slices.ContainsFunc(service.Volumes, func(v types.ServiceVolumeConfig) bool {
-		return v.Source == volumeKey
+		return v.Type == types.VolumeTypeVolume && v.Source == volumeKey
 	}) || slices.ContainsFunc(service.Mounts, func(m types.ServiceMountConfig) bool {
 		return m.Type == types.VolumeTypeVolume && m.Source == volumeKey
 	})

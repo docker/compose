@@ -415,27 +415,12 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 		}
 		for i, vol := range service.Volumes {
 			if vol.Type == types.VolumeTypeImage {
-				if _, ok := images[vol.Source]; !ok {
-					// Hack: create a fake ServiceConfig so we pull missing volume image
-					n := fmt.Sprintf("%s:volume %d", name, i)
-					needPull[n] = types.ServiceConfig{
-						Name:          n,
-						ContainerSpec: types.ContainerSpec{Image: vol.Source},
-					}
-					scheduled[vol.Source] = true
-				}
+				addImageSourcePull(needPull, scheduled, images, fmt.Sprintf("%s:volume %d", name, i), vol.Source)
 			}
 		}
 		for i, m := range service.Mounts {
 			if m.Type == types.VolumeTypeImage {
-				if _, ok := images[m.Source]; !ok {
-					n := fmt.Sprintf("%s:mount %d", name, i)
-					needPull[n] = types.ServiceConfig{
-						Name:          n,
-						ContainerSpec: types.ContainerSpec{Image: m.Source},
-					}
-					scheduled[m.Source] = true
-				}
+				addImageSourcePull(needPull, scheduled, images, fmt.Sprintf("%s:mount %d", name, i), m.Source)
 			}
 		}
 	}
@@ -658,4 +643,18 @@ func toPullProgressEvent(parent string, jm jsonstream.Message, events api.EventP
 		Text:     jm.Status,
 		Details:  details,
 	})
+}
+
+// addImageSourcePull schedules the pull of the image backing a `type: image` volume or mount, unless it is
+// already available or already scheduled
+func addImageSourcePull(needPull map[string]types.ServiceConfig, scheduled map[string]bool, images map[string]api.ImageSummary, name string, source string) {
+	if _, ok := images[source]; ok || scheduled[source] {
+		return
+	}
+	// Hack: create a fake ServiceConfig so we pull the missing image
+	needPull[name] = types.ServiceConfig{
+		Name:          name,
+		ContainerSpec: types.ContainerSpec{Image: source},
+	}
+	scheduled[source] = true
 }
