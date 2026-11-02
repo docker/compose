@@ -1147,8 +1147,12 @@ func volumeBindString(p types.Project, v types.ServiceVolumeConfig) (string, err
 }
 
 // absoluteBindSource makes the source of a bind absolute. It has already been prefixed with the working
-// directory when needed, by the compose-go project loader.
+// directory when needed, by the compose-go project loader, which also rejects a bind without source: a project
+// built by hand has to say it, rather than have the engine bind the working directory of the process.
 func absoluteBindSource(source string) (string, error) {
+	if source == "" {
+		return "", errors.New("bind mount has no source")
+	}
 	if filepath.IsAbs(source) || isUnixAbs(source) || isWindowsAbs(source) {
 		return source, nil
 	}
@@ -1204,7 +1208,7 @@ func (s *composeService) inheritedMounts(ctx context.Context, p types.Project, s
 		return nil, service, nil
 	}
 	var imageVolumes map[string]struct{}
-	if len(inherit.Mounts) > 0 {
+	if slices.ContainsFunc(inherit.Mounts, func(m container.MountPoint) bool { return m.Type != "tmpfs" }) {
 		img, err := s.apiClient().ImageInspect(ctx, api.GetImageNameOrDefault(service, p.Name))
 		if err != nil {
 			return nil, service, err

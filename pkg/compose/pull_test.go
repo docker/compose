@@ -331,3 +331,19 @@ func TestImageDigestResolverUsesDistributionDigest(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, resolved.String(), indexDigest)
 }
+
+// TestAddImageSourcePull_PullsAnImageOnlyOnce verifies an image backing both a volume and a mount, or several
+// of them, is scheduled once, and not at all when it is already available.
+func TestAddImageSourcePull_PullsAnImageOnlyOnce(t *testing.T) {
+	needPull := map[string]types.ServiceConfig{}
+	scheduled := map[string]bool{}
+	images := map[string]api.ImageSummary{"present:latest": {}}
+
+	addImageSourcePull(needPull, scheduled, images, "web:volume 0", "data:latest")
+	addImageSourcePull(needPull, scheduled, images, "web:mount 0", "data:latest")
+	addImageSourcePull(needPull, scheduled, images, "api:mount 0", "data:latest")
+	addImageSourcePull(needPull, scheduled, images, "web:mount 1", "present:latest")
+
+	assert.Equal(t, len(needPull), 1)
+	assert.Equal(t, needPull["web:volume 0"].Image, "data:latest")
+}

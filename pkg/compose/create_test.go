@@ -42,7 +42,7 @@ func TestBuildBindMount(t *testing.T) {
 	project := composetypes.Project{}
 	volume := composetypes.ServiceMountConfig{
 		Type:   composetypes.VolumeTypeBind,
-		Source: "",
+		Source: ".",
 		Target: "/data",
 	}
 	mount, err := buildServiceMount(project, volume)
@@ -51,6 +51,16 @@ func TestBuildBindMount(t *testing.T) {
 	_, err = os.Stat(mount.Source)
 	assert.NilError(t, err)
 	assert.Equal(t, mount.Type, mountTypes.TypeBind)
+}
+
+// A bind without source, which the loader rejects, must not end up binding the working directory of the process
+// when the project was built by hand.
+func TestBuildBindMountRejectsEmptySource(t *testing.T) {
+	_, err := buildServiceMount(composetypes.Project{}, composetypes.ServiceMountConfig{
+		Type:   composetypes.VolumeTypeBind,
+		Target: "/data",
+	})
+	assert.ErrorContains(t, err, "bind mount has no source")
 }
 
 func TestBuildNamedPipeMount(t *testing.T) {
@@ -761,4 +771,22 @@ func TestBuildContainerVolumesOnePerTarget(t *testing.T) {
 	}
 	assert.DeepEqual(t, targets, map[string]string{"/b": "/mount", "/run/secrets/s": "/mount-over-secret"})
 	assert.Equal(t, len(mounts), 2)
+}
+
+// A container inheriting nothing but tmpfs mounts has no anonymous volume to carry over: its image must not be
+// inspected, as it may be gone while the container still exists.
+func TestInheritedMountsSkipsImageInspectionForTmpfsOnly(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	// no ImageInspect expectation: the mock fails the test on an unexpected call
+	_, cli := prepareMocks(mockCtrl)
+	s := composeService{dockerCli: cli}
+
+	inherit := &container.Summary{Mounts: []container.MountPoint{
+		{Type: composetypes.VolumeTypeTmpfs, Destination: "/run"},
+	}}
+	service := composetypes.ServiceConfig{Name: "myService"}
+	mounts, _, err := s.inheritedMounts(t.Context(), composetypes.Project{Name: "myProject"}, service, inherit)
+	assert.NilError(t, err)
+	assert.Equal(t, len(mounts), 0)
 }
