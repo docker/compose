@@ -269,34 +269,34 @@ func runConfigInterpolate(ctx context.Context, dockerCli command.Cli, opts confi
 	return content, nil
 }
 
+// imageOnlySpec returns the spec with all attributes removed but image, and the `type: image` volumes and mounts
+func imageOnlySpec(spec types.ContainerSpec) types.ContainerSpec {
+	only := types.ContainerSpec{Image: spec.Image}
+	for _, vol := range spec.Volumes {
+		if vol.Type == types.VolumeTypeImage {
+			only.Volumes = append(only.Volumes, vol)
+		}
+	}
+	for _, m := range spec.Mounts {
+		if m.Type == types.VolumeTypeImage {
+			only.Mounts = append(only.Mounts, m)
+		}
+	}
+	return only
+}
+
 // imagesOnly return project with all attributes removed but service.images and `type: image` volumes
 func imagesOnly(project *types.Project) *types.Project {
 	digests := types.Services{}
 	for name, config := range project.Services {
-		service := types.ServiceConfig{
-			ContainerSpec: types.ContainerSpec{Image: config.Image},
-		}
-		for _, vol := range config.Volumes {
-			if vol.Type == types.VolumeTypeImage {
-				service.Volumes = append(service.Volumes, vol)
-			}
-		}
-		digests[name] = service
+		digests[name] = types.ServiceConfig{ContainerSpec: imageOnlySpec(config.ContainerSpec)}
 	}
 	var jobDigests types.Jobs
 	if len(project.Jobs) > 0 {
 		jobDigests = types.Jobs{}
 	}
 	for name, config := range project.Jobs {
-		job := types.JobConfig{
-			ContainerSpec: types.ContainerSpec{Image: config.Image},
-		}
-		for _, vol := range config.Volumes {
-			if vol.Type == types.VolumeTypeImage {
-				job.Volumes = append(job.Volumes, vol)
-			}
-		}
-		jobDigests[name] = job
+		jobDigests[name] = types.JobConfig{ContainerSpec: imageOnlySpec(config.ContainerSpec)}
 	}
 	project = &types.Project{Services: digests, Jobs: jobDigests}
 	return project
@@ -374,16 +374,16 @@ func lockModel(model map[string]any) {
 			for key := range service {
 				switch key {
 				case "image":
-				case "volumes":
-					if volumes := imageVolumes(service); len(volumes) > 0 {
-						// write back as []any to keep the raw-model volumes type unchanged
-						filtered := make([]any, len(volumes))
-						for i, volume := range volumes {
-							filtered[i] = volume
+				case "volumes", "mounts":
+					if entries := imageEntries(service, key); len(entries) > 0 {
+						// write back as []any to keep the raw-model type unchanged
+						filtered := make([]any, len(entries))
+						for i, entry := range entries {
+							filtered[i] = entry
 						}
-						service["volumes"] = filtered
+						service[key] = filtered
 					} else {
-						delete(service, "volumes")
+						delete(service, key)
 					}
 				default:
 					delete(service, key)
@@ -423,20 +423,10 @@ func resolveServiceImageDigests(ctx context.Context, dockerCli command.Cli, mode
 	services := model["services"].(map[string]any)
 	for name, s := range services {
 		service := s.(map[string]any)
-		config := types.ServiceConfig{}
-		if image, ok := service["image"].(string); ok {
-			config.Image = image
-		}
+		config := imageOnlyConfig(service)
 		for _, hook := range preStartHooks(service) {
 			image, _ := hook["image"].(string)
 			config.PreStart = append(config.PreStart, types.PreStartHook{ContainerSpec: types.ContainerSpec{Image: image}})
-		}
-		for _, volume := range imageVolumes(service) {
-			source, _ := volume["source"].(string)
-			config.Volumes = append(config.Volumes, types.ServiceVolumeConfig{
-				Type:   types.VolumeTypeImage,
-				Source: source,
-			})
 		}
 		p.Services[name] = config
 	}
@@ -459,13 +449,47 @@ func resolveServiceImageDigests(ctx context.Context, dockerCli command.Cli, mode
 				hook["image"] = image
 			}
 		}
-		for i, volume := range imageVolumes(service) {
-			if source := config.Volumes[i].Source; source != "" {
-				volume["source"] = source
-			}
-		}
+		setImageSources(service, config)
 	}
 	return nil
+}
+
+// imageOnlyConfig is the pseudo-service of a raw model: its image, and the sources of its `type: image` volumes and mounts
+func imageOnlyConfig(raw map[string]any) types.ServiceConfig {
+	config := types.ServiceConfig{}
+	if image, ok := raw["image"].(string); ok {
+		config.Image = image
+	}
+	for _, volume := range imageEntries(raw, "volumes") {
+		source, _ := volume["source"].(string)
+		config.Volumes = append(config.Volumes, types.ServiceVolumeConfig{
+			Type:   types.VolumeTypeImage,
+			Source: source,
+		})
+	}
+	for _, mount := range imageEntries(raw, "mounts") {
+		source, _ := mount["source"].(string)
+		config.Mounts = append(config.Mounts, types.ServiceMountConfig{
+			Type:   types.VolumeTypeImage,
+			Source: source,
+		})
+	}
+	return config
+}
+
+// setImageSources folds the resolved sources of the `type: image` volumes and mounts of the pseudo-service back
+// into the raw model, leaving untouched the ones absent from it (empty Source)
+func setImageSources(raw map[string]any, config types.ServiceConfig) {
+	for i, volume := range imageEntries(raw, "volumes") {
+		if source := config.Volumes[i].Source; source != "" {
+			volume["source"] = source
+		}
+	}
+	for i, mount := range imageEntries(raw, "mounts") {
+		if source := config.Mounts[i].Source; source != "" {
+			mount["source"] = source
+		}
+	}
 }
 
 // resolveJobImageDigests mirrors resolveServiceImageDigests for model["jobs"].
@@ -478,18 +502,7 @@ func resolveJobImageDigests(ctx context.Context, dockerCli command.Cli, model ma
 	jobs := model["jobs"].(map[string]any)
 	for name, j := range jobs {
 		job := j.(map[string]any)
-		config := types.ServiceConfig{}
-		if image, ok := job["image"].(string); ok {
-			config.Image = image
-		}
-		for _, volume := range imageVolumes(job) {
-			source, _ := volume["source"].(string)
-			config.Volumes = append(config.Volumes, types.ServiceVolumeConfig{
-				Type:   types.VolumeTypeImage,
-				Source: source,
-			})
-		}
-		jobsAsServices.Services[name] = config
+		jobsAsServices.Services[name] = imageOnlyConfig(job)
 	}
 
 	jobsAsServices, err := jobsAsServices.WithImagesResolved(compose.ImageDigestResolver(ctx, dockerCli.ConfigFile(), dockerCli.Client()))
@@ -503,11 +516,7 @@ func resolveJobImageDigests(ctx context.Context, dockerCli command.Cli, model ma
 		if config.Image != "" {
 			job["image"] = config.Image
 		}
-		for i, volume := range imageVolumes(job) {
-			if source := config.Volumes[i].Source; source != "" {
-				volume["source"] = source
-			}
-		}
+		setImageSources(job, config)
 	}
 	return nil
 }
@@ -527,17 +536,17 @@ func preStartHooks(service map[string]any) []map[string]any {
 	return result
 }
 
-// imageVolumes returns the `type: image` volume declarations of a service raw model
-func imageVolumes(service map[string]any) []map[string]any {
-	volumes, ok := service["volumes"].([]any)
+// imageEntries returns the `type: image` declarations of the `volumes` or `mounts` key of a service raw model
+func imageEntries(service map[string]any, key string) []map[string]any {
+	entries, ok := service[key].([]any)
 	if !ok {
 		return nil
 	}
 	var images []map[string]any
-	for _, v := range volumes {
-		volume, ok := v.(map[string]any)
-		if ok && volume["type"] == types.VolumeTypeImage {
-			images = append(images, volume)
+	for _, e := range entries {
+		entry, ok := e.(map[string]any)
+		if ok && entry["type"] == types.VolumeTypeImage {
+			images = append(images, entry)
 		}
 	}
 	return images

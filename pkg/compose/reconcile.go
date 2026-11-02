@@ -646,17 +646,23 @@ func (r *reconciler) servicesUsingVolume(volumeKey string) []string {
 	return volumeConsumers(r.project.Services, volumeKey)
 }
 
+// mountsVolume tells whether the service mounts the compose volume directly, by `volumes` or by `mounts`.
+func mountsVolume(service types.ServiceConfig, volumeKey string) bool {
+	return slices.ContainsFunc(service.Volumes, func(v types.ServiceVolumeConfig) bool {
+		return v.Source == volumeKey
+	}) || slices.ContainsFunc(service.Mounts, func(m types.ServiceMountConfig) bool {
+		return m.Type == types.VolumeTypeVolume && m.Source == volumeKey
+	})
+}
+
 // volumeConsumers is servicesUsingVolume over an arbitrary set of services.
 func volumeConsumers(services types.Services, volumeKey string) []string {
 	inSet := map[string]bool{}
 	// Seed with services that mount the volume directly.
 	for _, key := range slices.Sorted(maps.Keys(services)) {
 		service := services[key]
-		for _, v := range service.Volumes {
-			if v.Source == volumeKey {
-				inSet[service.Name] = true
-				break
-			}
+		if mountsVolume(service, volumeKey) {
+			inSet[service.Name] = true
 		}
 	}
 	// Grow the set by transitive volumes_from closure until it stabilizes: a
@@ -1116,12 +1122,23 @@ func (r *reconciler) hasNetworkMismatch(expected types.ServiceConfig, oc Observe
 
 // hasVolumeMismatch checks if the container is missing any expected volume mounts.
 func (r *reconciler) hasVolumeMismatch(expected types.ServiceConfig, oc ObservedContainer) bool {
+	sources := make([]string, 0, len(expected.Volumes)+len(expected.Mounts))
 	for _, vol := range expected.Volumes {
-		if vol.Type != string(mmount.TypeVolume) || vol.Source == "" {
+		if vol.Type == string(mmount.TypeVolume) {
+			sources = append(sources, vol.Source)
+		}
+	}
+	for _, m := range expected.Mounts {
+		if m.Type == string(mmount.TypeVolume) {
+			sources = append(sources, m.Source)
+		}
+	}
+	for _, source := range sources {
+		if source == "" {
 			continue
 		}
 		expectedName := ""
-		if obs, ok := r.resolvedVolumes[vol.Source]; ok {
+		if obs, ok := r.resolvedVolumes[source]; ok {
 			expectedName = obs.Name
 		}
 		if expectedName == "" {
@@ -1747,6 +1764,13 @@ func (r *reconciler) infrastructureDeps(service types.ServiceConfig) []*PlanNode
 	for _, vol := range service.Volumes {
 		if vol.Type == string(mmount.TypeVolume) && vol.Source != "" {
 			if node, ok := r.volumeNodes[vol.Source]; ok {
+				deps = append(deps, node)
+			}
+		}
+	}
+	for _, m := range service.Mounts {
+		if m.Type == string(mmount.TypeVolume) && m.Source != "" {
+			if node, ok := r.volumeNodes[m.Source]; ok {
 				deps = append(deps, node)
 			}
 		}

@@ -503,6 +503,145 @@ volumes:
 				},
 			},
 		},
+		{
+			name: "mounts: bind creating its source",
+			yaml: `
+services:
+  test:
+    mounts:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          create_src: true
+          propagation: rshared
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:        "bind",
+					Source:      filepath.Join(pwd, "data"),
+					Target:      "/data",
+					BindOptions: &mountTypes.BindOptions{CreateMountpoint: true, Propagation: "rshared"},
+				},
+			},
+		},
+		{
+			name: "mounts: bind does not create its source unless it says so",
+			yaml: `
+services:
+  test:
+    mounts:
+      - type: bind
+        source: ./data
+        target: /data
+        read_only: true
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:     "bind",
+					Source:   filepath.Join(pwd, "data"),
+					Target:   "/data",
+					ReadOnly: true,
+				},
+			},
+		},
+		{
+			name: "mounts: named volume goes through the Mount API",
+			yaml: `
+services:
+  test:
+    mounts:
+      - type: volume
+        source: data
+        target: /data
+volumes:
+  data:
+    name: my_volume
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:   "volume",
+					Source: "my_volume",
+					Target: "/data",
+				},
+			},
+		},
+		{
+			name: "mounts: anonymous volume with driver options",
+			yaml: `
+services:
+  test:
+    mounts:
+      - type: volume
+        target: /scratch
+        volume:
+          nocopy: true
+          driver: local
+          driver_opts:
+            type: tmpfs
+            device: tmpfs
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:   "volume",
+					Target: "/scratch",
+					VolumeOptions: &mountTypes.VolumeOptions{
+						NoCopy: true,
+						DriverConfig: &mountTypes.Driver{
+							Name:    "local",
+							Options: map[string]string{"type": "tmpfs", "device": "tmpfs"},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "mounts prevail over volumes at the same target, with their own options",
+			yaml: `
+services:
+  test:
+    volumes:
+      - ./data:/data
+    mounts:
+      - type: bind
+        source: ./other
+        target: /data
+        read_only: true
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:     "bind",
+					Source:   filepath.Join(pwd, "other"),
+					Target:   "/data",
+					ReadOnly: true,
+				},
+			},
+		},
+		{
+			name: "mounts: tmpfs",
+			yaml: `
+services:
+  test:
+    mounts:
+      - type: tmpfs
+        target: /run
+        tmpfs:
+          size: 1048576
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:         "tmpfs",
+					Target:       "/run",
+					TmpfsOptions: &mountTypes.TmpfsOptions{SizeBytes: 1048576},
+				},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -543,4 +682,24 @@ func TestSetBlkio(t *testing.T) {
 	assert.Equal(t, resources.BlkioDeviceReadIOps[0].Rate, uint64(2))
 	assert.Equal(t, resources.BlkioDeviceWriteBps[0].Rate, uint64(3))
 	assert.Assert(t, resources.BlkioDeviceWriteIOps == nil)
+}
+
+func TestWithoutAnonymousMount(t *testing.T) {
+	mounts := []composetypes.ServiceMountConfig{
+		{Type: composetypes.VolumeTypeVolume, Target: "/anonymous"},
+		{Type: composetypes.VolumeTypeVolume, Source: "named", Target: "/named"},
+		{Type: composetypes.VolumeTypeTmpfs, Target: "/tmp"},
+	}
+
+	kept, found := withoutAnonymousMount(mounts, "/anonymous")
+	assert.Assert(t, found)
+	assert.DeepEqual(t, kept, mounts[1:])
+
+	kept, found = withoutAnonymousMount(mounts, "/named")
+	assert.Assert(t, !found)
+	assert.DeepEqual(t, kept, mounts)
+
+	kept, found = withoutAnonymousMount(mounts, "/tmp")
+	assert.Assert(t, !found)
+	assert.DeepEqual(t, kept, mounts)
 }
