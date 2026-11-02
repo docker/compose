@@ -742,10 +742,10 @@ func (s *composeService) checkForBindMount(project *types.Project) map[string][]
 		}
 	}
 	for serviceName, config := range project.Services {
-		record(serviceName, config.Volumes)
+		record(serviceName, append(slices.Clone(config.Volumes), bindMountsAsVolumes(config.Mounts)...))
 	}
 	for name, job := range project.Jobs {
-		record(name, job.Volumes)
+		record(name, append(slices.Clone(job.Volumes), bindMountsAsVolumes(job.Mounts)...))
 	}
 	return allFindings
 }

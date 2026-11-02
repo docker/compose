@@ -25,6 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
@@ -2241,4 +2242,17 @@ func runningContainer(t *testing.T, svc types.ServiceConfig, id string) Observed
 			Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
 		},
 	}
+}
+
+func TestHasVolumeMismatch_Mounts(t *testing.T) {
+	r := &reconciler{resolvedVolumes: map[string]ObservedVolume{"data": {Name: "myproject_data"}}}
+	service := types.ServiceConfig{ContainerSpec: types.ContainerSpec{
+		Mounts: []types.ServiceMountConfig{{Type: types.VolumeTypeVolume, Source: "data", Target: "/data"}},
+	}}
+	withVolume := func(name string) ObservedContainer {
+		return ObservedContainer{Summary: container.Summary{Mounts: []container.MountPoint{{Type: mmount.TypeVolume, Name: name}}}}
+	}
+
+	assert.Assert(t, !r.hasVolumeMismatch(service, withVolume("myproject_data")))
+	assert.Assert(t, r.hasVolumeMismatch(service, withVolume("replaced")))
 }

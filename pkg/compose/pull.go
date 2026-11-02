@@ -426,6 +426,18 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 				}
 			}
 		}
+		for i, m := range service.Mounts {
+			if m.Type == types.VolumeTypeImage {
+				if _, ok := images[m.Source]; !ok {
+					n := fmt.Sprintf("%s:mount %d", name, i)
+					needPull[n] = types.ServiceConfig{
+						Name:          n,
+						ContainerSpec: types.ContainerSpec{Image: m.Source},
+					}
+					scheduled[m.Source] = true
+				}
+			}
+		}
 	}
 
 	if err := addPreStartHookPulls(project, images, needPull, scheduled); err != nil {

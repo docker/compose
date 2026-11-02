@@ -1,0 +1,10 @@
+services:
+  app:
+    image: alpine
+    command: sleep infinity
+    mounts:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          create_src: true

@@ -1053,7 +1053,7 @@ func (s *composeService) buildContainerVolumes(
 // which doesn't require the Mount API
 func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, bool) {
 	v := findVolumeByTarget(service.Volumes, m.Target)
-	if v == nil {
+	if v == nil || hasMountAtTarget(service, m.Target) {
 		return "", false
 	}
 	if v.Type != types.VolumeTypeBind {
@@ -1070,7 +1070,7 @@ func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, boo
 func volumeBindString(p types.Project, service types.ServiceConfig, m mount.Mount) (string, bool) {
 	v := findVolumeByTarget(service.Volumes, m.Target)
 	vol := findVolumeByName(p.Volumes, m.Source)
-	if v == nil || vol == nil {
+	if v == nil || vol == nil || hasMountAtTarget(service, m.Target) {
 		return "", false
 	}
 	if volumeRequiresMountAPI(v.Volume) {
@@ -1109,6 +1109,40 @@ func toBindString(name string, v *types.ServiceVolumeConfig) string {
 		options = append(options, "nocopy")
 	}
 	return fmt.Sprintf("%s:%s:%s", name, v.Target, strings.Join(options, ","))
+}
+
+// bindMountsAsVolumes returns the bind mounts of `mounts` as the volumes they are the equivalent of, for
+// what only looks at the host paths a service reads from.
+func bindMountsAsVolumes(mounts []types.ServiceMountConfig) []types.ServiceVolumeConfig {
+	var volumes []types.ServiceVolumeConfig
+	for _, m := range mounts {
+		if m.Type != types.VolumeTypeBind {
+			continue
+		}
+		volume := types.ServiceVolumeConfig{
+			Type:        types.VolumeTypeBind,
+			Source:      m.Source,
+			Target:      m.Target,
+			ReadOnly:    m.ReadOnly,
+			Consistency: m.Consistency,
+			Bind:        &types.ServiceVolumeBind{},
+		}
+		if m.Bind != nil {
+			volume.Bind = &types.ServiceVolumeBind{
+				Propagation:    m.Bind.Propagation,
+				CreateHostPath: types.OptOut(m.Bind.CreateSrc),
+				Recursive:      m.Bind.Recursive,
+			}
+		}
+		volumes = append(volumes, volume)
+	}
+	return volumes
+}
+
+// hasMountAtTarget tells whether `mounts` declares the target, in which case it prevails over `volumes`
+// and the options of the latter must not be read for it
+func hasMountAtTarget(service types.ServiceConfig, target string) bool {
+	return slices.ContainsFunc(service.Mounts, func(m types.ServiceMountConfig) bool { return m.Target == target })
 }
 
 func findVolumeByName(volumes types.Volumes, name string) *types.VolumeConfig {
@@ -1191,12 +1225,10 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 					}
 				}
 			}
-			volumes := []types.ServiceVolumeConfig{}
-			for _, v := range service.Volumes {
-				if v.Target != m.Destination || v.Source != "" {
-					volumes = append(volumes, v)
-					continue
-				}
+			var anonymousVolume, anonymousMount bool
+			service.Volumes, anonymousVolume = withoutAnonymousVolume(service.Volumes, m.Destination)
+			service.Mounts, anonymousMount = withoutAnonymousMount(service.Mounts, m.Destination)
+			if anonymousVolume || anonymousMount {
 				// inherit previous container's anonymous volume
 				mounts[m.Destination] = mount.Mount{
 					Type:     m.Type,
@@ -1205,7 +1237,6 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 					ReadOnly: !m.RW,
 				}
 			}
-			service.Volumes = volumes
 		}
 	}
 
@@ -1221,6 +1252,28 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	return values, nil
 }
 
+// withoutAnonymousVolume returns the volumes but for the anonymous volume at the target, and whether there was one
+func withoutAnonymousVolume(volumes []types.ServiceVolumeConfig, target string) ([]types.ServiceVolumeConfig, bool) {
+	kept := make([]types.ServiceVolumeConfig, 0, len(volumes))
+	for _, v := range volumes {
+		if v.Target != target || v.Source != "" {
+			kept = append(kept, v)
+		}
+	}
+	return kept, len(kept) != len(volumes)
+}
+
+// withoutAnonymousMount returns the mounts but for the anonymous volume at the target, and whether there was one
+func withoutAnonymousMount(mounts []types.ServiceMountConfig, target string) ([]types.ServiceMountConfig, bool) {
+	kept := make([]types.ServiceMountConfig, 0, len(mounts))
+	for _, m := range mounts {
+		if m.Target != target || m.Source != "" || m.Type != types.VolumeTypeVolume {
+			kept = append(kept, m)
+		}
+	}
+	return kept, len(kept) != len(mounts)
+}
+
 func fillBindMounts(project types.Project, service types.ServiceConfig, mounts map[string]mount.Mount) (map[string]mount.Mount, error) {
 	for _, volume := range service.Volumes {
 		bindMount, err := buildMount(project, volume)
@@ -1228,6 +1281,13 @@ func fillBindMounts(project types.Project, service types.ServiceConfig, mounts m
 			return nil, err
 		}
 		mounts[bindMount.Target] = bindMount
+	}
+	for _, m := range service.Mounts {
+		serviceMount, err := buildServiceMount(project, m)
+		if err != nil {
+			return nil, err
+		}
+		mounts[serviceMount.Target] = serviceMount
 	}
 
 	secretMounts, err := buildContainerSecretMounts(project, service)
@@ -1403,6 +1463,79 @@ func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.
 		TmpfsOptions:  tmpfs,
 		ImageOptions:  img,
 	}, nil
+}
+
+// buildServiceMount translates an entry of `mounts`, which has the structure of the Mount API, into a
+// mount of the engine. Unlike `volumes`, nothing is left to the implementation: it always goes through
+// the Mount API, and the options of the type are carried as they are.
+func buildServiceMount(project types.Project, m types.ServiceMountConfig) (mount.Mount, error) {
+	source := m.Source
+	switch m.Type {
+	case types.VolumeTypeBind:
+		if !filepath.IsAbs(source) && !isUnixAbs(source) && !isWindowsAbs(source) {
+			// source has already been prefixed with workdir if required, by compose-go project loader
+			var err error
+			source, err = filepath.Abs(source)
+			if err != nil {
+				return mount.Mount{}, err
+			}
+		}
+	case types.VolumeTypeVolume:
+		if pVolume, ok := project.Volumes[m.Source]; ok && m.Source != "" {
+			source = pVolume.Name
+		}
+	}
+
+	result := mount.Mount{
+		Type:        mount.Type(m.Type),
+		Source:      source,
+		Target:      m.Target,
+		ReadOnly:    m.ReadOnly,
+		Consistency: mount.Consistency(m.Consistency),
+	}
+	switch m.Type {
+	case types.VolumeTypeBind:
+		if m.Bind != nil {
+			result.BindOptions = &mount.BindOptions{
+				Propagation:      mount.Propagation(m.Bind.Propagation),
+				CreateMountpoint: m.Bind.CreateSrc,
+			}
+			switch m.Bind.Recursive {
+			case "disabled":
+				result.BindOptions.NonRecursive = true
+			case "writable":
+				result.BindOptions.ReadOnlyNonRecursive = true
+			case "readonly":
+				result.BindOptions.ReadOnlyForceRecursive = true
+			}
+		}
+	case types.VolumeTypeVolume:
+		if m.Volume != nil {
+			result.VolumeOptions = &mount.VolumeOptions{
+				NoCopy:  m.Volume.NoCopy,
+				Subpath: m.Volume.Subpath,
+				Labels:  m.Volume.Labels,
+			}
+			if m.Volume.Driver != "" || len(m.Volume.DriverOpts) > 0 {
+				result.VolumeOptions.DriverConfig = &mount.Driver{
+					Name:    m.Volume.Driver,
+					Options: m.Volume.DriverOpts,
+				}
+			}
+		}
+	case types.VolumeTypeTmpfs:
+		if m.Tmpfs != nil {
+			result.TmpfsOptions = &mount.TmpfsOptions{
+				SizeBytes: int64(m.Tmpfs.Size),
+				Mode:      os.FileMode(m.Tmpfs.Mode),
+			}
+		}
+	case types.VolumeTypeImage:
+		if m.Image != nil {
+			result.ImageOptions = &mount.ImageOptions{Subpath: m.Image.SubPath}
+		}
+	}
+	return result, nil
 }
 
 func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions, *mount.ImageOptions) {

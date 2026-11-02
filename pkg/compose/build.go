@@ -188,19 +188,38 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 
 func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.ImageSummary, projectName string) {
 	var digests []string
+	// resolve returns the name and the digest of the image a `type: image` mount reads from
+	resolve := func(source string) (string, api.ImageSummary, bool) {
+		imgName := source
+		img, ok := images[imgName]
+		if !ok {
+			// check if source is another service in the project
+			imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: source}, projectName)
+			// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
+			if img, ok = images[imgName]; !ok {
+				return "", api.ImageSummary{}, false
+			}
+		}
+		return imgName, img, true
+	}
+	for i, vol := range service.Mounts {
+		if vol.Type != types.VolumeTypeImage {
+			continue
+		}
+		imgName, img, ok := resolve(vol.Source)
+		if !ok {
+			continue
+		}
+		service.Mounts[i].Source = imgName
+		digests = append(digests, vol.Target+"="+img.ID)
+	}
 	for i, vol := range service.Volumes {
 		if vol.Type != types.VolumeTypeImage {
 			continue
 		}
-		imgName := vol.Source
-		img, ok := images[imgName]
+		imgName, img, ok := resolve(vol.Source)
 		if !ok {
-			// check if source is another service in the project
-			imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
-			// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
-			if img, ok = images[imgName]; !ok {
-				continue
-			}
+			continue
 		}
 		// The daemon only resolves a `type=image` mount Source that is a name/tag
 		// or a top-level image ID, not a per-platform manifest digest (which is
@@ -245,6 +264,11 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 		for _, volume := range s.Volumes {
 			if volume.Type == types.VolumeTypeImage {
 				imageNames.Add(volume.Source)
+			}
+		}
+		for _, m := range s.Mounts {
+			if m.Type == types.VolumeTypeImage {
+				imageNames.Add(m.Source)
 			}
 		}
 		for _, img := range api.GetDependentImages(s, project.Name) {

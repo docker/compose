@@ -507,9 +507,11 @@ func TestWatchTriggerPaths_BindMountedPath(t *testing.T) {
 
 func TestCheckIfPathAlreadyBindMounted(t *testing.T) {
 	hostDir := t.TempDir()
-	volumes := []types.ServiceVolumeConfig{
-		{Type: types.VolumeTypeBind, Source: hostDir, Bind: &types.ServiceVolumeBind{}},
-	}
+	volumes := bindMountsAsVolumes([]types.ServiceMountConfig{
+		{Type: types.VolumeTypeBind, Source: hostDir, Target: "/app"},
+		{Type: types.VolumeTypeVolume, Source: "named", Target: "/named"},
+	})
+	assert.Equal(t, len(volumes), 1)
 
 	for _, tt := range []struct {
 		name        string
