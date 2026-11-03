@@ -318,9 +318,11 @@ func TestGetDependencyCondition(t *testing.T) {
 	assert.Equal(t, getDependencyCondition(web, project), ServiceConditionRunningOrHealthy)
 }
 
-func inspectResultOf(id, name string, status container.ContainerState, exitCode int, health *container.Health) client.ContainerInspectResult {
-	config := &container.Config{}
-	if health != nil {
+// inspectResultOf builds the inspection of a container. Its healthcheck is the
+// one given, or a trivial one when it has a health state and none is given.
+func inspectResultOf(id, name string, status container.ContainerState, exitCode int, health *container.Health, healthcheck *container.HealthConfig) client.ContainerInspectResult {
+	config := &container.Config{Healthcheck: healthcheck}
+	if health != nil && healthcheck == nil {
 		config.Healthcheck = &container.HealthConfig{Test: []string{"CMD", "true"}}
 	}
 	return client.ContainerInspectResult{Container: container.InspectResponse{
@@ -347,7 +349,7 @@ func TestStart_WaitVerifiesTheApplicationIsReady(t *testing.T) {
 		apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
 			Return(client.ContainerListResult{Items: []container.Summary{webCtr}}, nil).AnyTimes()
 		apiClient.EXPECT().ContainerInspect(gomock.Any(), webCtr.ID, gomock.Any()).AnyTimes().
-			Return(inspectResultOf(webCtr.ID, "prj-web-1", container.StateRunning, 0, &container.Health{Status: health}), nil)
+			Return(inspectResultOf(webCtr.ID, "prj-web-1", container.StateRunning, 0, &container.Health{Status: health}, nil), nil)
 		return svc
 	}
 
@@ -406,9 +408,9 @@ func TestStart_WaitSatisfiesAOneShotServiceByItsCompletion(t *testing.T) {
 					Return(client.ContainerListResult{Items: []container.Summary{initCtr, appCtr}}, nil)
 				apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(client.ContainerStartResult{}, nil)
 				apiClient.EXPECT().ContainerInspect(gomock.Any(), initCtr.ID, gomock.Any()).AnyTimes().
-					Return(inspectResultOf(initCtr.ID, "prj-init-1", container.StateExited, tt.exitCode, nil), nil)
+					Return(inspectResultOf(initCtr.ID, "prj-init-1", container.StateExited, tt.exitCode, nil, nil), nil)
 				apiClient.EXPECT().ContainerInspect(gomock.Any(), appCtr.ID, gomock.Any()).AnyTimes().
-					Return(inspectResultOf(appCtr.ID, "prj-app-1", container.StateRunning, 0, nil), nil)
+					Return(inspectResultOf(appCtr.ID, "prj-app-1", container.StateRunning, 0, nil, nil), nil)
 
 				err := svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 5 * time.Second})
 

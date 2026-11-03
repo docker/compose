@@ -2300,12 +2300,10 @@ func TestExecutePlanBoundedConcurrencyNeverBlocksAPrerequisite(t *testing.T) {
 	svc, apiClient, _ := newStartPhaseTestService(t)
 	svc.maxConcurrency = 1
 
-	ctrs := map[string]container.Summary{}
 	plan := &Plan{}
 	nodes := map[string]*PlanNode{}
 	for _, name := range []string{"first", "second", "third"} {
 		ctr := container.Summary{ID: name + "-id", Names: []string{"/test-" + name + "-1"}}
-		ctrs[name] = ctr
 		nodes[name] = plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:" + name + ":1", Cause: "start", Container: &ctr}, "")
 	}
 	// the dependencies point at nodes created later
