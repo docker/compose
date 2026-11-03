@@ -32,6 +32,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -146,6 +147,9 @@ func TestUpDetachedWaitVerifiesTheApplicationIsReady(t *testing.T) {
 // diverge from what the rebuilt service now is), and no others -- neither its
 // dependencies, which are not rebuilt either, nor the services unrelated to
 // it, whose stopped containers have no business being started by a rebuild.
+// The rebuilt service is recreated even when its container is up to date (a
+// rebuild is forced), and a provider-backed service depending on it is left
+// alone: running a provider is no business of a rebuild.
 // The images are not built here (no service has a build section); the project
 // the rebuild works on is what is narrowed.
 func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) {
@@ -160,6 +164,8 @@ func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) 
 		}
 		return s
 	}
+	gateway := service("gateway", "app")
+	gateway.Provider = &types.ServiceProviderConfig{Type: "test"}
 	project := &types.Project{
 		Name: "prj",
 		Services: types.Services{
@@ -167,11 +173,22 @@ func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) 
 			"proxy":     service("proxy", "app"),
 			"database":  service("database"),
 			"unrelated": service("unrelated"),
+			// a provider-backed service depending on the rebuilt one: running
+			// its provider is no business of a rebuild
+			"gateway": gateway,
 		},
 		Networks: types.Networks{},
 		Volumes:  types.Volumes{},
 	}
+	// the container of the rebuilt service is up to date: only a forced
+	// recreation replaces it
+	appHash, err := confighash.ServiceHash(project.Services["app"])
+	assert.NilError(t, err)
+	runningApp := stoppedServiceContainer("app", 1, container.StateRunning)
+	runningApp.Labels[api.ConfigHashLabel] = appHash
+	runningApp.Labels[api.ImageDigestLabel] = "sha256:alpine"
 	existing := []container.Summary{
+		runningApp,
 		stoppedServiceContainer("proxy", 1, container.StateExited),
 		stoppedServiceContainer("database", 1, container.StateExited),
 		stoppedServiceContainer("unrelated", 1, container.StateExited),
@@ -204,12 +221,12 @@ func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) 
 		})
 	apiClient.EXPECT().ContainerStop(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
 		DoAndReturn(func(_ context.Context, id string, _ client.ContainerStopOptions) (client.ContainerStopResult, error) {
-			touch(id)
+			touch("stop:" + id)
 			return client.ContainerStopResult{}, nil
 		})
 	apiClient.EXPECT().ContainerRemove(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
 		DoAndReturn(func(_ context.Context, id string, _ client.ContainerRemoveOptions) (client.ContainerRemoveResult, error) {
-			touch(id)
+			touch("remove:" + id)
 			return client.ContainerRemoveResult{}, nil
 		})
 	apiClient.EXPECT().ContainerRename(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
@@ -231,7 +248,10 @@ func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) 
 		}
 		return false
 	}
+	assert.Assert(t, touchesService("app", "remove:"), "the rebuilt service is recreated even if up to date: %v", touched)
+	assert.Assert(t, touchesService("app", "new:"), "the rebuilt service is recreated even if up to date: %v", touched)
 	assert.Assert(t, touchesService("app", "start:"), "the rebuilt service is started: %v", touched)
+	assert.Assert(t, !touchesService("gateway", ""), "a provider-backed service is left alone: %v", touched)
 	assert.Assert(t, touchesService("proxy", "start:"), "the container of the service depending on it is converged and started: %v", touched)
 	assert.Assert(t, !touchesService("database", ""), "a dependency of the rebuilt service is left alone: %v", touched)
 	assert.Assert(t, !touchesService("unrelated", ""), "a service unrelated to it is left alone: %v", touched)
