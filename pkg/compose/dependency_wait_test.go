@@ -841,15 +841,6 @@ func TestShouldWaitForDependency(t *testing.T) {
 	}
 }
 
-func inspectOf(status container.ContainerState, health *container.Health, healthcheck *container.HealthConfig, exitCode int) client.ContainerInspectResult {
-	return client.ContainerInspectResult{Container: container.InspectResponse{
-		ID:     "db-id",
-		Name:   "/test-db-1",
-		Config: &container.Config{Healthcheck: healthcheck},
-		State:  &container.State{Status: status, Health: health, ExitCode: exitCode},
-	}}
-}
-
 // TestIsServiceHealthyStatuses pins how each state of a container with a
 // healthcheck reads for service_healthy: healthy is the only way to satisfy
 // the condition, starting means keep polling, and anything else -- exited,
@@ -863,12 +854,16 @@ func TestIsServiceHealthyStatuses(t *testing.T) {
 		healthy bool
 		err     string
 	}{
-		{name: "healthy", inspect: inspectOf(container.StateRunning, &container.Health{Status: container.Healthy}, check, 0), healthy: true},
-		{name: "still starting", inspect: inspectOf(container.StateRunning, &container.Health{Status: container.Starting}, check, 0)},
-		{name: "unhealthy", inspect: inspectOf(container.StateRunning, &container.Health{Status: container.Unhealthy}, check, 0), err: "container test-db-1 is unhealthy"},
-		{name: "exited", inspect: inspectOf(container.StateExited, nil, check, 3), err: "container test-db-1 exited (3)"},
-		{name: "no health state", inspect: inspectOf(container.StateRunning, nil, check, 0), err: "container test-db-1 has no healthcheck configured"},
-		{name: "unexpected status", inspect: inspectOf(container.StateRunning, &container.Health{Status: "weird"}, check, 0), err: `container test-db-1 had unexpected health status "weird"`},
+		{name: "healthy", inspect: inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Healthy}, check), healthy: true},
+		{name: "still starting", inspect: inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Starting}, check)},
+		{name: "unhealthy", inspect: inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Unhealthy}, check), err: "container test-db-1 is unhealthy"},
+		{name: "exited", inspect: inspectResultOf("db-id", "test-db-1", container.StateExited, 3, nil, check), err: "container test-db-1 exited (3)"},
+		{name: "no health state", inspect: inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, nil, check), err: "container test-db-1 has no healthcheck configured"},
+		{
+			name:    "unexpected status",
+			inspect: inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: "weird"}, check),
+			err:     `container test-db-1 had unexpected health status "weird"`,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -889,9 +884,9 @@ func TestIsServiceHealthyStatuses(t *testing.T) {
 	t.Run("every container of the service has to be healthy", func(t *testing.T) {
 		svc, apiClient, _ := newStartPhaseTestService(t)
 		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
-			Return(inspectOf(container.StateRunning, &container.Health{Status: container.Healthy}, check, 0), nil)
+			Return(inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Healthy}, check), nil)
 		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
-			Return(inspectOf(container.StateRunning, &container.Health{Status: container.Starting}, check, 0), nil)
+			Return(inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Starting}, check), nil)
 
 		healthy, err := svc.isServiceHealthy(t.Context(), Containers{{ID: "db-1"}, {ID: "db-2"}}, false)
 		assert.NilError(t, err)
@@ -917,19 +912,19 @@ func TestCheckDependencyCompleted(t *testing.T) {
 		events   []string
 	}{
 		{
-			name: "exited with 0", inspect: inspectOf(container.StateExited, nil, nil, 0), required: true,
+			name: "exited with 0", inspect: inspectResultOf("db-id", "test-db-1", container.StateExited, 0, nil, nil), required: true,
 			done: true, events: []string{api.StatusExited},
 		},
 		{
-			name: "still running", inspect: inspectOf(container.StateRunning, nil, nil, 0), required: true,
+			name: "still running", inspect: inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, nil, nil), required: true,
 		},
 		{
-			name: "required, exited with an error code", inspect: inspectOf(container.StateExited, nil, nil, 3), required: true,
+			name: "required, exited with an error code", inspect: inspectResultOf("db-id", "test-db-1", container.StateExited, 3, nil, nil), required: true,
 			err:    `service "db" didn't complete successfully: exit 3`,
 			events: []string{api.StatusError},
 		},
 		{
-			name: "optional, exited with an error code", inspect: inspectOf(container.StateExited, nil, nil, 3),
+			name: "optional, exited with an error code", inspect: inspectResultOf("db-id", "test-db-1", container.StateExited, 3, nil, nil),
 			done:   true,
 			events: []string{`Skipped: optional dependency "db" didn't complete successfully: exit 3`},
 		},
@@ -975,15 +970,17 @@ func TestWaitDependenciesReportsTheWait(t *testing.T) {
 	containers := Containers{
 		{ID: "db-id", Names: []string{"/test-db-1"}, Labels: labels("False")},
 		{ID: "run-id", Names: []string{"/test-db-run-1"}, Labels: labels("True")},
+		{ID: "hook-id", Names: []string{"/test-db-hook-1"}, Labels: map[string]string{api.ServiceLabel: "db", api.OneoffLabel: "False", api.HookLabel: "post_start"}},
 	}
 	apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-id", gomock.Any()).
-		Return(inspectOf(container.StateRunning, &container.Health{Status: container.Healthy}, &container.HealthConfig{Test: []string{"CMD", "true"}}, 0), nil)
+		Return(inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Healthy}, &container.HealthConfig{Test: []string{"CMD", "true"}}), nil)
 
 	dependencies := types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}}
 	assert.NilError(t, svc.waitDependencies(t.Context(), project, "web", dependencies, containers))
 
 	assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusWaiting, api.StatusHealthy})
 	assert.Equal(t, len(recorder.byID["Container test-db-run-1"]), 0, "a one-off container is not waited for")
+	assert.Equal(t, len(recorder.byID["Container test-db-hook-1"]), 0, "a hook runner is not waited for")
 }
 
 // TestWaitDependencyEndOfContextWinsOverATick pins that a wait whose context
@@ -1007,7 +1004,7 @@ func TestWaitDependencyEndOfContextWinsOverATick(t *testing.T) {
 				DoAndReturn(func(context.Context, string, client.ContainerInspectOptions) (client.ContainerInspectResult, error) {
 					close(entered)
 					<-release
-					return inspectOf(container.StateRunning, &container.Health{Status: container.Starting}, &container.HealthConfig{Test: []string{"CMD", "true"}}, 0), nil
+					return inspectResultOf("db-id", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Starting}, &container.HealthConfig{Test: []string{"CMD", "true"}}), nil
 				})
 			result := make(chan error, 1)
 			go func() {

@@ -231,7 +231,7 @@ func TestRestart_WaitsForADependencyBeforeRestartingItsDependent(t *testing.T) {
 	dbRestart := apiClient.EXPECT().ContainerRestart(gomock.Any(), dbCtr.ID, gomock.Any()).
 		Return(client.ContainerRestartResult{}, nil)
 	dbHealthy := apiClient.EXPECT().ContainerInspect(gomock.Any(), dbCtr.ID, gomock.Any()).
-		Return(inspectResultOf(dbCtr.ID, "prj-db-1", container.StateRunning, 0, &container.Health{Status: container.Healthy}), nil).
+		Return(inspectResultOf(dbCtr.ID, "prj-db-1", container.StateRunning, 0, &container.Health{Status: container.Healthy}, nil), nil).
 		After(dbRestart)
 	apiClient.EXPECT().ContainerRestart(gomock.Any(), webCtr.ID, gomock.Any()).
 		Return(client.ContainerRestartResult{}, nil).After(dbHealthy)
