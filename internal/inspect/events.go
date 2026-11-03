@@ -18,6 +18,8 @@ package inspect
 
 import (
 	"context"
+	"errors"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -76,6 +78,9 @@ func (s *Service) Events(ctx context.Context, projectName string, options api.Ev
 			}
 
 		case err := <-res.Err:
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
 			return err
 		}
 	}
