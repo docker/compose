@@ -988,7 +988,7 @@ func TestMonitorFollowsTheContainersOfTheApplicationOnly(t *testing.T) {
 	_, err := runMonitor(t, m)
 
 	assert.NilError(t, err)
-	project := labelFilter(api.ProjectLabel, strings.ToLower(testProject))
+	project := naming.LabelFilter(api.ProjectLabel, strings.ToLower(testProject))
 	assert.Assert(t, listed.All, "stopped containers are part of the application")
 	labels := listed.Filters["label"]
 	assert.Assert(t, labels[project], "listing filters: %v", listed.Filters)
@@ -1024,8 +1024,10 @@ func TestMonitorDoesNotWaitForARelay(t *testing.T) {
 
 	t.Run("created while the application runs", func(t *testing.T) {
 		m, apiMock := newMonitorTestFixture(t)
-		relayCreated := containerMessage(events.ActionCreate, "relay", "testproject-provider-1", "provider", map[string]string{api.RelayLabel: "relay-identity"})
-		expectEvents(apiMock, relayCreated, monitorEvent(events.ActionDestroy))
+		relayLabels := map[string]string{api.RelayLabel: "relay-identity"}
+		relayCreated := containerMessage(events.ActionCreate, "relay", "testproject-provider-1", "provider", relayLabels)
+		relayStarted := containerMessage(events.ActionStart, "relay", "testproject-provider-1", "provider", relayLabels)
+		expectEvents(apiMock, relayCreated, relayStarted, monitorEvent(events.ActionDestroy))
 
 		_, err := runMonitor(t, m)
 
