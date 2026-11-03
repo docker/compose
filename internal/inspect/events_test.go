@@ -17,7 +17,6 @@
 package inspect
 
 import (
-	"context"
 	"errors"
 	"io"
 	"testing"
@@ -42,7 +41,7 @@ func TestEventsTreatsEOFAsCompletion(t *testing.T) {
 	})
 	service := New(&fakeBackend{apiClient: apiClient})
 
-	err := service.Events(context.Background(), "project", api.EventsOptions{
+	err := service.Events(t.Context(), "project", api.EventsOptions{
 		Consumer: func(api.Event) error { return nil },
 	})
 
@@ -61,7 +60,7 @@ func TestEventsPropagatesStreamErrors(t *testing.T) {
 	})
 	service := New(&fakeBackend{apiClient: apiClient})
 
-	err := service.Events(context.Background(), "project", api.EventsOptions{
+	err := service.Events(t.Context(), "project", api.EventsOptions{
 		Consumer: func(api.Event) error { return nil },
 	})
 
