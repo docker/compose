@@ -18,6 +18,8 @@ package inspect
 
 import (
 	"context"
+	"errors"
+	"io"
 	"slices"
 	"strings"
 	"time"
@@ -76,6 +78,12 @@ func (s *Service) Events(ctx context.Context, projectName string, options api.Ev
 			}
 
 		case err := <-res.Err:
+			// A bounded stream (e.g. events --until) ends with io.EOF once the
+			// daemon has sent every matching event. That is a normal completion,
+			// not a command failure.
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
 			return err
 		}
 	}
