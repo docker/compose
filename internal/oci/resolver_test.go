@@ -19,6 +19,8 @@ package oci
 import (
 	"net/http"
 	"net/http/httptest"
+	"slices"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -214,4 +216,154 @@ func TestGetBlob_RejectsSizeMismatch(t *testing.T) {
 	})
 	assert.ErrorType(t, err, errdefs.IsFailedPrecondition)
 	assert.ErrorContains(t, err, "read past expected size")
+}
+
+// manifestServer is a registry serving content as the manifest of any reference of test/artifact,
+// whatever the digest it tells it has: a rogue registry says the digest it wants.
+func manifestServer(t *testing.T, claimed digest.Digest, served []byte) string {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		if !strings.HasPrefix(r.URL.Path, "/v2/test/artifact/manifests/") {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", spec.MediaTypeImageManifest)
+		w.Header().Set("Docker-Content-Digest", claimed.String())
+		if r.Method == http.MethodHead {
+			w.Header().Set("Content-Length", strconv.Itoa(len(served)))
+			return
+		}
+		_, _ = w.Write(served)
+	}))
+	t.Cleanup(server.Close)
+	return server.Listener.Addr().String()
+}
+
+// TestGet_RejectsDigestMismatch guards that the manifest served by the registry is verified against the
+// digest of the descriptor, whether the reference is a tag (the registry says the digest) or a digest (the
+// reference says it): Get bypasses containerd's content store, so nothing else checks it, and callers
+// identify the manifest by that digest.
+func TestGet_RejectsDigestMismatch(t *testing.T) {
+	pinned := digest.FromString("the manifest the reference pins")
+	tampered := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","artifactType":"tampered"}`)
+
+	host := manifestServer(t, pinned, tampered)
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+
+	for name, named := range map[string]string{
+		"tag":    host + "/test/artifact:latest",
+		"digest": host + "/test/artifact@" + pinned.String(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			ref, err := reference.ParseDockerRef(named)
+			assert.NilError(t, err)
+			_, content, err := Get(t.Context(), resolver, ref)
+			assert.ErrorContains(t, err, "digest mismatch")
+			assert.Assert(t, content == nil)
+		})
+	}
+}
+
+// TestGet_ReturnsVerifiedManifest guards the regular case: a manifest that has the digest it is served
+// under is returned with its descriptor.
+func TestGet_ReturnsVerifiedManifest(t *testing.T) {
+	manifest := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","artifactType":"application/vnd.docker.compose.project"}`)
+	dgst := digest.FromBytes(manifest)
+
+	host := manifestServer(t, dgst, manifest)
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+
+	for name, named := range map[string]string{
+		"tag":    host + "/test/artifact:latest",
+		"digest": host + "/test/artifact@" + dgst.String(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			ref, err := reference.ParseDockerRef(named)
+			assert.NilError(t, err)
+			descriptor, content, err := Get(t.Context(), resolver, ref)
+			assert.NilError(t, err)
+			assert.Equal(t, descriptor.Digest, dgst)
+			assert.DeepEqual(t, content, manifest)
+		})
+	}
+}
+
+// TestVerifyDigest guards what is checked against a digest: the algorithms of the
+// digests Compose can be given, and a digest which is not one, which is refused
+// rather than compared.
+func TestVerifyDigest(t *testing.T) {
+	content := []byte("content")
+
+	for name, tt := range map[string]struct {
+		expected digest.Digest
+		err      string
+	}{
+		"sha256":                      {digest.SHA256.FromBytes(content), ""},
+		"sha384":                      {digest.SHA384.FromBytes(content), ""},
+		"sha512":                      {digest.SHA512.FromBytes(content), ""},
+		"another content (sha256)":    {digest.SHA256.FromString("another"), "digest mismatch"},
+		"another content (sha512)":    {digest.SHA512.FromString("another"), "digest mismatch"},
+		"an unknown algorithm":        {digest.Digest("md5:" + strings.Repeat("0", 32)), "invalid digest"},
+		"a digest which is too short": {digest.Digest("sha256:short"), "invalid digest"},
+		"no digest":                   {"", "invalid digest"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := verifyDigest("manifest", tt.expected, content)
+			if tt.err == "" {
+				assert.NilError(t, err)
+				return
+			}
+			assert.ErrorContains(t, err, tt.err)
+		})
+	}
+}
+
+// TestGet_RejectsAnInvalidDigest guards that a manifest the registry says has a
+// digest which is not one is refused, not compared to it.
+func TestGet_RejectsAnInvalidDigest(t *testing.T) {
+	manifest := []byte(`{"schemaVersion":2}`)
+	host := manifestServer(t, digest.Digest("sha256:short"), manifest)
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+	ref, err := reference.ParseDockerRef(host + "/test/artifact:latest")
+	assert.NilError(t, err)
+
+	_, content, err := Get(t.Context(), resolver, ref)
+	assert.Assert(t, err != nil)
+	assert.Assert(t, content == nil)
+}
+
+// TestGet_RejectsAManifestLargerThanAnnounced guards that no more than the size
+// the registry announced is read, which Get relies on to not buffer what a rogue
+// registry serves: one which announces a small manifest and serves a larger one is
+// refused before anything is hashed or used.
+func TestGet_RejectsAManifestLargerThanAnnounced(t *testing.T) {
+	announced := []byte(`{"schemaVersion":2}`)
+	served := append(slices.Clone(announced), []byte(strings.Repeat(" ", 4096))...)
+	dgst := digest.FromBytes(announced)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v2/" {
+			return
+		}
+		w.Header().Set("Content-Type", spec.MediaTypeImageManifest)
+		w.Header().Set("Docker-Content-Digest", dgst.String())
+		if r.Method == http.MethodHead {
+			w.Header().Set("Content-Length", strconv.Itoa(len(announced)))
+			return
+		}
+		_, _ = w.Write(served)
+	}))
+	t.Cleanup(server.Close)
+	host := server.Listener.Addr().String()
+	resolver := NewResolver(&configfile.ConfigFile{}, &http.Transport{}, host)
+	ref, err := reference.ParseDockerRef(host + "/test/artifact@" + dgst.String())
+	assert.NilError(t, err)
+
+	_, content, err := Get(t.Context(), resolver, ref)
+	assert.ErrorContains(t, err, "read past expected size")
+	assert.Assert(t, content == nil)
 }
