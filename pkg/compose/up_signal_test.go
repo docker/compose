@@ -24,7 +24,6 @@ import (
 	"os/signal"
 	"syscall"
 	"testing"
-	"time"
 
 	"gotest.tools/v3/assert"
 )
@@ -45,19 +44,28 @@ func TestUpInteractiveDoesNotHandleSignalsDuringTheCreatePhase(t *testing.T) {
 	defer signal.Stop(mine)
 
 	h := newInteractiveUpHarness(t)
+	// the callback runs in the goroutine of the up, which may outlive the test
+	// when the up does not return in time: it reports through a channel the test
+	// reads, not through t
+	onCreateErr := make(chan error, 1)
 	h.daemon.onCreate = func() {
 		if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
-			t.Error(err)
+			onCreateErr <- err
 			return
 		}
 		select {
 		case <-mine:
-		case <-time.After(10 * time.Second):
-			t.Error("the signal was never delivered")
+		case <-t.Context().Done():
+			onCreateErr <- errors.New("the signal was never delivered")
 		}
 	}
 
 	assert.NilError(t, h.up(t))
+	select {
+	case err := <-onCreateErr:
+		t.Error(err)
+	default:
+	}
 	assert.Equal(t, h.daemon.indexOf("stop"), -1, "the application was stopped after a signal met during the Create phase: %v", h.daemon.recorded())
 }
 
@@ -79,6 +87,9 @@ func TestUpInteractiveStopsAContainerThatStartsAfterTheTeardownSweep(t *testing.
 	h.daemon.startGate = make(chan struct{})
 	h.daemon.neverExits = true
 	h.daemon.stopEndsStartedContainer = true
+	// the goroutine may outlive the test: it reports through a channel the test
+	// reads, not through t
+	killErr := make(chan error, 1)
 	go func() {
 		select {
 		case <-h.daemon.callSignal("start-requested"):
@@ -86,7 +97,7 @@ func TestUpInteractiveStopsAContainerThatStartsAfterTheTeardownSweep(t *testing.
 			return
 		}
 		if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
-			t.Error(err)
+			killErr <- err
 			return
 		}
 		// the sweep of the teardown, which finds the container not up yet
@@ -101,6 +112,11 @@ func TestUpInteractiveStopsAContainerThatStartsAfterTheTeardownSweep(t *testing.
 
 	assert.NilError(t, h.up(t))
 	assert.Equal(t, callsOf(h.daemon, "stop"), 2, "the container that started after the sweep must be stopped too: %v", h.daemon.recorded())
+	select {
+	case err := <-killErr:
+		t.Error(err)
+	default:
+	}
 }
 
 // TestUpInteractiveIgnoresTheStartPhaseErrorOfAnInterruptedUp pins that a
@@ -120,6 +136,7 @@ func TestUpInteractiveIgnoresTheStartPhaseErrorOfAnInterruptedUp(t *testing.T) {
 	h.daemon.startGate = make(chan struct{})
 	h.daemon.startErr = errors.New("container start interrupted by the stop")
 	h.daemon.stopEndsContainer = true
+	killErr := make(chan error, 1)
 	go func() {
 		// the container start is in flight when the interruption comes, and
 		// fails only once the graceful stop it triggered went through
@@ -129,7 +146,7 @@ func TestUpInteractiveIgnoresTheStartPhaseErrorOfAnInterruptedUp(t *testing.T) {
 			return
 		}
 		if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
-			t.Error(err)
+			killErr <- err
 			return
 		}
 		select {
@@ -141,4 +158,9 @@ func TestUpInteractiveIgnoresTheStartPhaseErrorOfAnInterruptedUp(t *testing.T) {
 	}()
 
 	assert.NilError(t, h.up(t))
+	select {
+	case err := <-killErr:
+		t.Error(err)
+	default:
+	}
 }
