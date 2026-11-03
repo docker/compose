@@ -75,10 +75,12 @@ func TestUpDetachedCreatesThenStartsTheContainers(t *testing.T) {
 func TestScaleCreatesThenStartsTheReplicas(t *testing.T) {
 	h := newInteractiveUpHarness(t)
 
-	err := h.svc.Scale(t.Context(), interactiveUpProject(), api.ScaleOptions{Replicas: map[string]int{"web": 1}})
+	err := h.svc.Scale(t.Context(), interactiveUpProject(), api.ScaleOptions{Replicas: map[string]int{"web": 2}})
 
 	assert.NilError(t, err)
 	assertCreatedThenStarted(t, h.daemon)
+	assert.Equal(t, callsOf(h.daemon, "create"), 2, "the requested replicas are created: %v", h.daemon.recorded())
+	assert.Equal(t, callsOf(h.daemon, "start"), 2, "the requested replicas are started: %v", h.daemon.recorded())
 }
 
 // TestRunStartsTheDependenciesOfTheOneOff pins that `compose run` brings up
@@ -214,23 +216,23 @@ func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) 
 		Return(client.ContainerRenameResult{}, nil)
 	apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().
 		DoAndReturn(func(_ context.Context, id string, _ client.ContainerStartOptions) (client.ContainerStartResult, error) {
-			touch(id)
+			touch("start:" + id)
 			return client.ContainerStartResult{}, nil
 		})
 
 	options := api.WatchOptions{Build: &api.BuildOptions{}, LogTo: &testLogConsumer{}}
 	assert.NilError(t, svc.rebuild(t.Context(), project, []string{"app"}, options))
 
-	touchesService := func(name string) bool {
+	touchesService := func(name, kind string) bool {
 		for id := range touched {
-			if strings.Contains(id, "prj-"+name+"-1") {
+			if strings.HasPrefix(id, kind) && strings.Contains(id, "prj-"+name+"-1") {
 				return true
 			}
 		}
 		return false
 	}
-	assert.Assert(t, touchesService("app"), "the rebuilt service is created and started: %v", touched)
-	assert.Assert(t, touchesService("proxy"), "the container of the service depending on it is converged: %v", touched)
-	assert.Assert(t, !touchesService("database"), "a dependency of the rebuilt service is left alone: %v", touched)
-	assert.Assert(t, !touchesService("unrelated"), "a service unrelated to it is left alone: %v", touched)
+	assert.Assert(t, touchesService("app", "start:"), "the rebuilt service is started: %v", touched)
+	assert.Assert(t, touchesService("proxy", "start:"), "the container of the service depending on it is converged and started: %v", touched)
+	assert.Assert(t, !touchesService("database", ""), "a dependency of the rebuilt service is left alone: %v", touched)
+	assert.Assert(t, !touchesService("unrelated", ""), "a service unrelated to it is left alone: %v", touched)
 }
