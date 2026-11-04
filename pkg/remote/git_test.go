@@ -111,6 +111,28 @@ func TestValidateGitSubDir(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			// Windows treats a backslash-prefixed path as rooted but not absolute, and filepath.Clean
+			// hides that from a check on the cleaned value.
+			name:    "rooted windows path without a drive",
+			subDir:  "\\etc\\passwd",
+			wantErr: true,
+		},
+		{
+			name:    "rooted windows path single component",
+			subDir:  "\\foo",
+			wantErr: true,
+		},
+		{
+			name:    "absolute windows path with forward slashes",
+			subDir:  "C:/x",
+			wantErr: true,
+		},
+		{
+			name:    "UNC path",
+			subDir:  "\\\\srv\\share\\x",
+			wantErr: true,
+		},
+		{
 			name:    "normalized path that would escape",
 			subDir:  "./../../etc/passwd",
 			wantErr: true,
