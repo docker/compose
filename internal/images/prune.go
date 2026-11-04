@@ -67,19 +67,16 @@ func NewPruner(imageClient client.ImageAPIClient, project *types.Project, limite
 	}
 }
 
-// ImageBelongsToKnownService reports whether img should be pruned: either
-// removeOrphans is set (indiscriminately prune all project images even if
-// they're not referenced by the current Compose state, e.g. the service was
-// removed from YAML), or the image belongs to a service still declared in
-// project. Shared by ImagesToPrune (tagged images) and down's own
-// dangling-image keep check, so the two can't drift on what counts as
-// orphaned — the image-side analog of the orphaned-container check of down.
+// ImageBelongsToKnownService reports whether img belongs to a selected service,
+// or to an orphan when removeOrphans is set. Declared but disabled services are
+// not orphans. Shared by tagged and dangling image pruning.
 func ImageBelongsToKnownService(project *types.Project, removeOrphans bool, img image.Summary) bool {
-	if removeOrphans {
+	service := img.Labels[api.ServiceLabel]
+	if _, err := project.GetService(service); err == nil {
 		return true
 	}
-	_, err := project.GetService(img.Labels[api.ServiceLabel])
-	return err == nil
+	_, disabled := project.DisabledServices[service]
+	return removeOrphans && !disabled
 }
 
 // ImagesToPrune returns the set of images that should be removed.

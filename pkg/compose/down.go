@@ -142,7 +142,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	ops = append(ops, s.ensureRelayLinkNetworksDown(ctx, project, limiter)...)
 
 	if options.Images != api.ImagePruneNone {
-		ops = append(ops, s.ensureImagesDown(ctx, project, options, limiter)...)
+		imageProject, err := project.WithSelectedServices(options.Services, types.IncludeDependents)
+		if err != nil {
+			return err
+		}
+		ops = append(ops, s.ensureImagesDown(ctx, imageProject, options, limiter)...)
 	}
 
 	if options.Volumes {
