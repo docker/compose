@@ -33,7 +33,8 @@ import (
 
 // TestPropagateDockerEndpoint locks which endpoint a child CLI plugin gets
 // (#14433): a named context by name only, the "default" one (also the one in
-// use with -H or DOCKER_HOST) by its host and TLS material.
+// use with -H or DOCKER_HOST) by its host and TLS material. The child inherits
+// the parent's environment, where DOCKER_HOST would win over DOCKER_CONTEXT.
 func TestPropagateDockerEndpoint(t *testing.T) {
 	tlsData := &clicontext.TLSData{CA: []byte("ca"), Cert: []byte("cert"), Key: []byte("key")}
 	tests := []struct {
@@ -74,20 +75,30 @@ func TestPropagateDockerEndpoint(t *testing.T) {
 			cli.EXPECT().DockerEndpoint().Return(tt.endpoint).AnyTimes()
 			s := &composeService{dockerCli: cli}
 
+			t.Setenv("DOCKER_HOST", "tcp://inherited:2375")
+			t.Setenv("DOCKER_CERT_PATH", "/inherited")
+			t.Setenv("DOCKER_TLS_VERIFY", "1")
+			t.Setenv("DOCKER_TLS", "1")
+
 			values, cleanup, err := s.propagateDockerEndpoint()
 			assert.NilError(t, err)
 			defer cleanup()
+			// as exec.Cmd does, the last value of a variable wins
 			env := map[string]string{}
-			for _, v := range values {
+			for _, v := range append(os.Environ(), values...) {
 				k, val, _ := strings.Cut(v, "=")
 				env[k] = val
 			}
 
 			assert.Equal(t, env["DOCKER_CONTEXT"], tt.context)
 			assert.Equal(t, env["DOCKER_HOST"], tt.wantHost)
-			certs, hasCerts := env["DOCKER_CERT_PATH"]
-			assert.Equal(t, hasCerts, tt.wantTLS)
+			if tt.context != "default" {
+				assert.Equal(t, env["DOCKER_CERT_PATH"], "")
+				assert.Equal(t, env["DOCKER_TLS_VERIFY"], "")
+				assert.Equal(t, env["DOCKER_TLS"], "")
+			}
 			if tt.wantTLS {
+				certs := env["DOCKER_CERT_PATH"]
 				assert.Equal(t, env["DOCKER_TLS_VERIFY"], "1")
 				_, err := os.Stat(filepath.Join(certs, flags.DefaultCaFile))
 				assert.NilError(t, err)
