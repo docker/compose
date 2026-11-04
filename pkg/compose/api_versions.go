@@ -30,6 +30,7 @@ const (
 	apiVersion144 = "1.44"
 
 	// apiVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
+	// internal/images declares the same constant: keep the two in sync.
 	//
 	// New features in this version:
 	//  - Volume mounts with type=image support
@@ -39,6 +40,7 @@ const (
 	apiVersion148 = "1.48"
 
 	// apiVersion149 represents Docker Engine API version 1.49 (Engine v28.1).
+	// internal/images declares the same constant: keep the two in sync.
 	//
 	// New features in this version:
 	//  - Network interface_name configuration

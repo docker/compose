@@ -213,3 +213,21 @@ func TestServiceImageDigest(t *testing.T) {
 		assert.Equal(t, got, "sha256:refreshed")
 	})
 }
+
+// TestImagesBackendWiring pins the adapter between a composeService and
+// internal/images: the images tests run against their own fake backend, so a
+// concurrency bound that stopped following the service's (--parallel ignored
+// by `images` and `down --rmi`), or an engine version read from somewhere
+// other than the negotiated one (manifest-based digests gated on the wrong
+// API version), would otherwise go unnoticed.
+func TestImagesBackendWiring(t *testing.T) {
+	api, s := newTestComposeService(t, gomock.NewController(t), "1.48")
+	s.maxConcurrency = 7
+	b := imagesBackend{s}
+
+	assert.Equal(t, b.MaxConcurrency(), 7)
+	assert.Assert(t, b.APIClient() == client.APIClient(api))
+	version, err := b.RuntimeAPIVersion(t.Context())
+	assert.NilError(t, err)
+	assert.Equal(t, version, "1.48")
+}
