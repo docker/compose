@@ -55,9 +55,10 @@ func TestUpOptionsValidate(t *testing.T) {
 		{name: "interactive watch", start: StartOptions{Attach: attached, Watch: true}},
 		{name: "interactive everything", start: StartOptions{Attach: attached, AttachTo: []string{"web"}, OnExit: CascadeFail, ExitCodeFrom: "web", Watch: true, NavigationMenu: true}},
 
-		// wait is detached
-		{name: "wait with attach", start: StartOptions{Wait: true, Attach: attached}, conflict: []string{"Start.Wait", "Start.Attach"}},
-		{name: "wait with attach and timeout", start: StartOptions{Wait: true, WaitTimeout: time.Second, Attach: attached}, conflict: []string{"Start.Wait", "Start.Attach"}},
+		// wait streams the logs until the services are running|healthy
+		{name: "wait with attach", start: StartOptions{Wait: true, Attach: attached}},
+		{name: "wait with attach cascade stop", start: StartOptions{Wait: true, Attach: attached, OnExit: CascadeStop}, conflict: []string{"Start.Wait", "Start.OnExit"}},
+		{name: "wait with attach watch", start: StartOptions{Wait: true, Attach: attached, Watch: true}, conflict: []string{"Start.Wait", "Start.Watch"}},
 
 		// session-only options require a session
 		{name: "detached cascade stop", start: StartOptions{OnExit: CascadeStop}, conflict: []string{"Start.Attach", "Start.OnExit"}},
@@ -160,10 +161,10 @@ func TestUpOptionsValidateReportsAllConflicts(t *testing.T) {
 			want:  [][]string{{"Start.Attach", "Start.Watch"}},
 		},
 		{
-			// the session options are fine once Attach is set, only Wait conflicts
+			// Attach is set, but Wait ends the session before the options could apply
 			name:  "wait with attach and session options",
 			start: StartOptions{Wait: true, Attach: attached, OnExit: CascadeStop, ExitCodeFrom: "web", Watch: true},
-			want:  [][]string{{"Start.Wait", "Start.Attach"}},
+			want:  [][]string{{"Start.Wait", "Start.OnExit"}, {"Start.Wait", "Start.ExitCodeFrom"}, {"Start.Wait", "Start.Watch"}},
 		},
 	}
 	for _, tt := range tests {

@@ -1,0 +1,9 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sh -c 'echo booting; sleep 3; echo ready-to-serve; touch /tmp/ready; sleep infinity'
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 1s
+      retries: 30

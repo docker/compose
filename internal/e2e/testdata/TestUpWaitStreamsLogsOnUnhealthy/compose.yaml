@@ -1,0 +1,9 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sh -c 'echo failing-to-boot; sleep infinity'
+    healthcheck:
+      test: ["CMD", "false"]
+      interval: 1s
+      retries: 3
