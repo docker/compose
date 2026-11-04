@@ -12,7 +12,7 @@
    limitations under the License.
 */
 
-package compose
+package devwatch
 
 import (
 	"context"
