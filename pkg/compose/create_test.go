@@ -544,3 +544,42 @@ func TestSetBlkio(t *testing.T) {
 	assert.Equal(t, resources.BlkioDeviceWriteBps[0].Rate, uint64(3))
 	assert.Assert(t, resources.BlkioDeviceWriteIOps == nil)
 }
+
+func TestGetRestartPolicy(t *testing.T) {
+	maxAttempts := uint64(5)
+	s := composetypes.ServiceConfig{Restart: "unless-stopped"}
+	assert.Equal(t, container.RestartPolicyUnlessStopped, getRestartPolicy(s).Name)
+
+	// deploy.restart_policy overrides the fields it sets
+	s = composetypes.ServiceConfig{
+		Restart: "unless-stopped",
+		Deploy: &composetypes.DeployConfig{
+			RestartPolicy: &composetypes.RestartPolicy{Condition: "on-failure", MaxAttempts: &maxAttempts},
+		},
+	}
+	p := getRestartPolicy(s)
+	assert.Equal(t, container.RestartPolicyOnFailure, p.Name)
+	assert.Equal(t, 5, p.MaximumRetryCount)
+
+	// a deploy.restart_policy without condition (e.g. delay-only) must not
+	// clobber the service-level restart with an empty engine policy name
+	s = composetypes.ServiceConfig{
+		Restart: "on-failure:3",
+		Deploy: &composetypes.DeployConfig{
+			RestartPolicy: &composetypes.RestartPolicy{},
+		},
+	}
+	p = getRestartPolicy(s)
+	assert.Equal(t, container.RestartPolicyOnFailure, p.Name)
+	assert.Equal(t, 3, p.MaximumRetryCount)
+
+	// deploy.restart_policy still applies when there is no service-level restart
+	s = composetypes.ServiceConfig{
+		Deploy: &composetypes.DeployConfig{
+			RestartPolicy: &composetypes.RestartPolicy{Condition: "unless-stopped"},
+		},
+	}
+	p = getRestartPolicy(s)
+	assert.Equal(t, container.RestartPolicyUnlessStopped, p.Name)
+	assert.Equal(t, 0, p.MaximumRetryCount)
+}

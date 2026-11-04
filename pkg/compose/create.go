@@ -763,13 +763,11 @@ func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 	}
 	if service.Deploy != nil && service.Deploy.RestartPolicy != nil {
 		policy := *service.Deploy.RestartPolicy
-		var attempts int
-		if policy.MaxAttempts != nil {
-			attempts = int(*policy.MaxAttempts)
+		if policy.Condition != "" {
+			restart.Name = mapRestartPolicyCondition(policy.Condition)
 		}
-		restart = container.RestartPolicy{
-			Name:              mapRestartPolicyCondition(policy.Condition),
-			MaximumRetryCount: attempts,
+		if policy.MaxAttempts != nil {
+			restart.MaximumRetryCount = int(*policy.MaxAttempts)
 		}
 	}
 	return restart
