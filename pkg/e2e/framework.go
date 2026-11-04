@@ -273,9 +273,10 @@ func (c *CLI) BaseEnvironment() []string {
 		"KUBECONFIG=invalid",
 		"PATH=" + os.Getenv("PATH"),
 	}
-	dockerContextEnv, ok := os.LookupEnv("DOCKER_CONTEXT")
-	if ok {
-		env = append(env, "DOCKER_CONTEXT="+dockerContextEnv)
+	for _, name := range []string{"DOCKER_HOST", "DOCKER_CONTEXT"} {
+		if value, ok := os.LookupEnv(name); ok {
+			env = append(env, name+"="+value)
+		}
 	}
 
 	if coverdir, ok := os.LookupEnv("GOCOVERDIR"); ok {

@@ -671,7 +671,9 @@ func TestBuildTLS(t *testing.T) {
 		fmt.Sprintf("host=tcp://127.0.0.1:%s,ca=%s/client/ca.pem,cert=%s/client/cert.pem,key=%s/client/key.pem,skip-tls-verify=1", hostPort, tmp, tmp, tmp))
 
 	cmd := c.NewDockerComposeCmd(t, "-f", "fixtures/build-test/minimal/compose.yaml", "build")
-	cmd.Env = append(cmd.Env, "DOCKER_CONTEXT="+dindBuilder)
+	// DOCKER_HOST takes precedence over DOCKER_CONTEXT, so clear it for the
+	// build to reach the dind builder rather than the engine under test.
+	cmd.Env = append(cmd.Env, "DOCKER_HOST=", "DOCKER_CONTEXT="+dindBuilder)
 	cmd.Stdout = os.Stdout
 	res = icmd.RunCmd(cmd)
 	res.Assert(t, icmd.Expected{Err: "Built"})
