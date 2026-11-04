@@ -32,6 +32,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/stringid"
 
+	"github.com/docker/compose/v5/internal/envresolver"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -267,7 +268,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, optio
 	if len(options.Environment) > 0 {
 		cmdEnv := types.NewMappingWithEquals(options.Environment)
 		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
-			v, ok := envResolver(project.Environment)(s)
+			v, ok := envresolver.New(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
 		if service.Environment == nil {

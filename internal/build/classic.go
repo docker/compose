@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package build
 
 import (
 	"context"
@@ -42,10 +42,11 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
+	composeprogress "github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func (s *composeService) doBuildClassic(ctx context.Context, project *types.Project, serviceToBuild types.Services, options api.BuildOptions) (map[string]string, error) {
+func (s *Service) doBuildClassic(ctx context.Context, project *types.Project, serviceToBuild types.Services, options api.BuildOptions) (map[string]string, error) {
 	imageIDs := map[string]string{}
 
 	// Not using bake, additional_context: service:xx is implemented by building images in dependency order
@@ -80,7 +81,7 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		return -1
 	}
 
-	err = InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
+	err = s.backend.InDependencyOrder(ctx, project, func(ctx context.Context, name string) error {
 		trace.SpanFromContext(ctx).SetAttributes(attribute.String("builder", "classic"))
 		service, ok := serviceToBuild[name]
 		if !ok {
@@ -88,24 +89,22 @@ func (s *composeService) doBuildClassic(ctx context.Context, project *types.Proj
 		}
 
 		image := api.GetImageNameOrDefault(service, project.Name)
-		s.events.On(buildingEvent(image))
+		s.backend.Events().On(composeprogress.Building(image))
 		id, err := s.doBuildImage(ctx, project, service, options)
 		if err != nil {
 			return err
 		}
-		s.events.On(builtEvent(image))
+		s.backend.Events().On(composeprogress.Built(image))
 		// the classic builder reports the raw image ID from the build stream;
 		// resolve the canonical content digest instead so the recorded
 		// identity matches what later runs compute for the same local image
 		// (resolved here to inherit the build traversal's concurrency)
-		builtDigests[getServiceIndex(name)] = s.canonicalBuiltDigest(ctx, image, service.Platform, id)
+		builtDigests[getServiceIndex(name)] = s.backend.CanonicalBuiltDigest(ctx, image, service.Platform, id)
 
 		if options.Push {
-			return s.push(ctx, project, api.PushOptions{})
+			return s.backend.Push(ctx, project, api.PushOptions{})
 		}
 		return nil
-	}, func(traversal *graphTraversal) {
-		traversal.maxConcurrency = s.maxConcurrency
 	})
 	if err != nil {
 		return nil, err
@@ -133,7 +132,7 @@ type classicBuildContext struct {
 	cleanup       func()
 }
 
-func (s *composeService) doBuildImage(ctx context.Context, project *types.Project, service types.ServiceConfig, options api.BuildOptions) (string, error) {
+func (s *Service) doBuildImage(ctx context.Context, project *types.Project, service types.ServiceConfig, options api.BuildOptions) (string, error) {
 	err := checkClassicBuilderSupported(service)
 	if err != nil {
 		return "", err
@@ -146,8 +145,8 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 
 	dockerfileName := dockerFilePath(service.Build.Context, service.Build.Dockerfile)
 	specifiedContext := service.Build.Context
-	progBuff := s.stdout()
-	buildBuff := s.stdout()
+	progBuff := s.backend.CLI().Out()
+	buildBuff := s.backend.CLI().Out()
 
 	bctx, err := prepareClassicBuildContext(specifiedContext, dockerfileName, progBuff)
 	if err != nil {
@@ -186,7 +185,7 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 	if err != nil {
 		return "", err
 	}
-	buildOpts := imageBuildOptions(s.getProxyConfig(), project, service, options)
+	buildOpts := imageBuildOptions(s.backend.ProxyConfig(), project, service, options)
 	imageName := api.GetImageNameOrDefault(service, project.Name)
 	buildOpts.Tags = append(buildOpts.Tags, imageName)
 	buildOpts.Dockerfile = relDockerfile
@@ -195,8 +194,8 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-	s.events.On(buildingEvent(imageName))
-	response, err := s.apiClient().ImageBuild(ctx, body, buildOpts)
+	s.backend.Events().On(composeprogress.Building(imageName))
+	response, err := s.backend.CLI().Client().ImageBuild(ctx, body, buildOpts)
 	if err != nil {
 		return "", err
 	}
@@ -224,7 +223,7 @@ func (s *composeService) doBuildImage(ctx context.Context, project *types.Projec
 		}
 		return "", err
 	}
-	s.events.On(builtEvent(imageName))
+	s.backend.Events().On(composeprogress.Built(imageName))
 	return imageID, nil
 }
 
@@ -320,8 +319,8 @@ func archiveBuildContext(contextDir, relDockerfile string) (io.ReadCloser, strin
 }
 
 // classicAuthConfigs converts the CLI credentials to the engine's auth config
-func (s *composeService) classicAuthConfigs() (map[string]registry.AuthConfig, error) {
-	creds, err := s.configFile().GetAllCredentials()
+func (s *Service) classicAuthConfigs() (map[string]registry.AuthConfig, error) {
+	creds, err := s.backend.CLI().ConfigFile().GetAllCredentials()
 	if err != nil {
 		return nil, err
 	}
