@@ -61,7 +61,12 @@ type ProjectLoadOptions struct {
 	Services []string
 	// Offline mode disables remote resource loading
 	Offline bool
+	// IncludeUnused keeps the resources no service uses (networks, volumes,
+	// secrets, configs), which are dropped by default
+	IncludeUnused bool
 	// All includes all resources (not just those used by services)
+	//
+	// Deprecated: use IncludeUnused, which means the same.
 	All bool
 	// Compatibility enables v1 compatibility mode
 	Compatibility bool
@@ -348,11 +353,16 @@ type CreateOptions struct {
 	RemoveOrphans bool
 	// Ignore legacy containers for services that are not defined in the project
 	IgnoreOrphans bool
-	// Recreate define the strategy to apply on existing containers
+	// Recreate define the strategy to apply on existing containers: one of
+	// RecreateDiverged (the default, also used for ""), RecreateForce or
+	// RecreateNever. Any other value is rejected by Validate.
 	Recreate string
-	// RecreateDependencies define the strategy to apply on dependencies services
+	// RecreateDependencies define the strategy to apply on dependencies
+	// services, with the same values as Recreate.
 	RecreateDependencies string
-	// Inherit reuse anonymous volumes from previous container
+	// Inherit reuse anonymous volumes from previous container. Beware that
+	// the zero value (false) recreates them, like `up --renew-anon-volumes`:
+	// set it to true to get what the CLI does by default.
 	Inherit bool
 	// Timeout set delay to wait for container to gracefully stop before sending SIGKILL
 	Timeout *time.Duration
@@ -481,6 +491,8 @@ type DownOptions struct {
 }
 
 // ConfigOptions group options of the Config API
+//
+// Deprecated: no operation of Compose takes these options, they will be removed.
 type ConfigOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
@@ -521,7 +533,12 @@ type KillOptions struct {
 	Services []string
 	// Signal to send to containers
 	Signal string
+	// IncludeStopped also targets the containers that are not running, instead
+	// of only the running ones. The one-off containers are targeted either way.
+	IncludeStopped bool
 	// All can be set to true to try to kill all found containers, independently of their state
+	//
+	// Deprecated: use IncludeStopped, which means the same.
 	All bool
 }
 
@@ -643,12 +660,29 @@ func (e Event) String() string {
 
 // ListOptions group options of the ls API
 type ListOptions struct {
+	// IncludeStopped takes stopped containers into account, so that a project
+	// whose containers are all stopped is listed
+	IncludeStopped bool
+	// All takes stopped containers into account, so that a project whose
+	// containers are all stopped is listed
+	//
+	// Deprecated: use IncludeStopped, which means the same.
 	All bool
 }
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
-	Project  *types.Project
+	Project *types.Project
+	// IncludeStopped includes the stopped containers, which are left out by
+	// default
+	IncludeStopped bool
+	// IncludeOneOff includes the one-off containers (`compose run`), which are
+	// left out by default
+	IncludeOneOff bool
+	// All includes the stopped containers and the one-off containers, which
+	// are both left out by default
+	//
+	// Deprecated: use IncludeStopped and IncludeOneOff, which All sets together.
 	All      bool
 	Services []string
 }
@@ -657,10 +691,16 @@ type PsOptions struct {
 type CopyOptions struct {
 	Source      string
 	Destination string
-	All         bool
-	Index       int
-	FollowLink  bool
-	CopyUIDGID  bool
+	// IncludeOneOff includes the one-off containers (`compose run`) of the
+	// service, which are left out by default. It only applies when Index is 0.
+	IncludeOneOff bool
+	// All includes the one-off containers of the service
+	//
+	// Deprecated: use IncludeOneOff, which means the same.
+	All        bool
+	Index      int
+	FollowLink bool
+	CopyUIDGID bool
 }
 
 // PortPublisher hold status about published port
@@ -754,6 +794,8 @@ type ImageSummary struct {
 }
 
 // ServiceStatus hold status about a service
+//
+// Deprecated: no operation of Compose returns it, it will be removed.
 type ServiceStatus struct {
 	ID         string
 	Name       string
@@ -812,16 +854,28 @@ type GenerateOptions struct {
 
 const (
 	// STARTING indicates that stack is being deployed
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	STARTING string = "Starting"
 	// RUNNING indicates that stack is deployed and services are running
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	RUNNING string = "Running"
 	// UPDATING indicates that some stack resources are being recreated
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	UPDATING string = "Updating"
 	// REMOVING indicates that stack is being deleted
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	REMOVING string = "Removing"
 	// UNKNOWN indicates unknown stack state
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	UNKNOWN string = "Unknown"
 	// FAILED indicates that stack deployment failed
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	FAILED string = "Failed"
 )
 
