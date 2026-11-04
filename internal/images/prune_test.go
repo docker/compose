@@ -35,7 +35,7 @@ import (
 // shared helper used by both `down --rmi` and `watch --prune`: images the
 // keep predicate spares must never be removed; an image already gone (a
 // benign race with something else removing it concurrently) or still in
-// use (the same tolerance removeResource already gives a tagged image in
+// use (the same tolerance down already gives a tagged image in
 // the same situation) is tolerated and not reported as a failure; a
 // genuine removal error doesn't stop the others, but is joined into the
 // returned error (preserving the actual daemon error, not just the image
@@ -76,7 +76,7 @@ func TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures(t *testing.T) {
 // TestRemoveImages_BucketsStillInUseSeparatelyFromRemoved guards a
 // regression caught by review: an image still in use (goal NOT achieved)
 // must land in its own return bucket, not be folded into removed — a caller
-// aggregating several images (removeDanglingImagesOp) needs the distinction
+// aggregating several images (down's removal of dangling images) needs the distinction
 // to report the batch honestly. An already-gone image reaches the goal like
 // an actual removal and a genuine failure is joined into err, so neither is
 // exercised here beyond not corrupting the removed/stillInUse buckets.
@@ -129,8 +129,8 @@ func TestRemoveDanglingImages_NoneFound(t *testing.T) {
 
 // TestImagesToPrune_RejectsInvalidMode guards the one check ImagesToPrune
 // still makes on its own: down() validates options.Images upfront (see
-// TestDownRejectsInvalidImagePruneModeUpfront), but ImagePruner is exported
-// and can be driven directly with a hand-built ImagePruneOptions that
+// TestDownRejectsInvalidImagePruneModeUpfront), but Pruner is exported
+// and can be driven directly with a hand-built PruneOptions that
 // bypasses that check — this is the defense-in-depth path Valid() must
 // still reject. No API client call is expected: an invalid mode must be
 // rejected before any engine call is made.

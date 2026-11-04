@@ -42,7 +42,9 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// Docker Engine API versions the operations of this package gate on.
+// Docker Engine API versions the operations of this package gate on. They are
+// also declared in pkg/compose/api_versions.go, which create.go still uses:
+// keep the two in sync.
 const (
 	// apiVersion148 is Docker Engine API 1.48 (Engine v28.0): image inspect can
 	// return per-manifest data.
@@ -52,7 +54,11 @@ const (
 	apiVersion149 = "1.49"
 )
 
-// Backend is what the operations need from the engine they act on.
+// Backend is what the operations need from the engine they act on. It is
+// narrow on purpose: it redeclares APIClient and MaxConcurrency of
+// engine.Backend rather than embedding it, which would force every
+// implementation (the fake of the tests included) to provide Containers and
+// SpecifiedContainer, that these operations never call.
 type Backend interface {
 	// APIClient talks to the Docker daemon.
 	APIClient() client.APIClient
@@ -228,6 +234,8 @@ func (s *Service) ImageInspectOptions(ctx context.Context) ([]client.ImageInspec
 	return []client.ImageInspectOption{client.ImageInspectWithManifests(true)}, nil
 }
 
+// Summarize builds the summary of an image from the tag it was found under and
+// its inspection.
 func Summarize(repoTag string, inspect client.ImageInspectResult) api.ImageSummary {
 	tag := ""
 	repository := ""

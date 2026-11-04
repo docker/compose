@@ -73,7 +73,7 @@ func NewPruner(imageClient client.ImageAPIClient, project *types.Project, limite
 // removed from YAML), or the image belongs to a service still declared in
 // project. Shared by ImagesToPrune (tagged images) and down's own
 // dangling-image keep check, so the two can't drift on what counts as
-// orphaned — the image-side analog of containers.go's isOrphaned.
+// orphaned — the image-side analog of the orphaned-container check of down.
 func ImageBelongsToKnownService(project *types.Project, removeOrphans bool, img image.Summary) bool {
 	if removeOrphans {
 		return true
@@ -160,11 +160,11 @@ func (p *Pruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error
 // RemoveImages removes the given images in parallel, tolerating individual
 // failures so one bad image doesn't abort the rest. An image already gone
 // (a benign race with something else removing it concurrently) or still in
-// use is never joined into err — same tolerance removeResource already
-// gives a tagged image in either situation (its own distinct, correctly
+// use is never joined into err — same tolerance down already gives a
+// tagged image in either situation (its own distinct, correctly
 // worded event, not an error). "Still in use" is returned in its own bucket,
-// not folded into removed, since a caller aggregating several images (see
-// removeDanglingImagesOp) needs that distinction to report the batch
+// not folded into removed, since a caller aggregating several images (down's
+// removal of dangling images) needs that distinction to report the batch
 // honestly; an already-gone image reached the goal the same as an actual
 // removal, so it's simply not counted against either bucket. Any other
 // removal error is joined into err so callers reporting failures to the
@@ -172,7 +172,7 @@ func (p *Pruner) labeledLocalImages(ctx context.Context) ([]image.Summary, error
 func (s *Service) RemoveImages(ctx context.Context, images []image.Summary, limiter *semaphore.Weighted) (removed, stillInUse []string, err error) {
 	var mu sync.Mutex
 	var errs []error
-	// as in removeTaggedImagesOp, a single image failure must not cancel the
+	// as in down's removal of tagged images, a single image failure must not cancel the
 	// shared errgroup ctx, so fn always returns nil and collects into the
 	// buckets below instead.
 	_ = concurrency.ForEach(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
@@ -186,7 +186,7 @@ func (s *Service) RemoveImages(ctx context.Context, images []image.Summary, limi
 				logrus.Debugf("dangling image %s already removed: %v", img.ID, err)
 			case imgStillInUse:
 				// the same benign skip the tagged-image path reports via
-				// removeResource's conflict branch
+				// down's conflict branch for a tagged image
 				logrus.Debugf("dangling image %s still in use: %v", img.ID, err)
 				stillInUse = append(stillInUse, img.ID)
 			default:

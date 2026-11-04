@@ -130,7 +130,7 @@ func (s *composeService) runProviderPull(ctx context.Context, project *types.Pro
 // The digest goes through the manifest-aware localContentDigest, not the raw
 // inspect ID: under BuildKit provenance attestations, the raw ID changes on
 // every build even when the runnable image content didn't (see
-// images.go:279-291, #13636), which would make the provider re-sync on every
+// LocalContentDigest in internal/images, #13636), which would make the provider re-sync on every
 // up for no reason — defeating the "identity test" docs/extension.md
 // documents --digest as.
 func (s *composeService) localImageFacts(ctx context.Context, ref, platform string) (digest, created string, ok bool) {
