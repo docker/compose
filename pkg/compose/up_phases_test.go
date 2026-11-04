@@ -516,6 +516,25 @@ func TestUpInteractiveDryRunOnlyCreates(t *testing.T) {
 	assert.Assert(t, strings.Contains(h.out.String(), "interactive run is not supported in dry-run mode"), "output: %q", h.out.String())
 }
 
+// TestUpInteractiveDryRunWaitStaysDetached: --wait in a dry run keeps the
+// detached plan: there is no session to stream logs from, and no interactive
+// run to announce as unsupported. The harness container has already exited, so
+// the readiness verdict itself (an error here) is not what this pins.
+func TestUpInteractiveDryRunWaitStaysDetached(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.svc.dryRun = true
+	options := interactiveUpOptions()
+	options.Start.Wait = true
+
+	_ = h.svc.Up(t.Context(), interactiveUpProject(), options)
+
+	for _, call := range []string{"attach", "events"} {
+		assert.Equal(t, h.daemon.indexOf(call), -1, "%s must not be reached by a detached --wait: %v", call, h.daemon.recorded())
+	}
+	assert.Assert(t, h.daemon.indexOf("start") >= 0, "the detached plan ran: %v", h.daemon.recorded())
+	assert.Assert(t, !strings.Contains(h.out.String(), "interactive run is not supported in dry-run mode"), "output: %q", h.out.String())
+}
+
 // TestUpInteractiveStartPhaseSurvivesCancellation: the Start phase runs on a
 // context that outlives the caller's, since an interruption is the session's to
 // handle once it is set up (it stops what the application started). Canceled

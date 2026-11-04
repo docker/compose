@@ -47,9 +47,11 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	if err := options.Validate(); err != nil {
 		return err
 	}
+	// A dry run has no session to stream logs from: --wait stays the detached plan.
+	detached := options.Start.Attach == nil || (options.Start.Wait && s.dryRun)
 	var created *createdUp
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		if options.Start.Attach == nil {
+		if detached {
 			return s.upDetached(ctx, project, options)
 		}
 		var err error
@@ -60,7 +62,7 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 		return err
 	}
 
-	if options.Start.Attach == nil {
+	if detached {
 		return err
 	}
 	if s.dryRun {
@@ -149,14 +151,20 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	if !options.Start.Wait {
 		return nil
 	}
+	return s.awaitProjectReady(ctx, project, options.Start.WaitTimeout)
+}
 
+// awaitProjectReady blocks until every service of the project is running or
+// healthy, within timeout when it is set: the --wait verification, once the
+// plan ran.
+func (s *composeService) awaitProjectReady(ctx context.Context, project *types.Project, timeout time.Duration) error {
 	// The plan may have created or recreated containers: this verification
 	// needs their current IDs, which the pre-execution observed snapshot
-	// above doesn't have for a container that didn't exist yet at
-	// observation time. The listing runs on the caller's context, before the
-	// --wait-timeout window opens, so daemon-listing latency never eats into
-	// the budget the readiness polling is owed (any deadline it hits is the
-	// caller's own, unrelated to --wait-timeout, and is returned as such).
+	// doesn't have for a container that didn't exist yet at observation time.
+	// The listing runs on the caller's context, before the --wait-timeout
+	// window opens, so daemon-listing latency never eats into the budget the
+	// readiness polling is owed (any deadline it hits is the caller's own,
+	// unrelated to --wait-timeout, and is returned as such).
 	containers, err := s.getContainers(ctx, project.Name, oneOffExclude, true)
 	if err != nil {
 		return err
@@ -174,8 +182,8 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 	// context's Err() report DeadlineExceeded too, inherited from the
 	// parent, even though this window's own timer never fired.
 	origCtx := ctx
-	if options.Start.WaitTimeout > 0 {
-		withTimeout, cancel := context.WithTimeout(ctx, options.Start.WaitTimeout)
+	if timeout > 0 {
+		withTimeout, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		ctx = withTimeout
 	}
@@ -188,8 +196,8 @@ func (s *composeService) upDetached(ctx context.Context, project *types.Project,
 		}
 	}
 	if err := s.waitDependencies(ctx, project, project.Name, depends, containers); err != nil {
-		if options.Start.WaitTimeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return fmt.Errorf("application not healthy after %s", options.Start.WaitTimeout)
+		if timeout > 0 && origCtx.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("application not healthy after %s", timeout)
 		}
 		return err
 	}
@@ -377,6 +385,14 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
 	err = created.run.runStart(context.WithoutCancel(ctx), u.printer.HandleEvent)
 	err = translateWaitTimeout(err)
+	if err == nil && options.Start.Wait {
+		// --wait streams the logs only until the services are running|healthy,
+		// then ends the session leaving them up. The caller's ctx, not
+		// globalCtx: the monitor cancels the latter once every container is
+		// gone, which must not abort the verification of one-shot services.
+		err = s.awaitProjectReady(ctx, project, options.Start.WaitTimeout)
+		cancel()
+	}
 	if err != nil && !u.isTerminated.Load() { // Ignore error if the process is terminated
 		cancel()
 		_ = u.eg.Wait()
@@ -396,10 +412,14 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 }
 
 // setupNavigationMenu initializes the interactive keyboard menu when enabled.
-// It returns a nil menu when the menu is disabled, when no menu implementation
+// It returns a nil menu when the menu is disabled (or Wait is set), when no menu implementation
 // was configured (WithNavigationMenu), or when the keyboard can't be grabbed —
 // then disabling the option.
 func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (NavigationMenu, error) {
+	if options.Start.Wait {
+		// the session ends on its own once the services are up: no menu to drive
+		options.Start.NavigationMenu = false
+	}
 	if !options.Start.NavigationMenu {
 		return nil, nil
 	}
