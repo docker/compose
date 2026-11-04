@@ -384,8 +384,10 @@ type StartOptions struct {
 	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
 	// Wait won't return until containers reached the running|healthy state.
-	// Up honors it in detached mode only (Attach nil): combined with Attach it
-	// is rejected, see UpOptions.Validate.
+	// Up honors it in detached mode (Attach nil), and combined with Attach it
+	// streams the logs until that state is reached, then returns leaving the
+	// containers running. The session options OnExit, ExitCodeFrom and Watch
+	// are rejected with it, see UpOptions.Validate.
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services names the services the user explicitly targeted; it only
@@ -396,7 +398,7 @@ type StartOptions struct {
 	// Start.
 	Watch bool
 	// NavigationMenu enables the keyboard menu of Up's foreground session;
-	// ignored by Start.
+	// ignored by Start, and by Up when Wait is set.
 	NavigationMenu bool
 }
 

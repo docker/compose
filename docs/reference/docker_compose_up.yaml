@@ -302,7 +302,8 @@ options:
     - option: wait
       value_type: bool
       default_value: "false"
-      description: Wait for services to be running|healthy. Implies detached mode.
+      description: |
+        Wait for services to be running|healthy, streaming their logs unless --detach is set
       deprecated: false
       hidden: false
       experimental: false

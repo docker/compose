@@ -36,9 +36,9 @@ func TestUpRejectsIncompatibleOptionsBeforeAnySideEffect(t *testing.T) {
 		want    []string
 	}{
 		{
-			name:    "wait with attach",
-			options: api.UpOptions{Start: api.StartOptions{Wait: true, Attach: &testLogConsumer{}}},
-			want:    []string{"Start.Wait", "Start.Attach"},
+			name:    "wait with attach and cascade",
+			options: api.UpOptions{Start: api.StartOptions{Wait: true, Attach: &testLogConsumer{}, OnExit: api.CascadeStop}},
+			want:    []string{"Start.Wait", "Start.OnExit"},
 		},
 		{
 			name:    "detached with cascade",
