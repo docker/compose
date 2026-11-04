@@ -1,0 +1,20 @@
+services:
+  web:
+    image: ${TEST_IMAGE_PREFIX}-web
+    build:
+      context: .
+      args:
+        SERVICE: web
+    depends_on: [db]
+  db:
+    image: ${TEST_IMAGE_PREFIX}-db
+    build:
+      context: .
+      args:
+        SERVICE: db
+  worker:
+    image: ${TEST_IMAGE_PREFIX}-worker
+    build:
+      context: .
+      args:
+        SERVICE: worker

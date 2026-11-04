@@ -675,6 +675,75 @@ func TestDownRemoveImages(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// Regression test for #14453: image removal must follow the services down
+// tears down, retaining dependencies and declared services outside the selection.
+func TestDownRemoveImagesWithSelectedServices(t *testing.T) {
+	projectName := strings.ToLower(testProject)
+	for _, mode := range []compose.ImagePruneMode{compose.ImagePruneLocal, compose.ImagePruneAll} {
+		for _, removeOrphans := range []bool{false, true} {
+			t.Run(fmt.Sprintf("%s/orphans=%t", mode, removeOrphans), func(t *testing.T) {
+				mockCtrl := gomock.NewController(t)
+				apiClient, cli := prepareMocks(mockCtrl)
+				tested, err := NewComposeService(cli)
+				assert.NilError(t, err)
+
+				project := &types.Project{
+					Name: projectName,
+					Services: types.Services{
+						"web": {Name: "web", ContainerSpec: types.ContainerSpec{Image: "web-image"}, WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
+							"db": {Condition: types.ServiceConditionStarted},
+						}}},
+						"frontend": {Name: "frontend", WorkloadSpec: types.WorkloadSpec{DependsOn: types.DependsOnConfig{
+							"web": {Condition: types.ServiceConditionStarted},
+						}}},
+						"db": {Name: "db"},
+					},
+					DisabledServices: types.Services{
+						"worker": {Name: "worker", ContainerSpec: types.ContainerSpec{Image: "worker-image"}},
+					},
+				}
+				apiClient.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(removeOrphans)).Return(client.ContainerListResult{}, nil)
+				apiClient.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt("web")).Return(client.ContainerListResult{}, nil)
+				apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+					Filters: naming.ProjectFilter(projectName).Add("label", compose.RelayNetworkLabel),
+				}).Return(client.NetworkListResult{}, nil)
+
+				var tagged, dangling []image.Summary
+				for _, service := range []string{"web", "frontend", "db", "worker", "orphan"} {
+					ref := projectName + "-" + service
+					if service == "web" {
+						ref = "web-image"
+					}
+					labels := map[string]string{compose.ServiceLabel: service}
+					tagged = append(tagged, image.Summary{Labels: labels, RepoTags: []string{ref + ":latest"}})
+					dangling = append(dangling, image.Summary{ID: "sha256:" + service, Labels: labels})
+					if service == "web" || service == "frontend" || service == "orphan" && removeOrphans {
+						apiClient.EXPECT().ImageRemove(gomock.Any(), ref+":latest", client.ImageRemoveOptions{}).Return(client.ImageRemoveResult{}, nil)
+						apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:"+service, client.ImageRemoveOptions{}).Return(client.ImageRemoveResult{}, nil)
+					}
+				}
+				apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+					Filters: naming.ProjectFilter(projectName).Add("dangling", "false"),
+				}).Return(client.ImageListResult{Items: tagged}, nil)
+				apiClient.EXPECT().ImageList(gomock.Any(), client.ImageListOptions{
+					Filters: naming.ProjectFilter(projectName).Add("dangling", "true"),
+				}).Return(client.ImageListResult{Items: dangling}, nil)
+				apiClient.EXPECT().ImageInspect(gomock.Any(), projectName+"-frontend").Return(client.ImageInspectResult{}, nil)
+				if mode == compose.ImagePruneAll {
+					apiClient.EXPECT().ImageInspect(gomock.Any(), "web-image").Return(client.ImageInspectResult{}, nil)
+				}
+
+				err = tested.Down(t.Context(), projectName, compose.DownOptions{
+					Project: project, Services: []string{"web"}, Images: mode, RemoveOrphans: removeOrphans,
+				})
+				assert.NilError(t, err)
+				assert.Equal(t, len(project.Services), 3)
+				assert.Equal(t, len(project.DisabledServices), 1)
+			})
+		}
+	}
+}
+
 func TestDownRemoveImages_NoLabel(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()

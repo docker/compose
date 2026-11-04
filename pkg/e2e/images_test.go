@@ -47,3 +47,28 @@ func TestImagesAfterImageRemoved(t *testing.T) {
 			ComposeCmd("images"),
 			OutputContains(s.Project()+"-app-1"))
 }
+
+// Regression test for https://github.com/docker/compose/issues/14453:
+// down --rmi must keep images of dependencies and other declared services.
+func TestDownImagesOfSelectedServices(t *testing.T) {
+	s := NewScenario(t, "down --rmi with a service must keep images of services outside its teardown")
+	web, db, worker, orphan := s.Project()+"-web", s.Project()+"-db", s.Project()+"-worker", s.Project()+"-orphan"
+	s.Env("TEST_IMAGE_PREFIX="+s.Project()).
+		Defer(DockerCmd("image", "rm", "-f", web, db, worker, orphan).MayFail()).
+		Step("build creates a separate image for each declared service",
+			ComposeCmd("build"),
+			ImageExists(web), ImageExists(db), ImageExists(worker)).
+		Step("build an image for a service no longer declared in the project",
+			DockerCmd("build", "-t", orphan, "--label", "com.docker.compose.project="+s.Project(),
+				"--label", "com.docker.compose.service=orphan", "-").WithStdin("FROM scratch\nLABEL service=orphan\n"),
+			ImageExists(orphan)).
+		Step("local removal keeps dependency, unselected service and orphan images",
+			ComposeCmd("down", "--rmi", "local", "web"),
+			ImageAbsent(web), ImageExists(db), ImageExists(worker), ImageExists(orphan)).
+		Step("rebuild restores the selected service's image",
+			ComposeCmd("build", "web"),
+			ImageExists(web)).
+		Step("all removal with orphans still keeps every other declared service's image",
+			ComposeCmd("down", "--rmi", "all", "--remove-orphans", "web"),
+			ImageAbsent(web), ImageAbsent(orphan), ImageExists(db), ImageExists(worker))
+}

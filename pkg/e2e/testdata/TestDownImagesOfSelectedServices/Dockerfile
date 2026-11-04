@@ -1,0 +1,3 @@
+FROM scratch
+ARG SERVICE
+LABEL service=$SERVICE
