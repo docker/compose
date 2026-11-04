@@ -36,6 +36,9 @@ func (s *composeService) logStream() *logstream.Service {
 }
 
 func (s *composeService) Logs(ctx context.Context, projectName string, consumer api.LogConsumer, options api.LogOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	return s.logStream().Logs(ctx, projectName, consumer, options)
 }
 
