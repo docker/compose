@@ -22,6 +22,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"os/exec"
 	"slices"
@@ -199,6 +200,7 @@ func (m *llmmanModelAPI) PullModel(ctx context.Context, model types.ModelConfig,
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Start(); err != nil {
+		_ = stream.Close()
 		return err
 	}
 
@@ -212,6 +214,11 @@ func (m *llmmanModelAPI) PullModel(ctx context.Context, model types.ModelConfig,
 			Status: api.Working,
 			Text:   api.StatusPulling,
 		})
+	}
+	if scanner.Err() != nil {
+		// A line too long for the scanner stops it reading: drain the rest so
+		// the child does not block on a full pipe.
+		_, _ = io.Copy(io.Discard, stream)
 	}
 
 	if err := cmd.Wait(); err != nil {

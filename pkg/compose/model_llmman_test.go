@@ -26,6 +26,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -46,6 +47,7 @@ import (
 //   - resolved: lines "<ref>=<name>|<tag>" answered by `llmman list <ref>`
 //   - down: when present, `llmman ps` fails as if no daemon was running
 //   - pullfail: when present, `llmman pull` fails
+//   - longline: when present, `llmman pull` prints a line longer than a scanner reads
 //
 // Every invocation is appended to calls.log, with the LLMMAN_* variables seen.
 type fakeLLMMan struct {
@@ -85,6 +87,10 @@ pull)
 	if [ -f "$dir/pullfail" ]; then
 		echo "registry exploded" >&2
 		exit 1
+	fi
+	if [ -f "$dir/longline" ]; then
+		head -c 300000 /dev/zero | tr '\0' x
+		echo
 	fi
 	echo "pulling $2"
 	echo "Pulled $2"
@@ -413,6 +419,24 @@ func TestLLMManPullFailure(t *testing.T) {
 	assert.Assert(t, events.has("llm", api.Error, api.StatusError), "pull error is reported")
 	assert.Assert(t, !events.has("llm", api.Working, api.StatusPulled))
 	assert.Assert(t, !events.has("llm", api.Done, api.StatusConfigured))
+}
+
+// TestLLMManPullDrainsOutputTooLongToScan: a line past the scanner's limit stops
+// it reading, and the child must not then block on a full pipe.
+func TestLLMManPullDrainsOutputTooLongToScan(t *testing.T) {
+	fake := newFakeLLMMan(t)
+	fake.set(t, "longline", "")
+	s := &composeService{events: &recordedEvents{}}
+	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+
+	done := make(chan error, 1)
+	go func() { done <- s.ensureModels(t.Context(), project, false) }()
+	select {
+	case err := <-done:
+		assert.NilError(t, err)
+	case <-time.After(30 * time.Second):
+		t.Fatal("pull blocked: the output nobody reads filled the pipe")
+	}
 }
 
 // TestLLMManPullFailureHintsAtDockerHubReferences: `ai/<name>` is how Docker Model
