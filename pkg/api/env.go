@@ -18,3 +18,6 @@ package api
 
 // ComposeCompatibility try to mimic compose v1 as much as possible
 const ComposeCompatibility = "COMPOSE_COMPATIBILITY"
+
+// ComposeExcludedProfiles defines a comma-separated list of profiles to exclude, if ProjectLoadOptions.ExcludedProfiles is empty
+const ComposeExcludedProfiles = "COMPOSE_EXCLUDED_PROFILES"
