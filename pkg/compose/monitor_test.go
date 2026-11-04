@@ -273,7 +273,7 @@ func newMonitorTestFixture(t *testing.T) (*logstream.Monitor, *mocks.MockAPIClie
 // newMonitorTestFixtureListing is newMonitorTestFixture for given containers
 // in the initial listing, whose request it records in listed when it is not
 // nil.
-func newMonitorTestFixtureListing(t *testing.T, initial []container.Summary, listed *client.ContainerListOptions) (*monitor, *mocks.MockAPIClient) {
+func newMonitorTestFixtureListing(t *testing.T, initial []container.Summary, listed *client.ContainerListOptions) (*logstream.Monitor, *mocks.MockAPIClient) {
 	t.Helper()
 	ignoreExisting := goleak.IgnoreCurrent()
 	t.Cleanup(func() {
