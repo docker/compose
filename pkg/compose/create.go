@@ -1059,7 +1059,7 @@ func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, boo
 	if v.Type != types.VolumeTypeBind {
 		v.Source = m.Source
 	}
-	if bindRequiresMountAPI(v.Bind) {
+	if bindRequiresMountAPI(v.Bind) || !bindStringCanRepresent(m.Source, m.Target) {
 		return "", false
 	}
 	return toBindString(m.Source, v), true
@@ -1073,10 +1073,25 @@ func volumeBindString(p types.Project, service types.ServiceConfig, m mount.Moun
 	if v == nil || vol == nil {
 		return "", false
 	}
-	if volumeRequiresMountAPI(v.Volume) {
+	if volumeRequiresMountAPI(v.Volume) || !bindStringCanRepresent(vol.Name, v.Target) {
 		return "", false
 	}
 	return toBindString(vol.Name, v), true
+}
+
+// bindStringCanRepresent reports whether the legacy Bind-API string
+// "source:target[:options]" can express this mount. The engine splits that
+// string on colons (see moby's daemon/volume/mounts parser), so a colon in the
+// source or target would be read as a field separator and the spec rejected as
+// invalid. Such mounts must use the Mount API instead. A Windows drive letter
+// is not a separator — the engine's Windows parser understands it — so it does
+// not disqualify the string form.
+func bindStringCanRepresent(source, target string) bool {
+	return !hasBindStringSeparator(source) && !hasBindStringSeparator(target)
+}
+
+func hasBindStringSeparator(p string) bool {
+	return strings.Contains(p, ":") && !isWindowsAbs(p)
 }
 
 // checkImageMountSupported verifies the negotiated API version supports image
