@@ -336,3 +336,16 @@ func TestWithNavigationMenu(t *testing.T) {
 	assert.NilError(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu { return nil })(s))
 	assert.Assert(t, s.navigationMenu != nil)
 }
+
+func TestSetupNavigationMenuDisabledByWait(t *testing.T) {
+	fm := &fakeMenu{}
+	svc, _ := newTestService(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu { return fm }))
+	options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true, Wait: true}}
+
+	menu, err := svc.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+	assert.NilError(t, err)
+	assert.Assert(t, menu == nil)
+	assert.Assert(t, !fm.opened, "a session ending once the services are up must not grab the keyboard")
+	assert.Assert(t, !options.Start.NavigationMenu)
+}

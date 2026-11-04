@@ -62,8 +62,8 @@ func incompatible(reason string, options ...string) error {
 //
 // Up has two modes, selected by Start.Attach: detached (nil) returns once the
 // containers are started, interactive (set) keeps running a foreground session.
-// Validate only checks the combinations listed below: Wait with Attach, and
-// OnExit, ExitCodeFrom or Watch without Attach. Other mode-specific fields
+// Validate only checks the combinations listed below: OnExit, ExitCodeFrom or
+// Watch without Attach, or with Wait. Other mode-specific fields
 // (e.g. Services, AttachTo, NavigationMenu) are not checked and may be ignored
 // in the mode they do not apply to.
 //
@@ -78,7 +78,6 @@ func incompatible(reason string, options ...string) error {
 // flags; Validate is the safety net for programs using the library directly.
 func (o UpOptions) Validate() error {
 	var errs []error
-	errs = append(errs, validateWaitIsDetached(o.Start)...)
 	errs = append(errs, validateDetachedHasNoSession(o.Start)...)
 	switch len(errs) {
 	case 0:
@@ -90,35 +89,25 @@ func (o UpOptions) Validate() error {
 	}
 }
 
-// validateWaitIsDetached: Wait blocks until the services are running|healthy
-// and then returns, which only happens in detached mode. In an interactive
-// session that check would be silently dropped.
-// CLI: --wait implies --detach and is incompatible with --attach and
-// --attach-dependencies.
-func validateWaitIsDetached(s StartOptions) []error {
-	if s.Wait && s.Attach != nil {
-		return []error{incompatible("Wait returns once services are running or healthy, which is detached mode, while Attach starts an interactive session",
-			"Start.Wait", "Start.Attach")}
-	}
-	return nil
-}
-
 // validateDetachedHasNoSession: the cascade policy, the exit code selection
 // and watch are all features of the interactive session, they have no effect
-// when Attach is nil. Every such option set is reported. When Wait is set, it
-// is the reason why the session cannot be started, so it is part of the conflict.
-// CLI: --detach is incompatible with --abort-on-container-exit,
+// when Attach is nil, and when Wait is set the session ends as soon as the
+// services are running or healthy. Every such option set is reported. When
+// Wait is set, it is part of the conflict.
+// CLI: --detach and --wait are incompatible with --abort-on-container-exit,
 // --abort-on-container-failure, --exit-code-from (which implies
 // --abort-on-container-exit) and --watch.
 func validateDetachedHasNoSession(s StartOptions) []error {
-	if s.Attach != nil {
+	if s.Attach != nil && !s.Wait {
 		return nil
 	}
-	reason := "Attach is nil (detached mode), so no interactive session runs to honor "
-	options := []string{"Start.Attach"}
+	reason := "no interactive session outlives the start (Attach is nil, or Wait ends it once the services are running or healthy) to honor "
+	var options []string
 	if s.Wait {
-		reason = "Wait implies detached mode and Attach is nil, so no interactive session runs to honor "
-		options = []string{"Start.Wait", "Start.Attach"}
+		options = append(options, "Start.Wait")
+	}
+	if s.Attach == nil {
+		options = append(options, "Start.Attach")
 	}
 	conflict := func(field string) error {
 		return incompatible(reason+field, append(slices.Clone(options), "Start."+field)...)
