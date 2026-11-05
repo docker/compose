@@ -1773,7 +1773,7 @@ func TestExecutePlanConcurrentFailuresEachEndTheirRow(t *testing.T) {
 	recorder.mu.Lock()
 	defer recorder.mu.Unlock()
 	for _, network := range []string{"a", "b"} {
-		assert.DeepEqual(t, recorder.byID["network:"+network], []string{"failed to create network test_" + network + ": failed " + network})
+		assert.DeepEqual(t, recorder.byID["Network test_"+network], []string{"Creating", "failed to create network test_" + network + ": failed " + network})
 	}
 }
 
@@ -1792,8 +1792,8 @@ func TestExecutePlanFailingOnItsOwnWhileCanceledSaysSo(t *testing.T) {
 
 	recorder.mu.Lock()
 	defer recorder.mu.Unlock()
-	assert.DeepEqual(t, recorder.byID["network:a"], []string{"failed to create network test_a: failed a"})
-	assert.DeepEqual(t, recorder.byID["network:b"], []string{"failed to create network test_b: failed b"})
+	assert.DeepEqual(t, recorder.byID["Network test_a"], []string{"Creating", "failed to create network test_a: failed a"})
+	assert.DeepEqual(t, recorder.byID["Network test_b"], []string{"Creating", "failed to create network test_b: failed b"})
 }
 
 // TestAbortReasonOfPostStart pins that a replica whose start is behind it is
