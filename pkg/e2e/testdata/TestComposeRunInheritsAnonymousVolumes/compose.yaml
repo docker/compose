@@ -6,6 +6,8 @@ services:
       - dep
   dep:
     image: alpine
+    # sleep as PID 1 ignores SIGTERM: without init, stopping dep for the
+    # recreate waits for the stop timeout and kills it
     init: true
     command: sleep infinity
     volumes:
