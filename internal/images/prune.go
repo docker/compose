@@ -41,8 +41,9 @@ import (
 type PruneOptions struct {
 	Mode api.ImagePruneMode
 
-	// RemoveOrphans will result in the removal of images that were built for
-	// the project regardless of whether they are for a known service if true.
+	// RemoveOrphans also removes project images that belong to no declared
+	// service. Images for declared services disabled by a profile or left out
+	// of the teardown selection are kept.
 	RemoveOrphans bool
 }
 
@@ -67,9 +68,10 @@ func NewPruner(imageClient client.ImageAPIClient, project *types.Project, limite
 	}
 }
 
-// ImageBelongsToKnownService reports whether img belongs to a selected service,
-// or to an orphan when removeOrphans is set. Declared but disabled services are
-// not orphans. Shared by tagged and dangling image pruning.
+// ImageBelongsToKnownService reports whether img should be pruned: it belongs to
+// a service of project, or to an orphan when removeOrphans is set. A declared
+// but disabled service is not an orphan. project must already be narrowed to
+// the services being torn down. Shared by tagged and dangling image pruning.
 func ImageBelongsToKnownService(project *types.Project, removeOrphans bool, img image.Summary) bool {
 	service := img.Labels[api.ServiceLabel]
 	if _, err := project.GetService(service); err == nil {

@@ -698,6 +698,8 @@ func TestDownRemoveImagesWithSelectedServices(t *testing.T) {
 						}}},
 						"db": {Name: "db"},
 					},
+					// A declared service disabled by an inactive profile is not an orphan.
+					// Its images are kept even with --remove-orphans.
 					DisabledServices: types.Services{
 						"worker": {Name: "worker", ContainerSpec: types.ContainerSpec{Image: "worker-image"}},
 					},
@@ -717,7 +719,7 @@ func TestDownRemoveImagesWithSelectedServices(t *testing.T) {
 					labels := map[string]string{compose.ServiceLabel: service}
 					tagged = append(tagged, image.Summary{Labels: labels, RepoTags: []string{ref + ":latest"}})
 					dangling = append(dangling, image.Summary{ID: "sha256:" + service, Labels: labels})
-					if service == "web" || service == "frontend" || service == "orphan" && removeOrphans {
+					if service == "web" || service == "frontend" || (service == "orphan" && removeOrphans) {
 						apiClient.EXPECT().ImageRemove(gomock.Any(), ref+":latest", client.ImageRemoveOptions{}).Return(client.ImageRemoveResult{}, nil)
 						apiClient.EXPECT().ImageRemove(gomock.Any(), "sha256:"+service, client.ImageRemoveOptions{}).Return(client.ImageRemoveResult{}, nil)
 					}
