@@ -61,7 +61,7 @@ func newCacheTestRegistry(t *testing.T) *cacheTestRegistry {
 }
 
 // serve starts the registry and returns its host, which the loader of the test must be told is insecure.
-func (r *cacheTestRegistry) serve(t *testing.T) string {
+func (r *cacheTestRegistry) serve(t *testing.T) (string, *httptest.Server) {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {
@@ -80,7 +80,7 @@ func (r *cacheTestRegistry) serve(t *testing.T) string {
 		}
 	}))
 	t.Cleanup(server.Close)
-	return server.Listener.Addr().String()
+	return server.Listener.Addr().String(), server
 }
 
 func (r *cacheTestRegistry) ref(host string) string {
@@ -108,7 +108,7 @@ func setCacheRoot(t *testing.T) string {
 // as complete, so that a directory which is not one is not taken for an entry.
 func TestOCILoaderCacheEntryIsComplete(t *testing.T) {
 	registry := newCacheTestRegistry(t)
-	host := registry.serve(t)
+	host, _ := registry.serve(t)
 	cache := setCacheRoot(t)
 
 	file, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
@@ -139,7 +139,7 @@ func TestOCILoaderCacheEntryIsComplete(t *testing.T) {
 // entry written by a release which did not mark them looks like a complete one.
 func TestOCILoaderExtractsAgainWhatIsNotACompleteEntry(t *testing.T) {
 	registry := newCacheTestRegistry(t)
-	host := registry.serve(t)
+	host, _ := registry.serve(t)
 
 	for name, compose := range map[string]string{
 		"an interrupted extraction":                    "services:\n  app:\n    ima",
@@ -171,7 +171,7 @@ func TestOCILoaderExtractsAgainWhatIsNotACompleteEntry(t *testing.T) {
 func TestOCILoaderFailedPullLeavesNothingBehind(t *testing.T) {
 	registry := newCacheTestRegistry(t)
 	registry.blob = []byte("services:\n  app:\n    image: alp1ne\n") // as long as the layer, not the same
-	host := registry.serve(t)
+	host, _ := registry.serve(t)
 	cache := setCacheRoot(t)
 
 	_, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
@@ -190,7 +190,7 @@ func TestOCILoaderFailedPullLeavesNothingBehind(t *testing.T) {
 // of the cache once the runs are over.
 func TestOCILoaderConcurrentRunsLeaveOneCompleteEntry(t *testing.T) {
 	registry := newCacheTestRegistry(t)
-	host := registry.serve(t)
+	host, _ := registry.serve(t)
 
 	for name, seed := range map[string]func(t *testing.T, entry string){
 		"no entry": func(*testing.T, string) {},
@@ -252,4 +252,23 @@ func TestMoveCacheEntryDoesNotRestoreADirectoryWhichIsNotAnEntry(t *testing.T) {
 	entries, err := os.ReadDir(cache)
 	assert.NilError(t, err)
 	assert.Equal(t, len(entries), 0, "neither the directory nor anything aside is left")
+}
+
+// Ensure that we can load a sha-pinned oci artifact from the cache only.
+//
+// This is crucial for operational safety: If the registry is down, this still
+// allows to do basic operations.
+func TestOCILoaderNoRegistryIfCached(t *testing.T) {
+	registry := newCacheTestRegistry(t)
+	host, server := registry.serve(t)
+	setCacheRoot(t)
+
+	_, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.NilError(t, err)
+
+	server.Close()
+
+	// Note: recreate a loader: we want to test on-disk cache, not in-memory cache.
+	_, err = newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.NilError(t, err)
 }

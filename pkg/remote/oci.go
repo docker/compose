@@ -33,6 +33,7 @@ import (
 	"github.com/containerd/containerd/v2/core/remotes"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/command"
+	"github.com/opencontainers/go-digest"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v5/internal/desktop"
@@ -157,6 +158,20 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", err
 	}
 
+	cache, err := cacheDir()
+	if err != nil {
+		return "", fmt.Errorf("initializing remote resource cache: %w", err)
+	}
+
+	// if the ref has a digest eagerly look in the local cache.
+	// (still works if the registry is down)
+	if ref, ok := ref.(reference.Digested); ok {
+		local := localOCIPath(cache, ref.Digest())
+		if cacheEntryIsComplete(local) {
+			return local, nil
+		}
+	}
+
 	resolver := oci.NewResolver(g.authProvider(), g.httpTransport(ctx), g.insecureRegistries...)
 
 	descriptor, content, err := oci.Get(ctx, resolver, ref)
@@ -164,12 +179,7 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", fmt.Errorf("failed to pull OCI resource %q: %w", ref, err)
 	}
 
-	cache, err := cacheDir()
-	if err != nil {
-		return "", fmt.Errorf("initializing remote resource cache: %w", err)
-	}
-
-	local := filepath.Join(cache, descriptor.Digest.Hex())
+	local := localOCIPath(cache, descriptor.Digest)
 	if cacheEntryIsComplete(local) {
 		return local, nil
 	}
@@ -328,6 +338,10 @@ func (g *ociRemoteLoader) pullComposeFiles(ctx context.Context, local string, ma
 		}
 	}
 	return nil
+}
+
+func localOCIPath(cache string, dig digest.Digest) string {
+	return filepath.Join(cache, dig.Hex())
 }
 
 func writeComposeFile(layer spec.Descriptor, i int, local string, content []byte) error {
