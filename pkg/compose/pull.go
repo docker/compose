@@ -48,6 +48,49 @@ func (s *composeService) Pull(ctx context.Context, project *types.Project, optio
 	}, "pull", s.events)
 }
 
+// pullKey identifies what a pull fetches: an image reference for a platform.
+// The same reference pulled for two platforms is two pulls.
+type pullKey struct {
+	image    string
+	platform string
+}
+
+// pullSchedule remembers the pulls already scheduled in a run, so that an image
+// which several services share, or which a service shares with a volume or a
+// hook, is pulled once. `up` and `pull` both schedule through it, so that they
+// send the same requests for the same project.
+type pullSchedule struct {
+	defaultPlatform string
+	scheduled       map[pullKey]struct{}
+}
+
+func newPullSchedule(project *types.Project) *pullSchedule {
+	return &pullSchedule{
+		defaultPlatform: project.Environment["DOCKER_DEFAULT_PLATFORM"],
+		scheduled:       map[pullKey]struct{}{},
+	}
+}
+
+// claim reports whether the caller has to pull the image of service: false when
+// the same image has been claimed already for the same platform.
+func (p *pullSchedule) claim(service types.ServiceConfig) bool {
+	key := pullKey{image: service.Image, platform: pullPlatform(service, p.defaultPlatform)}
+	if _, ok := p.scheduled[key]; ok {
+		return false
+	}
+	p.scheduled[key] = struct{}{}
+	return true
+}
+
+// pullPlatform is the platform an image is pulled for: the one of the service,
+// or else the default platform of the project.
+func pullPlatform(service types.ServiceConfig, defaultPlatform string) string {
+	if service.Platform != "" {
+		return service.Platform
+	}
+	return defaultPlatform
+}
+
 // imagePuller tracks the state of a `compose pull` run: the images already
 // scheduled (a same image may back several services), per-service pull
 // failures, and services whose image must be built as a fallback.
@@ -57,7 +100,7 @@ type imagePuller struct {
 	opts       api.PullOptions
 	images     map[string]api.ImageSummary
 	eg         *errgroup.Group
-	scheduled  map[string]string // image -> first service pulling it
+	schedule   *pullSchedule
 	pullErrors []error
 	mu         sync.Mutex
 	mustBuild  []string
@@ -78,7 +121,7 @@ func (s *composeService) pull(ctx context.Context, project *types.Project, opts 
 		opts:           opts,
 		images:         images,
 		eg:             eg,
-		scheduled:      map[string]string{},
+		schedule:       newPullSchedule(project),
 		pullErrors:     make([]error, len(project.Services)),
 	}
 
@@ -141,10 +184,9 @@ func (p *imagePuller) pullServiceImages(ctx context.Context) error {
 			p.eventSkippedPull("Image "+service.Image, "Image can be built")
 			continue
 		}
-		if _, ok := p.scheduled[service.Image]; ok {
+		if !p.schedule.claim(service) {
 			continue
 		}
-		p.scheduled[service.Image] = service.Name
 
 		idx := i
 		p.eg.Go(func() error {
@@ -202,11 +244,10 @@ func (p *imagePuller) pullHookImages(ctx context.Context) error {
 				}
 				continue
 			}
-			if _, ok := p.scheduled[img]; ok {
+			hookService := types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img}}
+			if !p.schedule.claim(hookService) {
 				continue
 			}
-			p.scheduled[img] = name
-			hookService := types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: img}}
 			p.eg.Go(func() error {
 				err := p.pullServiceImage(ctx, hookService, p.opts.Quiet, p.project.Environment["DOCKER_DEFAULT_PLATFORM"])
 				if err != nil && !p.opts.IgnoreFailures {
@@ -309,10 +350,7 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 		return err
 	}
 
-	platform := service.Platform
-	if platform == "" {
-		platform = defaultPlatform
-	}
+	platform := pullPlatform(service, defaultPlatform)
 
 	var ociPlatforms []ocispec.Platform
 	if platform != "" {
@@ -401,34 +439,35 @@ func imageDigestResolver(ctx context.Context, credentials registry.AuthProvider,
 
 func (s *composeService) pullRequiredImages(ctx context.Context, project *types.Project, images map[string]api.ImageSummary, quietPull bool) error {
 	needPull := map[string]types.ServiceConfig{}
-	// track image references already scheduled for pull so dependent images
-	// (volume/hook images shared across services) aren't pulled more than once
-	scheduled := map[string]bool{}
+	// an image is pulled once, however many services, volumes and hooks use it,
+	// as `compose pull` does: see pullSchedule
+	schedule := newPullSchedule(project)
 	for name, service := range project.Services {
 		pull, err := mustPull(service, images)
 		if err != nil {
 			return err
 		}
-		if pull {
+		if pull && schedule.claim(service) {
 			needPull[name] = service
-			scheduled[service.Image] = true
 		}
 		for i, vol := range service.Volumes {
 			if vol.Type == types.VolumeTypeImage {
 				if _, ok := images[vol.Source]; !ok {
 					// Hack: create a fake ServiceConfig so we pull missing volume image
 					n := fmt.Sprintf("%s:volume %d", name, i)
-					needPull[n] = types.ServiceConfig{
+					volumeImage := types.ServiceConfig{
 						Name:          n,
 						ContainerSpec: types.ContainerSpec{Image: vol.Source},
 					}
-					scheduled[vol.Source] = true
+					if schedule.claim(volumeImage) {
+						needPull[n] = volumeImage
+					}
 				}
 			}
 		}
 	}
 
-	if err := addPreStartHookPulls(project, images, needPull, scheduled); err != nil {
+	if err := addPreStartHookPulls(project, images, needPull, schedule); err != nil {
 		return err
 	}
 
@@ -443,7 +482,7 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 	var mutex sync.Mutex
 	for name, service := range needPull {
 		eg.Go(func() error {
-			err := s.pullServiceImage(pullCtx, service, quietPull, project.Environment["DOCKER_DEFAULT_PLATFORM"])
+			err := s.pullServiceImage(pullCtx, service, quietPull, schedule.defaultPlatform)
 			mutex.Lock()
 			defer mutex.Unlock()
 			pulled[name] = err == nil
@@ -503,8 +542,8 @@ func (s *composeService) resolvePulledImages(ctx context.Context, needPull map[s
 // can't be built, so `build` falls back to pull-if-missing instead of
 // exempting it from pulling; only `never` skips entirely. Running as a second
 // pass over the services keeps the dedup against service/volume images (via
-// scheduled) independent of service iteration order.
-func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, scheduled map[string]bool) error {
+// schedule) independent of service iteration order.
+func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSummary, needPull map[string]types.ServiceConfig, schedule *pullSchedule) error {
 	for name, service := range project.Services {
 		if service.PullPolicy == types.PullPolicyNever {
 			continue
@@ -518,15 +557,17 @@ func addPreStartHookPulls(project *types.Project, images map[string]api.ImageSum
 			if err != nil {
 				return err
 			}
-			if !pull || scheduled[img] {
+			if !pull {
 				continue
 			}
-			scheduled[img] = true
 			// Hack: create a fake ServiceConfig so we pull missing pre_start hook image
 			n := fmt.Sprintf("%s:pre_start %d", name, i)
-			needPull[n] = types.ServiceConfig{
+			hookImage := types.ServiceConfig{
 				Name:          n,
 				ContainerSpec: types.ContainerSpec{Image: img},
+			}
+			if schedule.claim(hookImage) {
+				needPull[n] = hookImage
 			}
 		}
 	}

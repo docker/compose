@@ -21,10 +21,13 @@ import (
 	"io"
 	"iter"
 	"sort"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	cerrdefs "github.com/containerd/errdefs"
+	"github.com/containerd/platforms"
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/image"
@@ -45,13 +48,13 @@ import (
 func scheduledHookImages(t *testing.T, project *types.Project, present map[string]api.ImageSummary) []string {
 	t.Helper()
 	needPull := map[string]types.ServiceConfig{}
-	scheduled := map[string]bool{}
-	// Seed scheduled with the service images, as pullRequiredImages does before
-	// calling addPreStartHookPulls.
+	schedule := newPullSchedule(project)
+	// Seed the schedule with the service images, as pullRequiredImages does
+	// before calling addPreStartHookPulls.
 	for _, service := range project.Services {
-		scheduled[service.Image] = true
+		schedule.claim(service)
 	}
-	if err := addPreStartHookPulls(project, present, needPull, scheduled); err != nil {
+	if err := addPreStartHookPulls(project, present, needPull, schedule); err != nil {
 		t.Fatal(err)
 	}
 	var images []string
@@ -176,6 +179,144 @@ func TestPullRequiredImagesUsesContentDigest(t *testing.T) {
 	err := tested.pullRequiredImages(t.Context(), project, images, true)
 	assert.NilError(t, err)
 	assert.Equal(t, images[ref].ID, "sha256:image")
+}
+
+// pullRequestsOf runs the pull of a project, through `up` (pullRequiredImages)
+// or through `compose pull`, against an engine which has none of its images,
+// and returns the pull requests it sent, as `image` or `image@platform`.
+func pullRequestsOf(t *testing.T, command string, project *types.Project) []string {
+	t.Helper()
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+	var (
+		mu       sync.Mutex
+		requests []string
+	)
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, ref string, options client.ImagePullOptions) (client.ImagePullResponse, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			request := ref
+			if len(options.Platforms) > 0 {
+				request = ref + "@" + platforms.Format(options.Platforms[0])
+			}
+			requests = append(requests, request)
+			return fakePullResponse{}, nil
+		}).
+		AnyTimes()
+	// no image is local before the pulls, and all of them are once pulled
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(context.Context, string, ...client.ImageInspectOption) (client.ImageInspectResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			if len(requests) == 0 {
+				return client.ImageInspectResult{}, cerrdefs.ErrNotFound
+			}
+			return client.ImageInspectResult{InspectResponse: image.InspectResponse{
+				ID:        "sha256:index",
+				Manifests: []image.ManifestSummary{imageManifest("sha256:image", "amd64", true)},
+			}}, nil
+		}).
+		AnyTimes()
+
+	switch command {
+	case "up":
+		assert.NilError(t, tested.pullRequiredImages(t.Context(), project, map[string]api.ImageSummary{}, true))
+	case "pull":
+		assert.NilError(t, tested.pull(t.Context(), project, api.PullOptions{Quiet: true}))
+	default:
+		t.Fatalf("unknown command %q", command)
+	}
+	sort.Strings(requests)
+	return requests
+}
+
+// `up` and `compose pull` pull what a project needs the same way: an image is
+// pulled once however many services use it, and once for each platform when
+// services want it for several.
+func TestPullRequestsOfUpAndPullAreTheSame(t *testing.T) {
+	service := func(name, image, platform string, hooks ...string) types.ServiceConfig {
+		svc := types.ServiceConfig{Name: name, ContainerSpec: types.ContainerSpec{Image: image, Platform: platform}}
+		for _, hook := range hooks {
+			svc.PreStart = append(svc.PreStart, types.PreStartHook{ContainerSpec: types.ContainerSpec{Image: hook}})
+		}
+		return svc
+	}
+	for name, tc := range map[string]struct {
+		services        []types.ServiceConfig
+		defaultPlatform string
+		want            []string
+	}{
+		"services sharing an image pull it once": {
+			services: []types.ServiceConfig{service("a", "shared:1", ""), service("b", "shared:1", ""), service("c", "shared:1", "")},
+			want:     []string{"shared:1"},
+		},
+		"services sharing an image and a platform pull it once": {
+			services: []types.ServiceConfig{service("a", "shared:1", "linux/amd64"), service("b", "shared:1", "linux/amd64")},
+			want:     []string{"shared:1@linux/amd64"},
+		},
+		"services sharing an image for distinct platforms pull it for each": {
+			services: []types.ServiceConfig{service("a", "shared:1", ""), service("b", "shared:1", "linux/amd64"), service("c", "shared:1", "linux/arm64")},
+			want:     []string{"shared:1", "shared:1@linux/amd64", "shared:1@linux/arm64"},
+		},
+		"a platform which is the default one is shared with the services which have none": {
+			services:        []types.ServiceConfig{service("a", "shared:1", ""), service("b", "shared:1", "linux/amd64")},
+			defaultPlatform: "linux/amd64",
+			want:            []string{"shared:1@linux/amd64"},
+		},
+		// a hook container has no platform of its own: its image is the one of the default platform
+		"a hook image which is the image of a service pinned to a platform is pulled for the default one": {
+			services: []types.ServiceConfig{service("a", "one:1", "linux/arm64"), service("b", "two:1", "", "one:1")},
+			want:     []string{"one:1", "one:1@linux/arm64", "two:1"},
+		},
+		"services with distinct images pull each": {
+			services: []types.ServiceConfig{service("a", "one:1", ""), service("b", "two:1", "")},
+			want:     []string{"one:1", "two:1"},
+		},
+		"a hook image shared by services is pulled once": {
+			services: []types.ServiceConfig{service("a", "one:1", "", "init:1"), service("b", "two:1", "", "init:1")},
+			want:     []string{"init:1", "one:1", "two:1"},
+		},
+		"a hook image which is the image of another service is pulled once": {
+			services: []types.ServiceConfig{service("a", "one:1", "", "two:1"), service("b", "two:1", "")},
+			want:     []string{"one:1", "two:1"},
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			project := &types.Project{Name: "demo", Services: types.Services{}, Environment: types.Mapping{}}
+			if tc.defaultPlatform != "" {
+				project.Environment["DOCKER_DEFAULT_PLATFORM"] = tc.defaultPlatform
+			}
+			for _, svc := range tc.services {
+				project.Services[svc.Name] = svc
+			}
+			for _, command := range []string{"up", "pull"} {
+				t.Run(command, func(t *testing.T) {
+					assert.DeepEqual(t, pullRequestsOf(t, command, project), tc.want)
+				})
+			}
+		})
+	}
+}
+
+// `up` pulls an image once when volumes, or a volume and a service, use it: the
+// images of volumes are pulled by `up` only, which has to run them.
+func TestPullRequiredImagesPullsASharedVolumeImageOnce(t *testing.T) {
+	volume := types.ServiceVolumeConfig{Type: types.VolumeTypeImage, Source: "data:1", Target: "/data"}
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"a": {Name: "a", ContainerSpec: types.ContainerSpec{Image: "one:1", Volumes: []types.ServiceVolumeConfig{volume}}},
+			"b": {Name: "b", ContainerSpec: types.ContainerSpec{Image: "two:1", Volumes: []types.ServiceVolumeConfig{volume}}},
+			"c": {Name: "c", ContainerSpec: types.ContainerSpec{Image: "data:1"}},
+		},
+	}
+
+	assert.DeepEqual(t, pullRequestsOf(t, "up", project), []string{"data:1", "one:1", "two:1"})
 }
 
 // TestAddPreStartHookPulls_DedupsSharedHookImage verifies a hook image shared by
