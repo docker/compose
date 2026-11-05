@@ -545,9 +545,9 @@ type RemoveOptions struct {
 // Detach.
 type RunOptions struct {
 	// CreateOptions is embedded, but creating the one-off's dependencies
-	// only honors Build, IgnoreOrphans, RemoveOrphans and QuietPull; the
-	// other fields (Recreate, RecreateDependencies, Inherit, Timeout,
-	// Services, SkipProviders) are ignored.
+	// only honors Build, IgnoreOrphans, RemoveOrphans, QuietPull, Recreate
+	// and RecreateDependencies; Inherit is always true, and the other fields
+	// (Timeout, Services, SkipProviders) are ignored.
 	CreateOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
