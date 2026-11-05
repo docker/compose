@@ -544,3 +544,51 @@ func TestSetBlkio(t *testing.T) {
 	assert.Equal(t, resources.BlkioDeviceWriteBps[0].Rate, uint64(3))
 	assert.Assert(t, resources.BlkioDeviceWriteIOps == nil)
 }
+
+// The restart policy of a container comes from the service's restart, in which
+// the loader has already merged deploy.restart_policy: a restart_policy that
+// sets no condition (docker/compose#14383) must leave the policy of restart as
+// it is, and the two attributes must not contradict each other.
+func TestGetRestartPolicy(t *testing.T) {
+	loadService := func(t *testing.T, attributes string) (composetypes.ServiceConfig, error) {
+		t.Helper()
+		project, err := composeloader.LoadWithContext(t.Context(), composetypes.ConfigDetails{
+			ConfigFiles: []composetypes.ConfigFile{{Filename: "compose.yaml", Content: []byte("name: test\nservices:\n  foo:\n    image: alpine\n" + attributes)}},
+			Environment: map[string]string{},
+		})
+		if err != nil {
+			return composetypes.ServiceConfig{}, err
+		}
+		return project.Services["foo"], nil
+	}
+
+	for _, tc := range []struct {
+		name       string
+		attributes string
+		want       container.RestartPolicy
+	}{
+		{"restart", "    restart: unless-stopped\n", container.RestartPolicy{Name: container.RestartPolicyUnlessStopped}},
+		{"restart with a retry count", "    restart: on-failure:3\n", container.RestartPolicy{Name: container.RestartPolicyOnFailure, MaximumRetryCount: 3}},
+		{"restart_policy alone", "    deploy: {restart_policy: {condition: on-failure, max_attempts: 5}}\n", container.RestartPolicy{Name: container.RestartPolicyOnFailure, MaximumRetryCount: 5}},
+		{"restart_policy any", "    deploy: {restart_policy: {condition: any}}\n", container.RestartPolicy{Name: container.RestartPolicyAlways}},
+		{"restart_policy none", "    deploy: {restart_policy: {condition: none}}\n", container.RestartPolicy{Name: container.RestartPolicyDisabled}},
+		{
+			"restart_policy completes restart",
+			"    restart: on-failure\n    deploy: {restart_policy: {max_attempts: 3}}\n",
+			container.RestartPolicy{Name: container.RestartPolicyOnFailure, MaximumRetryCount: 3},
+		},
+		{"restart_policy without condition keeps restart", "    restart: always\n    deploy: {restart_policy: {delay: 5s}}\n", container.RestartPolicy{Name: container.RestartPolicyAlways}},
+		{"restart_policy without condition and no restart", "    deploy: {restart_policy: {delay: 5s}}\n", container.RestartPolicy{}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			service, err := loadService(t, tc.attributes)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, getRestartPolicy(service), tc.want)
+		})
+	}
+
+	t.Run("contradictory restart and restart_policy", func(t *testing.T) {
+		_, err := loadService(t, "    restart: unless-stopped\n    deploy: {restart_policy: {condition: on-failure}}\n")
+		assert.ErrorContains(t, err, "can't set distinct values on 'restart' and 'deploy.restart_policy.condition'")
+	})
+}

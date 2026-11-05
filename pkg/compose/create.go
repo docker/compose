@@ -751,35 +751,26 @@ func umaskOption(service types.ServiceConfig, version string) (*uint32, error) {
 	return service.Umask, nil
 }
 
+// getRestartPolicy reads the restart policy of the service. The loader has
+// already merged deploy.restart_policy into restart, and rejected the two when
+// they contradict each other, so restart is the only attribute to read.
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
-	var restart container.RestartPolicy
-	if service.Restart != "" {
-		name, num, ok := strings.Cut(service.Restart, ":")
-		var attempts int
-		if ok {
-			attempts, _ = strconv.Atoi(num)
-		}
-		restart = container.RestartPolicy{
-			Name:              mapRestartPolicyCondition(name),
-			MaximumRetryCount: attempts,
-		}
+	if service.Restart == "" {
+		return container.RestartPolicy{}
 	}
-	if service.Deploy != nil && service.Deploy.RestartPolicy != nil {
-		policy := *service.Deploy.RestartPolicy
-		var attempts int
-		if policy.MaxAttempts != nil {
-			attempts = int(*policy.MaxAttempts)
-		}
-		restart = container.RestartPolicy{
-			Name:              mapRestartPolicyCondition(policy.Condition),
-			MaximumRetryCount: attempts,
-		}
+	name, num, ok := strings.Cut(service.Restart, ":")
+	var attempts int
+	if ok {
+		attempts, _ = strconv.Atoi(num)
 	}
-	return restart
+	return container.RestartPolicy{
+		Name:              mapRestartPolicyCondition(name),
+		MaximumRetryCount: attempts,
+	}
 }
 
 func mapRestartPolicyCondition(condition string) container.RestartPolicyMode {
-	// map definitions of deploy.restart_policy to engine definitions
+	// map the names of restart to engine definitions
 	switch condition {
 	case "none", "no":
 		return container.RestartPolicyDisabled
