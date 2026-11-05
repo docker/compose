@@ -74,7 +74,7 @@ func NewDryRunClient(apiClient client.APIClient, cli command.Cli) (*DryRunClient
 		apiClient:   apiClient,
 		containers:  []containerType.Summary{},
 		execs:       sync.Map{},
-		credentials: registry.NewDesktopAuthProvider(cli.ConfigFile()),
+		credentials: cli.ConfigFile(),
 	}, nil
 }
 
@@ -87,7 +87,7 @@ func (d *DryRunClient) resolve(ctx context.Context, ref string) error {
 	if err != nil {
 		return err
 	}
-	auth, err := registry.EncodedAuth(named, d.credentials)
+	auth, err := registry.EncodedAuth(named, registry.NewDesktopAuthProvider(ctx, d.credentials))
 	if err != nil {
 		return err
 	}

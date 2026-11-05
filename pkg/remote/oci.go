@@ -102,9 +102,6 @@ type ociRemoteLoader struct {
 	// detection happens once per loader rather than per Load() call.
 	transportOnce sync.Once
 	transport     http.RoundTripper
-
-	credentialsOnce sync.Once
-	credentials     registry.AuthProvider
 }
 
 func (g *ociRemoteLoader) httpTransport(ctx context.Context) http.RoundTripper {
@@ -112,13 +109,6 @@ func (g *ociRemoteLoader) httpTransport(ctx context.Context) http.RoundTripper {
 		g.transport = desktop.ProxyTransportFor(ctx, g.dockerCli.Client())
 	})
 	return g.transport
-}
-
-func (g *ociRemoteLoader) authProvider() registry.AuthProvider {
-	g.credentialsOnce.Do(func() {
-		g.credentials = registry.NewDesktopAuthProvider(g.dockerCli.ConfigFile())
-	})
-	return g.credentials
 }
 
 func (g *ociRemoteLoader) Accept(path string) bool {
@@ -157,7 +147,8 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", err
 	}
 
-	resolver := oci.NewResolver(g.authProvider(), g.httpTransport(ctx), g.insecureRegistries...)
+	credentials := registry.NewDesktopAuthProvider(ctx, g.dockerCli.ConfigFile())
+	resolver := oci.NewResolver(credentials, g.httpTransport(ctx), g.insecureRegistries...)
 
 	descriptor, content, err := oci.Get(ctx, resolver, ref)
 	if err != nil {
