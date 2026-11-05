@@ -183,10 +183,11 @@ func TestOCILoaderFailedPullLeavesNothingBehind(t *testing.T) {
 }
 
 // Runs that load the same artifact at the same time, whether the cache has the
-// entry already, has none or has a directory that is not one, all succeed and
-// leave a single complete entry, and nothing aside. What a run gets is the path
-// of the entry, which is read once the runs are over: a run that replaces a
-// directory which is not an entry takes it out of the way for a moment.
+// entry already, has none or has a directory that is not one, leave a single
+// complete entry, and nothing aside. A run that loses to another while it
+// replaces a directory which is not an entry may return an error, so what is
+// pinned for every run is the path of the entry when it succeeds, and the state
+// of the cache once the runs are over.
 func TestOCILoaderConcurrentRunsLeaveOneCompleteEntry(t *testing.T) {
 	registry := newCacheTestRegistry(t)
 	host := registry.serve(t)
@@ -218,8 +219,9 @@ func TestOCILoaderConcurrentRunsLeaveOneCompleteEntry(t *testing.T) {
 			wg.Wait()
 
 			for i := range runs {
-				assert.NilError(t, errs[i])
-				assert.Equal(t, files[i], filepath.Join(entry, "compose.yaml"))
+				if errs[i] == nil {
+					assert.Equal(t, files[i], filepath.Join(entry, "compose.yaml"))
+				}
 			}
 			content, err := os.ReadFile(filepath.Join(entry, "compose.yaml"))
 			assert.NilError(t, err)
@@ -232,4 +234,22 @@ func TestOCILoaderConcurrentRunsLeaveOneCompleteEntry(t *testing.T) {
 			assert.Equal(t, len(entries), 1, "no directory is left aside")
 		})
 	}
+}
+
+// A directory which is not an entry that is replaced, and whose replacement
+// then fails, is not put back: only a complete entry is worth restoring. Put
+// back, it would be in the way of the run that set aside the entry which took
+// its place (see moveCacheEntry), and would leave the cache with it instead.
+func TestMoveCacheEntryDoesNotRestoreADirectoryWhichIsNotAnEntry(t *testing.T) {
+	cache := t.TempDir()
+	local := filepath.Join(cache, "entry")
+	assert.NilError(t, os.MkdirAll(local, 0o700))
+	assert.NilError(t, os.WriteFile(filepath.Join(local, "compose.yaml"), []byte("services:\n  app:\n    ima"), 0o600))
+
+	err := moveCacheEntry(filepath.Join(cache, "missing"), local)
+	assert.Assert(t, err != nil)
+
+	entries, err := os.ReadDir(cache)
+	assert.NilError(t, err)
+	assert.Equal(t, len(entries), 0, "neither the directory nor anything aside is left")
 }
