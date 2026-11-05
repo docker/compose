@@ -24,9 +24,10 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-func Plain(out io.Writer) api.EventProcessor {
+func Plain(out io.Writer, dryRun bool) api.EventProcessor {
 	return &plainWriter{
-		out: out,
+		out:    out,
+		dryRun: dryRun,
 	}
 }
 
