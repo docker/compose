@@ -342,29 +342,42 @@ func (exec *planExecutor) interruptedWait(node *PlanNode, rs *runState, phase *p
 	return fmt.Errorf("%s: %w", reason, context.Canceled)
 }
 
+// progressName is the name of the row an ungrouped node reports on: the same
+// one for its Working, Done and Error events, since a consumer keys on it
+// (see api.Resource). It is not the plan's ResourceID, which names the node
+// and is no resource a consumer ever saw opened. A node with no row of its own
+// reports on the row of the container it acts on (a network connection), or
+// failing that on its ResourceID (a hook).
+func progressName(op Operation) string {
+	switch op.Type {
+	case OpCreateContainer:
+		return "Container " + op.Name
+	case OpCreateNetwork, OpRemoveNetwork:
+		return "Network " + op.Name
+	case OpCreateVolume, OpRemoveVolume:
+		return "Volume " + op.Name
+	}
+	if op.Container != nil {
+		return getContainerProgressName(*op.Container)
+	}
+	return op.ResourceID
+}
+
 // emitStartEvent emits the appropriate Working event for an ungrouped node.
 //
 //nolint:dupl // mirrors emitDoneEvent: keeping the Working and Done events side by side keeps their pairing visible
 func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 	op := node.Operation
+	name := progressName(op)
 	switch op.Type {
-	case OpCreateContainer:
-		events.On(progress.Creating("Container " + op.Name))
+	case OpCreateContainer, OpCreateNetwork, OpCreateVolume:
+		events.On(progress.Creating(name))
 	case OpStartContainer:
-		name := getContainerProgressName(*op.Container)
 		events.On(progress.New(name, api.Working, api.StatusStarting))
 	case OpStopContainer:
-		events.On(progress.Stopping(getContainerProgressName(*op.Container)))
-	case OpRemoveContainer:
-		events.On(progress.Removing(getContainerProgressName(*op.Container)))
-	case OpCreateNetwork:
-		events.On(progress.Creating("Network " + op.Name))
-	case OpRemoveNetwork:
-		events.On(progress.Removing("Network " + op.Name))
-	case OpCreateVolume:
-		events.On(progress.Creating("Volume " + op.Name))
-	case OpRemoveVolume:
-		events.On(progress.Removing("Volume " + op.Name))
+		events.On(progress.Stopping(name))
+	case OpRemoveContainer, OpRemoveNetwork, OpRemoveVolume:
+		events.On(progress.Removing(name))
 	}
 }
 
@@ -373,24 +386,16 @@ func emitStartEvent(node *PlanNode, events api.EventProcessor) {
 //nolint:dupl // mirrors emitStartEvent, see there
 func emitDoneEvent(node *PlanNode, events api.EventProcessor) {
 	op := node.Operation
+	name := progressName(op)
 	switch op.Type {
-	case OpCreateContainer:
-		events.On(progress.Created("Container " + op.Name))
+	case OpCreateContainer, OpCreateNetwork, OpCreateVolume:
+		events.On(progress.Created(name))
 	case OpStartContainer:
-		name := getContainerProgressName(*op.Container)
 		events.On(progress.New(name, api.Done, api.StatusStarted))
 	case OpStopContainer:
-		events.On(progress.Stopped(getContainerProgressName(*op.Container)))
-	case OpRemoveContainer:
-		events.On(progress.Removed(getContainerProgressName(*op.Container)))
-	case OpCreateNetwork:
-		events.On(progress.Created("Network " + op.Name))
-	case OpRemoveNetwork:
-		events.On(progress.Removed("Network " + op.Name))
-	case OpCreateVolume:
-		events.On(progress.Created("Volume " + op.Name))
-	case OpRemoveVolume:
-		events.On(progress.Removed("Volume " + op.Name))
+		events.On(progress.Stopped(name))
+	case OpRemoveContainer, OpRemoveNetwork, OpRemoveVolume:
+		events.On(progress.Removed(name))
 	}
 }
 
@@ -405,15 +410,8 @@ func emitErrorEvent(node *PlanNode, events api.EventProcessor, err error) {
 		// confusing duplicate with no matching resource.
 		return
 	}
-	var id string
-	switch {
-	case op.Container != nil:
-		id = getContainerProgressName(*op.Container)
-	default:
-		id = op.ResourceID
-	}
 	events.On(api.Resource{
-		ID:     id,
+		ID:     progressName(op),
 		Status: api.Error,
 		Text:   err.Error(),
 	})

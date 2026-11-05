@@ -44,7 +44,6 @@ import (
 
 	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/internal/naming"
-	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -1475,6 +1474,7 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 // config-hash. It is executed as a plan operation (OpCreateNetwork); resolution
 // of external networks lives in resolveExternalNetwork, and reuse of legacy
 // name-matched networks is decided by the reconciler from the observed state.
+// It reports no progress: the plan executor does, on the row of the network.
 func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConfig) error {
 	var ipam *network.IPAM
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 || len(n.Ipam.Options) > 0 {
@@ -1508,22 +1508,16 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		EnableIPv4: n.EnableIPv4,
 	}
 
-	networkEventName := "Network " + n.Name
-	s.events.On(progress.Creating(networkEventName))
-
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
 		// A concurrent `docker compose up|run` may have created the same network
 		// between the observed-state snapshot and now. Treat the resulting
 		// conflict as success rather than failing hard: the network we wanted
 		// exists.
 		if errdefs.IsConflict(err) {
-			s.events.On(progress.Created(networkEventName))
 			return nil
 		}
-		s.events.On(progress.Error(networkEventName, err.Error()))
 		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
-	s.events.On(progress.Created(networkEventName))
 	return nil
 }
 
@@ -1578,9 +1572,9 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 }
 
+// createVolume creates the given volume with its compose labels and config-hash.
+// Like createNetwork it reports no progress: the plan executor does.
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
-	eventName := "Volume " + volume.Name
-	s.events.On(progress.Creating(eventName))
 	hash, err := confighash.VolumeHash(volume)
 	if err != nil {
 		return err
@@ -1592,12 +1586,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		Driver:     volume.Driver,
 		DriverOpts: volume.DriverOpts,
 	})
-	if err != nil {
-		s.events.On(progress.Error(eventName, err.Error()))
-		return err
-	}
-	s.events.On(progress.Created(eventName))
-	return nil
+	return err
 }
 
 func parseIPAMPool(pool *types.IPAMPool) (network.IPAMConfig, error) {
