@@ -203,3 +203,60 @@ func TestDockerPathMatcher_MatchesAllowList(t *testing.T) {
 		})
 	}
 }
+
+func TestDockerPathMatcher_MatchesEntireDirAllowList(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		path    string
+		want    bool
+	}{
+		{
+			name:    "allow-list matches unrelated dir entirely",
+			content: "*\n!src\n",
+			path:    "data",
+			want:    true,
+		},
+		{
+			name:    "allow-list matches nested unrelated dir entirely",
+			content: "*\n!src\n",
+			path:    "node_modules/foo",
+			want:    true,
+		},
+		{
+			name:    "allow-list keeps re-included dir",
+			content: "*\n!src\n",
+			path:    "src",
+			want:    false,
+		},
+		{
+			name:    "deny-list matches excluded dir entirely",
+			content: "data/\n",
+			path:    "data",
+			want:    true,
+		},
+		{
+			name:    "deny-list keeps unrelated dir",
+			content: "data/\n",
+			path:    "src",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matcher, err := DockerIgnoreTesterFromContents("/repo", tt.content)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got, err := matcher.MatchesEntireDir(tt.path)
+			if err != nil {
+				t.Fatalf("unexpected error matching %q: %v", tt.path, err)
+			}
+			if got != tt.want {
+				t.Errorf("MatchesEntireDir(%q) with .dockerignore %q = %v, want %v",
+					tt.path, tt.content, got, tt.want)
+			}
+		})
+	}
+}
