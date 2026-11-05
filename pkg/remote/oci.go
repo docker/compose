@@ -232,7 +232,9 @@ func cacheEntryIsComplete(local string) bool {
 // it out of the cache in one step, and only then removed: a run that replaces
 // it at the same time does not remove the entry that another one has put in
 // place in the meantime, and the cache is left with a complete entry whichever
-// of them is last.
+// of them is last. A run that loses to another may still return an error: what
+// it gets is the state of the cache when it is over, not the result of its own
+// move.
 func moveCacheEntry(tmp, local string) error {
 	err := os.Rename(tmp, local)
 	if err == nil || cacheEntryIsComplete(local) {
@@ -252,9 +254,13 @@ func moveCacheEntry(tmp, local string) error {
 		if cacheEntryIsComplete(local) {
 			return nil
 		}
-		// nothing took the place of what was set aside: put it back rather than
-		// leave the cache without it
-		_ = os.Rename(stale, local)
+		// nothing took the place of what was set aside: put it back, if it is a
+		// complete entry, rather than leave the cache without it. One that is
+		// not stays aside: another run may have set aside the entry that took
+		// its place, and would then find this one in its way.
+		if cacheEntryIsComplete(stale) {
+			_ = os.Rename(stale, local)
+		}
 		return err
 	}
 	return nil
