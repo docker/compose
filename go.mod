@@ -141,4 +141,6 @@ exclude (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
 )
 
-replace github.com/compose-spec/compose-go/v2 => github.com/ndeloof/compose-go/v2 v2.0.0-20261105081003-860ac4acaec0
+// DEMO ONLY: compose-go with restart and deploy.restart_policy reconciled by the loader, from
+// https://github.com/compose-spec/compose-go/pull/989. To be dropped once that PR is released.
+replace github.com/compose-spec/compose-go/v2 => github.com/ndeloof/compose-go/v2 v2.0.0-20261105145003-9652c7ff3592
