@@ -147,6 +147,12 @@ func TestDockerPathMatcher_MatchesAllowList(t *testing.T) {
 			want:    false,
 		},
 		{
+			name:    "allow-list keeps nested re-included dir",
+			content: "*\n!src\n",
+			path:    "src/nested/deep/file.go",
+			want:    false,
+		},
+		{
 			name:    "wildcard with single exclusion keeps excluded file",
 			content: "*\n!file.txt\n",
 			path:    "file.txt",
