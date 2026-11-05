@@ -58,6 +58,7 @@ Define and run multi-container applications with Docker
 | `--compatibility`      | `bool`        |         | Run compose in backward compatibility mode                                                          |
 | `--dry-run`            | `bool`        |         | Execute command in dry run mode                                                                     |
 | `--env-file`           | `stringArray` |         | Specify an alternate environment file                                                               |
+| `--exclude-profile`    | `stringArray` |         | Exclude services attached to a profile, even if also attached to an enabled one                     |
 | `-f`, `--file`         | `stringArray` |         | Compose configuration files                                                                         |
 | `--parallel`           | `int`         | `-1`    | Control max parallelism, -1 for unlimited                                                           |
 | `--profile`            | `stringArray` |         | Specify a profile to enable                                                                         |
@@ -213,6 +214,14 @@ You can also enable multiple profiles, e.g. with `docker compose --profile front
 
 Profiles can also be set by `COMPOSE_PROFILES` environment variable.
 
+Use `--exclude-profile` to exclude one or more profiles. Exclusion applies after profiles have been enabled:
+every service attached to an excluded profile is left out, even if it is also attached to an enabled profile.
+For example, `docker compose --profile "*" --exclude-profile debug up` starts all services but those with the
+profile `debug`, and `docker compose --profile frontend --exclude-profile debug up` starts the services with the
+profile `frontend`, except those also attached to `debug`.
+
+Excluded profiles can also be set by `COMPOSE_EXCLUDED_PROFILES` environment variable, as a comma-separated list.
+
 ### Configuring parallelism
 
 Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls or builds.
@@ -231,7 +240,8 @@ You can set environment variables for various docker compose options, including 
 
 Setting the `COMPOSE_FILE` environment variable is equivalent to passing the `-f` flag,
 `COMPOSE_PROJECT_NAME` environment variable does the same as the `-p` flag,
-`COMPOSE_PROFILES` environment variable is equivalent to the `--profiles` flag
+`COMPOSE_PROFILES` environment variable is equivalent to the `--profiles` flag,
+`COMPOSE_EXCLUDED_PROFILES` environment variable is equivalent to the `--exclude-profile` flag
 and `COMPOSE_PARALLEL_LIMIT` does the same as the `--parallel` flag.
 
 If flags are explicitly set on the command line, the associated environment variable is ignored.

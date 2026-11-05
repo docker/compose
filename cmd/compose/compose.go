@@ -140,6 +140,7 @@ func Adapt(fn Command) func(cmd *cobra.Command, args []string) error {
 type ProjectOptions struct {
 	ProjectName           string
 	Profiles              []string
+	ExcludedProfiles      []string
 	ConfigPaths           []string
 	WorkDir               string
 	ProjectDir            string
@@ -223,6 +224,7 @@ func makeJSONError(err error) error {
 
 func (o *ProjectOptions) addProjectFlags(f *pflag.FlagSet) {
 	f.StringArrayVar(&o.Profiles, "profile", []string{}, "Specify a profile to enable")
+	f.StringArrayVar(&o.ExcludedProfiles, "exclude-profile", []string{}, "Exclude services attached to a profile, even if also attached to an enabled one")
 	f.StringVarP(&o.ProjectName, "project-name", "p", "", "Project name")
 	f.StringArrayVarP(&o.ConfigPaths, "file", "f", []string{}, "Compose configuration files")
 	f.StringArrayVar(&o.insecureRegistries, "insecure-registry", []string{}, "Use insecure registry to pull Compose OCI artifacts. Doesn't apply to images")
@@ -357,6 +359,7 @@ func (o *ProjectOptions) ToProject(
 		WorkingDir:        o.ProjectDir,
 		EnvFiles:          o.EnvFiles,
 		Profiles:          o.Profiles,
+		ExcludedProfiles:  o.ExcludedProfiles,
 		Services:          services,
 		Offline:           o.Offline,
 		All:               o.All,
@@ -593,6 +596,10 @@ func RootCommand(dockerCli command.Cli, backendOptions *BackendOptions) *cobra.C
 	)
 	c.RegisterFlagCompletionFunc( //nolint:errcheck
 		"profile",
+		completeProfileNames(dockerCli, &opts),
+	)
+	c.RegisterFlagCompletionFunc( //nolint:errcheck
+		"exclude-profile",
 		completeProfileNames(dockerCli, &opts),
 	)
 	c.RegisterFlagCompletionFunc( //nolint:errcheck
