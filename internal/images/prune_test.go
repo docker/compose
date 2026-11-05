@@ -31,6 +31,33 @@ import (
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
+func TestImageBelongsToKnownService(t *testing.T) {
+	project := &types.Project{
+		Services:         types.Services{"web": {Name: "web"}},
+		DisabledServices: types.Services{"worker": {Name: "worker"}},
+	}
+	for _, tc := range []struct {
+		name            string
+		service         string
+		want            bool
+		wantWithOrphans bool
+	}{
+		{name: "enabled", service: "web", want: true, wantWithOrphans: true},
+		{name: "disabled", service: "worker"},
+		{name: "undeclared", service: "old", wantWithOrphans: true},
+		{name: "unlabeled", wantWithOrphans: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var img image.Summary
+			if tc.service != "" {
+				img.Labels = map[string]string{compose.ServiceLabel: tc.service}
+			}
+			assert.Equal(t, ImageBelongsToKnownService(project, false, img), tc.want)
+			assert.Equal(t, ImageBelongsToKnownService(project, true, img), tc.wantWithOrphans)
+		})
+	}
+}
+
 // TestRemoveDanglingImages_FiltersKeepsAndToleratesFailures guards the
 // shared helper used by both `down --rmi` and `watch --prune`: images the
 // keep predicate spares must never be removed; an image already gone (a

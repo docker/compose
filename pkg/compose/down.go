@@ -111,6 +111,14 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	options.Services = services
 
+	var imageProject *types.Project
+	if options.Images != api.ImagePruneNone {
+		imageProject, err = project.WithSelectedServices(options.Services, types.IncludeDependents)
+		if err != nil {
+			return err
+		}
+	}
+
 	if len(containers) > 0 {
 		resourceToRemove = true
 	}
@@ -141,11 +149,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	ops := s.ensureNetworksDown(ctx, project, limiter)
 	ops = append(ops, s.ensureRelayLinkNetworksDown(ctx, project, limiter)...)
 
-	if options.Images != api.ImagePruneNone {
-		imageProject, err := project.WithSelectedServices(options.Services, types.IncludeDependents)
-		if err != nil {
-			return err
-		}
+	if imageProject != nil {
 		ops = append(ops, s.ensureImagesDown(ctx, imageProject, options, limiter)...)
 	}
 
@@ -198,9 +202,9 @@ func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Pr
 			return s.removeTaggedImagesOp(ctx, project, pruneOpts, limiter)
 		})
 
-		// a dangling image from a service no longer in the project must be
-		// spared unless RemoveOrphans is set, same as that service's tagged
-		// image is (imageBelongsToKnownService is ImagesToPrune's own check).
+		// Apply the same rules to dangling and tagged images: keep images
+		// of declared services outside the teardown set and keep orphan
+		// images unless RemoveOrphans is set.
 		keep := func(img image.Summary) bool {
 			return !imageBelongsToKnownService(project, options.RemoveOrphans, img)
 		}
