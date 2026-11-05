@@ -54,6 +54,14 @@ func TestNewDockerPatternMatcher(t *testing.T) {
 			expectedPat:  []string{"/repo/*", "!/repo/file.txt"},
 		},
 		{
+			name:         "Wildcard with directory exclusion",
+			repoRoot:     "/repo",
+			patterns:     []string{"*", "!src"},
+			expectedErr:  false,
+			expectedRoot: "/repo",
+			expectedPat:  []string{"/repo/*", "!/repo/src"},
+		},
+		{
 			name:         "No patterns",
 			repoRoot:     "/repo",
 			patterns:     []string{},
