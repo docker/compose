@@ -49,6 +49,9 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	}
 	defer mdlAPI.Close()
 	availableModels, err := mdlAPI.ListModels(ctx)
+	if err != nil {
+		return err
+	}
 
 	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
@@ -61,8 +64,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		}
 		eg.Go(func() error {
 			if !slices.Contains(availableModels, config.Model) {
-				err = mdlAPI.PullModel(ctx, config, quietPull, s.events)
-				if err != nil {
+				if err := mdlAPI.PullModel(ctx, config, quietPull, s.events); err != nil {
 					return err
 				}
 			}
