@@ -161,6 +161,12 @@ func TestDockerPathMatcher_MatchesAllowList(t *testing.T) {
 			want:    false,
 		},
 		{
+			name:    "allow-list ignores sibling with same prefix",
+			content: "*\n!src\n",
+			path:    "src-old/index.js",
+			want:    true,
+		},
+		{
 			name:    "wildcard with single exclusion keeps excluded file",
 			content: "*\n!file.txt\n",
 			path:    "file.txt",
