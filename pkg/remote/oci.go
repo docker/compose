@@ -27,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/containerd/containerd/v2/core/images"
@@ -170,7 +171,7 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 	}
 
 	local := filepath.Join(cache, descriptor.Digest.Hex())
-	if _, err = os.Stat(local); !os.IsNotExist(err) {
+	if cacheEntryIsComplete(local) {
 		return local, nil
 	}
 
@@ -188,13 +189,68 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", err
 	}
 
-	err = g.pullComposeFiles(ctx, local, manifest, ref, resolver)
+	// the entry is extracted aside and moved in place once complete, so that what
+	// is in the cache is never half written, by an interrupted or a concurrent run
+	if err := os.MkdirAll(cache, 0o700); err != nil {
+		return "", fmt.Errorf("initializing remote resource cache: %w", err)
+	}
+	tmp, err := os.MkdirTemp(cache, ".pull-")
 	if err != nil {
-		// we need to clean up the directory to be sure we won't leave empty files behind
-		_ = os.RemoveAll(local)
+		return "", err
+	}
+	defer func() { _ = os.RemoveAll(tmp) }() // nothing left to remove once moved
+
+	err = g.pullComposeFiles(ctx, tmp, manifest, ref, resolver)
+	if err != nil {
+		return "", err
+	}
+	// last, so that nothing the artifact says can leave an entry without it
+	if err := os.WriteFile(filepath.Join(tmp, cacheEntryComplete), nil, 0o600); err != nil {
+		return "", err
+	}
+	if err := moveCacheEntry(tmp, local); err != nil {
 		return "", err
 	}
 	return local, nil
+}
+
+// cacheEntryComplete is the file which marks a directory of the cache as a
+// complete entry, written once everything the entry holds is in place.
+const cacheEntryComplete = ".complete"
+
+// cacheEntryIsComplete tells whether the directory is a complete entry of the
+// cache. A directory without the marker is not one: it is what an extraction
+// that was interrupted left, or an entry of a release that did not mark them.
+func cacheEntryIsComplete(local string) bool {
+	info, err := os.Stat(filepath.Join(local, cacheEntryComplete))
+	return err == nil && info.Mode().IsRegular()
+}
+
+// moveCacheEntry puts the entry extracted in tmp in place, unless another run
+// did already, and replaces what is there when it is not a complete entry.
+//
+// What is replaced is first set aside, which takes it out of the cache in one
+// step, and only then removed: a run that replaces it at the same time does
+// not remove the entry that another one has put in place in the meantime, and
+// the cache is left with a complete entry whichever of them is last.
+func moveCacheEntry(tmp, local string) error {
+	err := os.Rename(tmp, local)
+	if err == nil || cacheEntryIsComplete(local) {
+		return nil
+	}
+
+	stale := filepath.Join(filepath.Dir(local), fmt.Sprintf(".stale-%s-%d", filepath.Base(local), time.Now().UnixNano()))
+	if err := os.Rename(local, stale); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(stale) }()
+	if err := os.Rename(tmp, local); err != nil {
+		if cacheEntryIsComplete(local) {
+			return nil
+		}
+		return err
+	}
+	return nil
 }
 
 // resolveComposeManifest returns the content of the compose artifact manifest
