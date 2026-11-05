@@ -27,7 +27,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/containerd/containerd/v2/core/images"
@@ -229,25 +228,33 @@ func cacheEntryIsComplete(local string) bool {
 // moveCacheEntry puts the entry extracted in tmp in place, unless another run
 // did already, and replaces what is there when it is not a complete entry.
 //
-// What is replaced is first set aside, which takes it out of the cache in one
-// step, and only then removed: a run that replaces it at the same time does
-// not remove the entry that another one has put in place in the meantime, and
-// the cache is left with a complete entry whichever of them is last.
+// What is replaced is first set aside, in a directory of its own, which takes
+// it out of the cache in one step, and only then removed: a run that replaces
+// it at the same time does not remove the entry that another one has put in
+// place in the meantime, and the cache is left with a complete entry whichever
+// of them is last.
 func moveCacheEntry(tmp, local string) error {
 	err := os.Rename(tmp, local)
 	if err == nil || cacheEntryIsComplete(local) {
 		return nil
 	}
 
-	stale := filepath.Join(filepath.Dir(local), fmt.Sprintf(".stale-%s-%d", filepath.Base(local), time.Now().UnixNano()))
+	aside, err := os.MkdirTemp(filepath.Dir(local), ".stale-")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = os.RemoveAll(aside) }()
+	stale := filepath.Join(aside, filepath.Base(local))
 	if err := os.Rename(local, stale); err != nil && !os.IsNotExist(err) {
 		return err
 	}
-	defer func() { _ = os.RemoveAll(stale) }()
 	if err := os.Rename(tmp, local); err != nil {
 		if cacheEntryIsComplete(local) {
 			return nil
 		}
+		// nothing took the place of what was set aside: put it back rather than
+		// leave the cache without it
+		_ = os.Rename(stale, local)
 		return err
 	}
 	return nil
