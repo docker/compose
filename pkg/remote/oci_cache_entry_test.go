@@ -17,10 +17,12 @@
 package remote
 
 import (
+	"cmp"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -44,6 +46,11 @@ type cacheTestRegistry struct {
 	compose  []byte
 	// what the blob endpoint serves, which is the compose file unless a test says otherwise
 	blob []byte
+	// the media type reported with the manifest, which is the one of a manifest unless a test says otherwise
+	contentType string
+	// what is served for a reference, which is a digest, instead of the manifest: a rogue registry tells
+	// it is the content of the digest
+	byReference map[digest.Digest][]byte
 }
 
 func newCacheTestRegistry(t *testing.T) *cacheTestRegistry {
@@ -67,11 +74,15 @@ func (r *cacheTestRegistry) serve(t *testing.T) string {
 		switch {
 		case req.URL.Path == "/v2/":
 		case strings.HasPrefix(req.URL.Path, "/v2/test/artifact/manifests/"):
-			w.Header().Set("Content-Type", spec.MediaTypeImageManifest)
-			w.Header().Set("Docker-Content-Digest", r.digest.String())
-			w.Header().Set("Content-Length", strconv.Itoa(len(r.manifest))) // also for HEAD, which resolves
+			manifest, claimed := r.manifest, r.digest
+			if served, ok := r.byReference[digest.Digest(path.Base(req.URL.Path))]; ok {
+				manifest, claimed = served, digest.Digest(path.Base(req.URL.Path))
+			}
+			w.Header().Set("Content-Type", cmp.Or(r.contentType, spec.MediaTypeImageManifest))
+			w.Header().Set("Docker-Content-Digest", claimed.String())
+			w.Header().Set("Content-Length", strconv.Itoa(len(manifest))) // also for HEAD, which resolves
 			if req.Method != http.MethodHead {
-				_, _ = w.Write(r.manifest)
+				_, _ = w.Write(manifest)
 			}
 		case req.URL.Path == "/v2/test/artifact/blobs/"+digest.FromBytes(r.compose).String():
 			_, _ = w.Write(r.blob)
@@ -375,9 +386,9 @@ func TestOCILoaderRefusesAnArtifactWritingTheDirectoryOfTheManifest(t *testing.T
 
 func ptr[T any](v T) *T { return &v }
 
-// fileExists tells whether the path is a file.
-func fileExists(path string) bool {
-	info, err := os.Stat(path)
+// fileExists tells whether the file is there, as a regular file.
+func fileExists(file string) bool {
+	info, err := os.Stat(file)
 	return err == nil && info.Mode().IsRegular()
 }
 
@@ -388,4 +399,86 @@ func entryNames(entries []os.DirEntry) []string {
 		names = append(names, e.Name())
 	}
 	return names
+}
+
+// What the registry reports as the media type of a manifest is not authenticated,
+// only its content is: a registry that serves authentic bytes under another type,
+// or a manifest with nothing to extract, is refused and caches nothing, rather
+// than have an entry of what was not read as the document it is.
+func TestOCILoaderRefusesADocumentNotReadAsWhatItIs(t *testing.T) {
+	compose := []byte("services:\n  app:\n    image: alpine\n")
+	serve := func(t *testing.T, document any, contentType string) (*cacheTestRegistry, string) {
+		t.Helper()
+		content, err := json.Marshal(document)
+		assert.NilError(t, err)
+		registry := &cacheTestRegistry{manifest: content, digest: digest.FromBytes(content), compose: compose, blob: compose, contentType: contentType}
+		host := registry.serve(t)
+		return registry, host
+	}
+	index := spec.Index{
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    spec.MediaTypeImageIndex,
+		ArtifactType: oci.ComposeProjectArtifactType,
+		Manifests:    []spec.Descriptor{{MediaType: spec.MediaTypeImageManifest, ArtifactType: oci.ComposeProjectArtifactType, Digest: digest.FromString("child"), Size: 5}},
+	}
+	emptyManifest := spec.Manifest{
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    spec.MediaTypeImageManifest,
+		ArtifactType: oci.ComposeProjectArtifactType,
+		Config:       spec.Descriptor{MediaType: oci.ComposeEmptyConfigMediaType, Digest: digest.FromString("{}"), Size: 2},
+	}
+
+	for name, tt := range map[string]struct {
+		document    any
+		contentType string
+		err         string
+	}{
+		"an index reported as a manifest": {index, spec.MediaTypeImageManifest, "which it is not"},
+		"a manifest reported as an index": {emptyManifest, spec.MediaTypeImageIndex, "which it is not"},
+		"a manifest with no compose file": {emptyManifest, spec.MediaTypeImageManifest, "holds no compose file"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache := setCacheRoot(t)
+			registry, host := serve(t, tt.document, tt.contentType)
+
+			_, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+			assert.ErrorContains(t, err, tt.err)
+
+			entries, err := os.ReadDir(cache)
+			assert.Assert(t, err == nil || os.IsNotExist(err))
+			assert.Equal(t, len(entries), 0, "nothing is cached")
+		})
+	}
+}
+
+// What an authentic image index says its manifests are is not enough: a manifest
+// it names is verified against the digest it names it by, like the index is, and
+// a registry that serves another one for it is refused, with nothing cached.
+func TestOCILoaderRefusesAnIndexManifestNotHavingItsDigest(t *testing.T) {
+	genuine := newCacheTestRegistry(t)
+	tampered := []byte(`{"schemaVersion":2,"mediaType":"application/vnd.oci.image.manifest.v1+json","artifactType":"` + oci.ComposeProjectArtifactType + `","layers":[]}`)
+	content, err := json.Marshal(spec.Index{
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    spec.MediaTypeImageIndex,
+		ArtifactType: oci.ComposeProjectArtifactType,
+		Manifests: []spec.Descriptor{{
+			MediaType: spec.MediaTypeImageManifest, ArtifactType: oci.ComposeProjectArtifactType,
+			Digest: genuine.digest, Size: int64(len(tampered)),
+		}},
+	})
+	assert.NilError(t, err)
+	registry := &cacheTestRegistry{
+		manifest: content, digest: digest.FromBytes(content), compose: genuine.compose, blob: genuine.compose,
+		contentType: spec.MediaTypeImageIndex,
+		byReference: map[digest.Digest][]byte{genuine.digest: tampered},
+	}
+	host := registry.serve(t)
+	cache := setCacheRoot(t)
+
+	_, err = newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.ErrorContains(t, err, "digest mismatch")
+
+	entries, err := os.ReadDir(cache)
+	assert.Assert(t, err == nil || os.IsNotExist(err))
+	assert.Equal(t, len(entries), 0, "nothing is cached")
 }

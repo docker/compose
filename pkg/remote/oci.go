@@ -181,7 +181,11 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 	root := content
 
 	// a Compose application bundle is published as an image index
-	if images.IsIndexType(descriptor.MediaType) {
+	isIndex, err := isIndexDocument(descriptor, content)
+	if err != nil {
+		return "", fmt.Errorf("failed to pull OCI resource %q: %w", ref, err)
+	}
+	if isIndex {
 		content, err = g.resolveComposeManifest(ctx, resolver, ref, content)
 		if err != nil {
 			return "", err
@@ -209,6 +213,11 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 	if err != nil {
 		return "", err
 	}
+	// what is loaded from the entry: one that holds none is not complete, however
+	// the manifest it was extracted from was served
+	if info, err := os.Stat(filepath.Join(tmp, "compose.yaml")); err != nil || !info.Mode().IsRegular() {
+		return "", fmt.Errorf("%s holds no compose file", ref)
+	}
 	// last, so that nothing the artifact says can leave an entry without it
 	if err := writeCacheEntryManifest(tmp, root); err != nil {
 		return "", fmt.Errorf("failed to pull OCI resource %q: %w", ref, err)
@@ -217,6 +226,27 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", err
 	}
 	return local, nil
+}
+
+// isIndexDocument tells whether the document the registry served for the
+// reference is an image index, from what the document says it is. The media type
+// the registry reports with it is not authenticated, the digest is the one of
+// the content only: a registry that reports another one for authentic bytes is
+// refused, rather than have them read as what they are not.
+func isIndexDocument(descriptor spec.Descriptor, content []byte) (bool, error) {
+	var document struct {
+		MediaType string          `json:"mediaType"`
+		Manifests json.RawMessage `json:"manifests"`
+	}
+	if err := json.Unmarshal(content, &document); err != nil {
+		return false, fmt.Errorf("invalid manifest %s: %w", descriptor.Digest, err)
+	}
+	isIndex := images.IsIndexType(document.MediaType) || (document.MediaType == "" && document.Manifests != nil)
+	reported := descriptor.MediaType
+	if (images.IsIndexType(reported) || images.IsManifestType(reported)) && images.IsIndexType(reported) != isIndex {
+		return false, fmt.Errorf("manifest %s is reported as %s, which it is not", descriptor.Digest, reported)
+	}
+	return isIndex, nil
 }
 
 // cacheOCIDir is the directory of the cache which holds the entries of the OCI
