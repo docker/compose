@@ -3,9 +3,6 @@
 - [Where to get Docker Compose](#where-to-get-docker-compose)
     + [Windows and macOS](#windows-and-macos)
     + [Linux](#linux)
-- [Quick Start](#quick-start)
-- [Contributing](#contributing)
-- [Legacy](#legacy)
 
 # Docker Compose
 
