@@ -123,3 +123,51 @@ func TestGetDependentImages(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPureResourceProvider(t *testing.T) {
+	provider := &types.ServiceProviderConfig{Type: "awesomecloud"}
+	tests := []struct {
+		name     string
+		service  types.ServiceConfig
+		expected bool
+	}{
+		{
+			name:     "provider without image or build is a pure resource provider",
+			service:  types.ServiceConfig{Provider: provider},
+			expected: true,
+		},
+		{
+			name: "provider with an image is not a pure resource provider",
+			service: types.ServiceConfig{
+				Provider:      provider,
+				ContainerSpec: types.ContainerSpec{Image: "redis"},
+			},
+			expected: false,
+		},
+		{
+			name: "provider with a build is not a pure resource provider",
+			service: types.ServiceConfig{
+				Provider:     provider,
+				WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+			},
+			expected: false,
+		},
+		{
+			name: "service without provider is not a pure resource provider",
+			service: types.ServiceConfig{
+				ContainerSpec: types.ContainerSpec{Image: "nginx"},
+			},
+			expected: false,
+		},
+		{
+			name:     "service without provider, image or build is not a pure resource provider",
+			service:  types.ServiceConfig{},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, IsPureResourceProvider(tt.service), tt.expected)
+		})
+	}
+}
