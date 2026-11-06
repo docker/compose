@@ -99,7 +99,7 @@ func setCacheRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
 	t.Setenv("XDG_CACHE_HOME", root)
-	return filepath.Join(root, "docker-compose")
+	return filepath.Join(root, "docker-compose", cacheOCIDir)
 }
 
 // An entry of the cache of extracted projects is complete or is not there: it
@@ -252,4 +252,25 @@ func TestMoveCacheEntryDoesNotRestoreADirectoryWhichIsNotAnEntry(t *testing.T) {
 	entries, err := os.ReadDir(cache)
 	assert.NilError(t, err)
 	assert.Equal(t, len(entries), 0, "neither the directory nor anything aside is left")
+}
+
+// The extracted artifacts are kept in a directory of the cache for OCI artifacts: an
+// entry, even a complete one, which an earlier release left at the root of the
+// cache is not looked for, and the artifact is extracted again in the directory.
+func TestOCILoaderKeepsEntriesInTheDirectoryForOCI(t *testing.T) {
+	registry := newCacheTestRegistry(t)
+	host := registry.serve(t)
+	cache := setCacheRoot(t)
+	legacy := filepath.Join(filepath.Dir(cache), registry.digest.Hex())
+	assert.NilError(t, os.MkdirAll(legacy, 0o700))
+	assert.NilError(t, os.WriteFile(filepath.Join(legacy, "compose.yaml"), []byte("services: {}\n"), 0o600))
+	assert.NilError(t, os.WriteFile(filepath.Join(legacy, cacheEntryComplete), nil, 0o600))
+
+	file, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.NilError(t, err)
+
+	assert.Equal(t, file, filepath.Join(cache, registry.digest.Hex(), "compose.yaml"))
+	content, err := os.ReadFile(file)
+	assert.NilError(t, err)
+	assert.Equal(t, string(content), string(registry.compose))
 }
