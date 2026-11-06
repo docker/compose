@@ -741,7 +741,7 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 		return err
 	}
 
-	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{"**/.git"})
 	if err != nil {
 		return err
 	}
@@ -752,10 +752,15 @@ func (s *composeService) initialSync(ctx context.Context, service types.ServiceC
 	}
 
 	// also exclude override compose files and any custom-named Dockerfile
-	dockerFilePatterns := append([]string{"Dockerfile"}, cli.DefaultFileNames...)
-	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
+	dockerFilePatterns := []string{"**/Dockerfile"}
+	for _, name := range cli.DefaultFileNames {
+		dockerFilePatterns = append(dockerFilePatterns, "**/"+name)
+	}
+	for _, name := range cli.DefaultOverrideFileNames {
+		dockerFilePatterns = append(dockerFilePatterns, "**/"+name)
+	}
 	if service.Build != nil && service.Build.Dockerfile != "" {
-		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+		dockerFilePatterns = append(dockerFilePatterns, "**/"+filepath.Base(service.Build.Dockerfile))
 	}
 
 	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
@@ -790,7 +795,7 @@ func (s *composeService) initialSyncFiles(service types.ServiceConfig, trigger t
 		return initialSyncDirectory(trigger, service, ignore)
 	case mode.IsRegular():
 		// process file
-		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if !shouldIgnore(trigger.Path, ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 			return []*sync.PathMapping{{
 				HostPath:      trigger.Path,
 				ContainerPath: trigger.Target,
@@ -813,7 +818,7 @@ func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ig
 			// walk starts at the root directory
 			return nil
 		}
-		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+		if shouldIgnore(path, ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
 			// By definition sync ignores bind mounted paths
 			if d.IsDir() {
 				// skip folder
