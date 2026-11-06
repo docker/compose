@@ -168,6 +168,7 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 	if err != nil {
 		return "", fmt.Errorf("initializing remote resource cache: %w", err)
 	}
+	cache = filepath.Join(cache, cacheOCIDir)
 
 	local := filepath.Join(cache, descriptor.Digest.Hex())
 	if cacheEntryIsComplete(local) {
@@ -212,6 +213,12 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 	}
 	return local, nil
 }
+
+// cacheOCIDir is the directory of the cache which holds the extracted OCI
+// artifacts, one directory for each digest, as cacheGitDir does for the checkouts of
+// Git repositories. Earlier releases kept them at the root of the cache, where they
+// are no longer looked for: an artifact is pulled again the first time it is used.
+const cacheOCIDir = "oci"
 
 // cacheEntryComplete is the file which marks a directory of the cache as a
 // complete entry, written once everything the entry holds is in place.
