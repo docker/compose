@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -31,6 +32,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/moby/moby/client/pkg/versions"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	"github.com/docker/compose/v5/internal/concurrency"
@@ -48,7 +50,11 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		return err
 	}
 	defer mdlAPI.Close()
-	availableModels, err := mdlAPI.ListModels(ctx)
+	if err := mdlAPI.Check(ctx); err != nil {
+		return err
+	}
+	// best effort: when the models cannot be listed, they are all pulled
+	availableModels, _ := mdlAPI.ListModels(ctx)
 
 	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
@@ -60,7 +66,11 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 			config.Name = name
 		}
 		eg.Go(func() error {
-			if !slices.Contains(availableModels, config.Model) {
+			available, err := mdlAPI.HasModel(ctx, availableModels, config.Model)
+			if err != nil {
+				return err
+			}
+			if !available {
 				err = mdlAPI.PullModel(ctx, config, quietPull, s.events)
 				if err != nil {
 					return err
@@ -72,7 +82,74 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	return eg.Wait()
 }
 
-type modelAPI struct {
+// modelAPI is a backend able to serve the top-level `models` element.
+// Docker Model Runner is the default one, llmman can be selected with
+// COMPOSE_MODEL_PROVIDER or is used as a fallback when the Docker Model
+// plugin is not installed (see model_llmman.go).
+type modelAPI interface {
+	// Check verifies the backend is usable before any model is listed or pulled.
+	Check(ctx context.Context) error
+	// ListModels returns the models already available locally. Its error is not fatal.
+	ListModels(ctx context.Context) ([]string, error)
+	// HasModel tells whether model is available, given the result of ListModels.
+	HasModel(ctx context.Context, available []string, model string) (bool, error)
+	// PullModel fetches a model which is not available yet.
+	PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events api.EventProcessor) error
+	// ConfigureModel applies the model settings (context size, runtime flags).
+	ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error
+	// SetModelVariables injects the model and endpoint variables into services.
+	SetModelVariables(ctx context.Context, project *types.Project) error
+	// Close releases resources held by the backend.
+	Close()
+}
+
+const (
+	// modelProviderEnv selects the models backend, read from the project environment.
+	// When unset or empty, Docker Model Runner is used, or llmman if the Docker Model
+	// plugin is not installed and llmman is found in PATH. Setting it explicitly
+	// disables that fallback.
+	modelProviderEnv = "COMPOSE_MODEL_PROVIDER"
+	// modelProviderDMR is the default models backend, Docker Model Runner.
+	modelProviderDMR = "docker-model-runner"
+	// modelProviderLLMMan selects llmman, see model_llmman.go.
+	modelProviderLLMMan = "llmman"
+)
+
+// errDMRPluginNotFound is returned when the `docker model` CLI plugin is not installed.
+var errDMRPluginNotFound = errors.New("'models' support requires Docker Model plugin")
+
+// newModelAPI returns the backend selected by COMPOSE_MODEL_PROVIDER. When the
+// variable is unset or empty, Docker Model Runner is used. Only if its plugin
+// is not installed (a broken plugin is an error) and an llmman binary is found
+// in PATH is llmman used instead. An explicit value never falls back.
+func (s *composeService) newModelAPI(project *types.Project) (modelAPI, error) {
+	switch provider := strings.TrimSpace(project.Environment[modelProviderEnv]); provider {
+	case "", modelProviderDMR:
+		m, err := s.newDMRModelAPI(project)
+		if err != nil {
+			if provider == "" && errors.Is(err, errDMRPluginNotFound) {
+				if path, lookErr := exec.LookPath(llmmanBinary); lookErr == nil {
+					logrus.Debugf("Docker Model plugin not found, using llmman (%s) for models", path)
+					return s.newLLMManModelAPI(project)
+				}
+			}
+			return nil, err
+		}
+		return m, nil
+	case modelProviderLLMMan:
+		m, err := s.newLLMManModelAPI(project)
+		if err != nil {
+			return nil, err
+		}
+		return m, nil
+	default:
+		return nil, fmt.Errorf("unsupported %s %q: supported values are %q (default) and %q",
+			modelProviderEnv, provider, modelProviderDMR, modelProviderLLMMan)
+	}
+}
+
+// dmrModelAPI is the Docker Model Runner backend, driven through the `docker model` CLI plugin.
+type dmrModelAPI struct {
 	path    string
 	env     []string
 	prepare func(ctx context.Context, cmd *exec.Cmd) error
@@ -81,11 +158,11 @@ type modelAPI struct {
 	dryRun  bool
 }
 
-func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) {
+func (s *composeService) newDMRModelAPI(project *types.Project) (*dmrModelAPI, error) {
 	dockerModel, err := manager.GetPlugin("model", s.dockerCli, &cobra.Command{})
 	if err != nil {
 		if errdefs.IsNotFound(err) {
-			return nil, errors.New("'models' support requires Docker Model plugin")
+			return nil, errDMRPluginNotFound
 		}
 		return nil, err
 	}
@@ -96,7 +173,7 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 	if err != nil {
 		return nil, err
 	}
-	return &modelAPI{
+	return &dmrModelAPI{
 		path:    dockerModel.Path,
 		version: dockerModel.Version,
 		prepare: func(ctx context.Context, cmd *exec.Cmd) error {
@@ -108,11 +185,20 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 	}, nil
 }
 
-func (m *modelAPI) Close() {
+func (m *dmrModelAPI) Close() {
 	m.cleanup()
 }
 
-func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events api.EventProcessor) error {
+// Check is a no-op: the plugin is validated when loaded.
+func (m *dmrModelAPI) Check(context.Context) error {
+	return nil
+}
+
+func (m *dmrModelAPI) HasModel(_ context.Context, available []string, model string) (bool, error) {
+	return slices.Contains(available, model), nil
+}
+
+func (m *dmrModelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events api.EventProcessor) error {
 	events.On(api.Resource{
 		ID:     model.Name,
 		Status: api.Working,
@@ -129,33 +215,7 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 	if err != nil {
 		return err
 	}
-	stream, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		if msg == "" {
-			continue
-		}
-
-		if !quietPull {
-			events.On(api.Resource{
-				ID:     model.Name,
-				Status: api.Working,
-				Text:   api.StatusPulling,
-			})
-		}
-	}
-
-	err = cmd.Wait()
+	err = streamPull(cmd, model.Name, quietPull, events)
 	if err != nil {
 		events.On(progress.Error(model.Name, err.Error()))
 	}
@@ -167,7 +227,34 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 	return err
 }
 
-func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {
+// streamPull runs a pull command and reports a pulling event for each line it
+// prints on stdout, unless quiet.
+func streamPull(cmd *exec.Cmd, name string, quiet bool, events api.EventProcessor) error {
+	stream, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		_ = stream.Close()
+		return err
+	}
+
+	scanner := bufio.NewScanner(stream)
+	for scanner.Scan() {
+		if scanner.Text() == "" || quiet {
+			continue
+		}
+		events.On(api.Resource{ID: name, Status: api.Working, Text: api.StatusPulling})
+	}
+	if scanner.Err() != nil {
+		// A line too long for the scanner stops it reading: drain the rest so
+		// the child does not block on a full pipe.
+		_, _ = io.Copy(io.Discard, stream)
+	}
+	return cmd.Wait()
+}
+
+func (m *dmrModelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {
 	events.On(api.Resource{
 		ID:     config.Name,
 		Status: api.Working,
@@ -206,7 +293,7 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 	return nil
 }
 
-func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project) error {
+func (m *dmrModelAPI) SetModelVariables(ctx context.Context, project *types.Project) error {
 	cmd := exec.CommandContext(ctx, m.path, "status", "--json")
 	err := m.prepare(ctx, cmd)
 	if err != nil {
@@ -227,6 +314,13 @@ func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project
 		return err
 	}
 
+	setModelVariables(project, status.Endpoint)
+	return nil
+}
+
+// setModelVariables injects, for each model bound to a service, the model name and
+// endpoint variables (<NAME>_MODEL and <NAME>_URL, or the model_var and endpoint_var overrides).
+func setModelVariables(project *types.Project, endpoint string) {
 	for _, service := range project.Services {
 		for ref, modelConfig := range service.Models {
 			model := project.Models[ref]
@@ -244,10 +338,9 @@ func (m *modelAPI) SetModelVariables(ctx context.Context, project *types.Project
 			} else {
 				variable = varPrefix + "_URL"
 			}
-			service.Environment[variable] = &status.Endpoint
+			service.Environment[variable] = &endpoint
 		}
 	}
-	return nil
 }
 
 type Model struct {
@@ -263,7 +356,7 @@ type Model struct {
 	} `json:"config"`
 }
 
-func (m *modelAPI) ListModels(ctx context.Context) ([]string, error) {
+func (m *dmrModelAPI) ListModels(ctx context.Context) ([]string, error) {
 	cmd := exec.CommandContext(ctx, m.path, "ls", "--json")
 	err := m.prepare(ctx, cmd)
 	if err != nil {
@@ -295,7 +388,7 @@ func (m *modelAPI) ListModels(ctx context.Context) ([]string, error) {
 
 // supportsRuntimeFlags checks if the docker model version supports runtime flags
 // Runtime flags are supported in version >= v1.0.6
-func (m *modelAPI) supportsRuntimeFlags() bool {
+func (m *dmrModelAPI) supportsRuntimeFlags() bool {
 	// If version is not cached, don't append runtime flags to be safe
 	if m.version == "" {
 		return false
