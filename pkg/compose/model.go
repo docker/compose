@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"slices"
 	"strconv"
@@ -214,33 +215,7 @@ func (m *dmrModelAPI) PullModel(ctx context.Context, model types.ModelConfig, qu
 	if err != nil {
 		return err
 	}
-	stream, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
-
-	err = cmd.Start()
-	if err != nil {
-		return err
-	}
-
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		msg := scanner.Text()
-		if msg == "" {
-			continue
-		}
-
-		if !quietPull {
-			events.On(api.Resource{
-				ID:     model.Name,
-				Status: api.Working,
-				Text:   api.StatusPulling,
-			})
-		}
-	}
-
-	err = cmd.Wait()
+	err = streamPull(cmd, model.Name, quietPull, events)
 	if err != nil {
 		events.On(progress.Error(model.Name, err.Error()))
 	}
@@ -250,6 +225,33 @@ func (m *dmrModelAPI) PullModel(ctx context.Context, model types.ModelConfig, qu
 		Text:   api.StatusPulled,
 	})
 	return err
+}
+
+// streamPull runs a pull command and reports a pulling event for each line it
+// prints on stdout, unless quiet.
+func streamPull(cmd *exec.Cmd, name string, quiet bool, events api.EventProcessor) error {
+	stream, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		_ = stream.Close()
+		return err
+	}
+
+	scanner := bufio.NewScanner(stream)
+	for scanner.Scan() {
+		if scanner.Text() == "" || quiet {
+			continue
+		}
+		events.On(api.Resource{ID: name, Status: api.Working, Text: api.StatusPulling})
+	}
+	if scanner.Err() != nil {
+		// A line too long for the scanner stops it reading: drain the rest so
+		// the child does not block on a full pipe.
+		_, _ = io.Copy(io.Discard, stream)
+	}
+	return cmd.Wait()
 }
 
 func (m *dmrModelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig, events api.EventProcessor) error {

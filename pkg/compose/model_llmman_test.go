@@ -19,7 +19,10 @@ package compose
 import (
 	"context"
 	"errors"
+	"io"
+	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"slices"
@@ -46,6 +49,8 @@ import (
 //   - store: references `llmman list` prints, one per line
 //   - resolved: lines "<ref>=<name>|<tag>" answered by `llmman list <ref>`
 //   - down: when present, `llmman ps` fails as if no daemon was running
+//   - listfail: when present, `llmman list --format` fails
+//   - resolvefail: when present, `llmman list <ref>` fails
 //   - pullfail: when present, `llmman pull` fails
 //   - longline: when present, `llmman pull` prints a line longer than a scanner reads
 //
@@ -75,8 +80,16 @@ ps)
 	;;
 list)
 	if [ "$2" = "--format" ]; then
+		if [ -f "$dir/listfail" ]; then
+			echo "store unreadable" >&2
+			exit 1
+		fi
 		[ -f "$dir/store" ] && cat "$dir/store"
 		exit 0
+	fi
+	if [ -f "$dir/resolvefail" ]; then
+		echo "cannot resolve" >&2
+		exit 1
 	fi
 	[ -f "$dir/resolved" ] && while IFS='=' read -r ref out; do
 		[ "$ref" = "$2" ] && echo "$out"
@@ -140,16 +153,22 @@ func (r *recordedEvents) On(events ...api.Resource) {
 	r.events = append(r.events, events...)
 }
 
-// has tells whether an event with the given status and text was recorded for id.
-func (r *recordedEvents) has(id string, status api.EventStatus, text string) bool {
+// count returns how many events with the given status and text were recorded for id.
+func (r *recordedEvents) count(id string, status api.EventStatus, text string) int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	n := 0
 	for _, e := range r.events {
 		if e.ID == id && e.Status == status && e.Text == text {
-			return true
+			n++
 		}
 	}
-	return false
+	return n
+}
+
+// has tells whether an event with the given status and text was recorded for id.
+func (r *recordedEvents) has(id string, status api.EventStatus, text string) bool {
+	return r.count(id, status, text) > 0
 }
 
 func (r *recordedEvents) details(id string, status api.EventStatus) []string {
@@ -455,6 +474,83 @@ func TestLLMManPullFailureHintsAtDockerHubReferences(t *testing.T) {
 	err = s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "registry exploded")
 	assert.Assert(t, !strings.Contains(err.Error(), "Docker Hub"), err.Error())
+}
+
+// TestLLMManListFailureIsNotFatal: when the store cannot be listed, every model is pulled.
+func TestLLMManListFailureIsNotFatal(t *testing.T) {
+	fake := newFakeLLMMan(t)
+	fake.set(t, "listfail", "")
+	s := &composeService{events: &recordedEvents{}}
+	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	assert.NilError(t, s.ensureModels(t.Context(), project, false))
+	assert.DeepEqual(t, fake.log(t), []string{"ps", "list --format {{.Name}}", "pull smollm2"})
+}
+
+func TestLLMManResolveFailure(t *testing.T) {
+	fake := newFakeLLMMan(t)
+	fake.set(t, "store", "docker.io/ai/other:latest\n")
+	fake.set(t, "resolvefail", "")
+	s := &composeService{events: &recordedEvents{}}
+	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	err := s.ensureModels(t.Context(), project, false)
+	assert.ErrorContains(t, err, "error checking model smollm2")
+	assert.ErrorContains(t, err, "cannot resolve")
+}
+
+func TestLLMManQuietPull(t *testing.T) {
+	newFakeLLMMan(t)
+	model := types.ModelConfig{Name: "llm", Model: "smollm2"}
+	for quiet, want := range map[bool]int{false: 3, true: 1} {
+		events := &recordedEvents{}
+		s := &composeService{events: events}
+		m, err := s.newLLMManModelAPI(llmmanProject(llmmanEnv(), nil, nil))
+		assert.NilError(t, err)
+		assert.NilError(t, m.PullModel(t.Context(), model, quiet, events))
+		// one event when the pull starts, then one per line llmman prints
+		assert.Equal(t, events.count("llm", api.Working, api.StatusPulling), want, "quiet=%v", quiet)
+	}
+}
+
+func TestLLMManCommandFailures(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("relies on the false command")
+	}
+	ctx := t.Context()
+	events := &recordedEvents{}
+	model := types.ModelConfig{Name: "llm", Model: "smollm2"}
+	noop := func(context.Context, *exec.Cmd) error { return nil }
+	errBoom := errors.New("boom")
+
+	t.Run("failure without output", func(t *testing.T) {
+		// false exits 1 with nothing on stdout and stderr
+		m := &llmmanModelAPI{path: "false", prepare: noop}
+		assert.ErrorContains(t, m.Check(ctx), "exit status 1")
+		_, err := m.ListModels(ctx)
+		assert.ErrorContains(t, err, "error checking available models: exit status 1")
+		_, err = m.HasModel(ctx, []string{"other"}, "smollm2")
+		assert.ErrorContains(t, err, "error checking model smollm2: exit status 1")
+		assert.Error(t, m.PullModel(ctx, model, false, events), "exit status 1")
+	})
+
+	t.Run("prepare failure", func(t *testing.T) {
+		m := &llmmanModelAPI{path: "false", prepare: func(context.Context, *exec.Cmd) error { return errBoom }}
+		_, err := m.run(ctx, "ps")
+		assert.ErrorIs(t, err, errBoom)
+		assert.ErrorIs(t, m.PullModel(ctx, model, false, events), errBoom)
+	})
+
+	t.Run("stdout cannot be piped", func(t *testing.T) {
+		m := &llmmanModelAPI{path: "false", prepare: func(_ context.Context, cmd *exec.Cmd) error {
+			cmd.Stdout = io.Discard
+			return nil
+		}}
+		assert.ErrorContains(t, m.PullModel(ctx, model, false, events), "Stdout already set")
+	})
+
+	t.Run("binary cannot start", func(t *testing.T) {
+		m := &llmmanModelAPI{path: filepath.Join(t.TempDir(), "missing"), prepare: noop}
+		assert.ErrorIs(t, m.PullModel(ctx, model, false, events), fs.ErrNotExist)
+	})
 }
 
 func TestLLMManVariables(t *testing.T) {

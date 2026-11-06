@@ -17,12 +17,10 @@
 package compose
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os/exec"
 	"slices"
@@ -193,35 +191,9 @@ func (m *llmmanModelAPI) PullModel(ctx context.Context, model types.ModelConfig,
 	if err := m.prepare(ctx, cmd); err != nil {
 		return err
 	}
-	stream, err := cmd.StdoutPipe()
-	if err != nil {
-		return err
-	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
-	if err := cmd.Start(); err != nil {
-		_ = stream.Close()
-		return err
-	}
-
-	scanner := bufio.NewScanner(stream)
-	for scanner.Scan() {
-		if scanner.Text() == "" || quietPull {
-			continue
-		}
-		events.On(api.Resource{
-			ID:     model.Name,
-			Status: api.Working,
-			Text:   api.StatusPulling,
-		})
-	}
-	if scanner.Err() != nil {
-		// A line too long for the scanner stops it reading: drain the rest so
-		// the child does not block on a full pipe.
-		_, _ = io.Copy(io.Discard, stream)
-	}
-
-	if err := cmd.Wait(); err != nil {
+	if err := streamPull(cmd, model.Name, quietPull, events); err != nil {
 		if msg := strings.TrimSpace(stderr.String()); msg != "" {
 			err = fmt.Errorf("%w: %s", err, msg)
 		}
