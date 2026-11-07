@@ -1,0 +1,17 @@
+services:
+  app:
+    image: alpine
+    command: sleep infinity
+    volumes:
+      - type: tmpfs
+        target: /scratch
+        tmpfs:
+          size: 1048576
+      - type: volume
+        source: data
+        target: /data
+        volume:
+          nocopy: true
+      - /anonymous
+volumes:
+  data: {}

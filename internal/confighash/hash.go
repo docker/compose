@@ -157,6 +157,9 @@ var serviceHashKeyOrder = []string{
 	// sorted fallback would place it here already, listing it only freezes
 	// the position
 	"umask",
+	// added with the compose-go `mounts` attribute: absent (hence not hashed)
+	// from every configuration that doesn't use it, so no existing hash moves
+	"mounts",
 }
 
 // trimServiceHashFields removes the attributes deliberately excluded from the
