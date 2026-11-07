@@ -1,0 +1,39 @@
+services:
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+    environment:
+      V: ${DB_V:-1}
+  scaled:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo pre_stop >> /data/scaled'
+  dependent:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    depends_on:
+      db:
+        condition: service_started
+        restart: true
+    pre_stop:
+      - command: sh -c 'echo pre_stop >> /data/dependent'
+  recreated:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    environment:
+      V: ${RECREATED_V:-1}
+    pre_stop:
+      - command: sh -c 'echo pre_stop >> /data/recreated'
+volumes:
+  data:
