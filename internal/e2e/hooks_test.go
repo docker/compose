@@ -56,6 +56,33 @@ func TestPreStopHookSuccess(t *testing.T) {
 			OutputContains("In the pre-stop"))
 }
 
+// Regression test for https://github.com/docker/compose/issues/14476: up stopped
+// containers without running their pre_stop hooks.
+func TestPreStopHookWhenUpStopsAContainer(t *testing.T) {
+	s := NewScenario(t, "up must run the pre_stop hooks of every container it stops")
+	s.Step("up starts the services with two replicas of scaled",
+		ComposeCmd("up", "-d", "--scale", "scaled=2"),
+		ServiceScale("scaled", 2)).
+		Step("scaling down stops the extra replica",
+			ComposeCmd("up", "-d", "--scale", "scaled=1"),
+			ServiceScale("scaled", 1)).
+		Step("the removed replica ran its hook",
+			probeVolume(s, "cat", "/mnt/scaled"),
+			OutputContains("pre_stop")).
+		Step("recreating db restarts its restart: true dependent",
+			ComposeCmd("up", "-d").WithEnv("DB_V=2"),
+			Recreated("db")).
+		Step("the restarted dependent ran its hook",
+			probeVolume(s, "cat", "/mnt/dependent"),
+			OutputContains("pre_stop")).
+		Step("a config change recreates the service",
+			ComposeCmd("up", "-d").WithEnv("DB_V=2", "RECREATED_V=2"),
+			Recreated("recreated")).
+		Step("the replaced container ran its hook",
+			probeVolume(s, "cat", "/mnt/recreated"),
+			OutputContains("pre_stop"))
+}
+
 func TestPreStopHookInError(t *testing.T) {
 	NewScenario(t, "a failing pre_stop hook must fail the down, reporting the hook's exit status").
 		Step("up starts the service",
