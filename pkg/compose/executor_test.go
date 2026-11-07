@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"strconv"
 	"sync"
 	"testing"
@@ -198,6 +199,81 @@ func TestExecutePlanStopRemoveContainer(t *testing.T) {
 
 	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), plan)
 	assert.NilError(t, err)
+}
+
+// Regression test for docker/compose#14476.
+func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
+	project := &types.Project{Name: "test", Services: types.Services{
+		"web": {Name: "web", PreStop: []types.ServiceHook{{Command: types.ShellCommand{"drain"}}}},
+	}}
+	stopPlan := func(ctr container.Summary) *Plan {
+		plan := &Plan{}
+		plan.addNode(Operation{
+			Type:       OpStopContainer,
+			ResourceID: "service:web:1",
+			Cause:      "scale down",
+			Container:  &ctr,
+		}, "")
+		return plan
+	}
+	webContainer := func(state container.ContainerState, service string) container.Summary {
+		return container.Summary{
+			ID:     "c1",
+			Names:  []string{"/test-web-1"},
+			State:  state,
+			Labels: map[string]string{api.ServiceLabel: service, api.ContainerNumberLabel: "1"},
+		}
+	}
+	expectHook := func(apiClient *mocks.MockAPIClient, exitCode int) *gomock.Call {
+		serverConn, clientConn := net.Pipe()
+		go func() {
+			_ = writeStdcopyFrame(serverConn, 1, "draining\n")
+			_ = serverConn.Close()
+		}()
+		create := apiClient.EXPECT().ExecCreate(gomock.Any(), "c1", gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ string, opts client.ExecCreateOptions) (client.ExecCreateResult, error) {
+				assert.DeepEqual(t, opts.Cmd, []string{"drain"})
+				return client.ExecCreateResult{ID: "exec1"}, nil
+			})
+		attach := apiClient.EXPECT().ExecAttach(gomock.Any(), "exec1", gomock.Any()).
+			Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
+		inspect := apiClient.EXPECT().ExecInspect(gomock.Any(), "exec1", gomock.Any()).
+			Return(client.ExecInspectResult{ExitCode: exitCode}, nil)
+		gomock.InOrder(create, attach, inspect)
+		return inspect
+	}
+
+	t.Run("the hook runs before the container is stopped", func(t *testing.T) {
+		svc, apiClient := newTestService(t)
+		hook := expectHook(apiClient, 0)
+		apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+			Return(client.ContainerStopResult{}, nil).After(hook)
+
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(container.StateRunning, "web")))
+		assert.NilError(t, err)
+	})
+
+	t.Run("a failing hook fails the plan and the container is not stopped", func(t *testing.T) {
+		svc, apiClient := newTestService(t)
+		expectHook(apiClient, 1)
+
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(container.StateRunning, "web")))
+		assert.ErrorContains(t, err, "web hook exited with status 1")
+	})
+
+	for name, ctr := range map[string]container.Summary{
+		"a container that is not running has no hook to run":   webContainer(container.StateExited, "web"),
+		"a container of no service of the project has no hook": webContainer(container.StateRunning, "orphan"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, apiClient := newTestService(t)
+			apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+				Return(client.ContainerStopResult{}, nil)
+
+			err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(ctr))
+			assert.NilError(t, err)
+		})
+	}
 }
 
 // emptyObservedState returns an ObservedState with no containers/networks/volumes,
