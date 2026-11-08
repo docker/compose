@@ -35,7 +35,12 @@ func (s *composeService) Scale(ctx context.Context, project *types.Project, opti
 		if len(services) == 0 {
 			services = slices.Collect(maps.Keys(options.Replicas))
 		}
-		return s.createAndStart(ctx, project, api.CreateOptions{Services: services})
+		return s.createAndStart(ctx, project, api.CreateOptions{
+			Services: services,
+			// a recreated container keeps its anonymous volumes, as with `up`:
+			// scale has no --renew-anon-volumes to opt out
+			Inherit: true,
+		})
 	}), "scale", s.events)
 }
 
