@@ -26,7 +26,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/docker/cli/cli/config/configfile"
 	"github.com/opencontainers/go-digest"
 	specs "github.com/opencontainers/image-spec/specs-go"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
@@ -41,6 +40,8 @@ type composeArtifact struct {
 	manifest []byte
 	claimed  digest.Digest
 	layer    []byte
+	// the digest of the layer in the manifest, which the blob is served under
+	layerDigest digest.Digest
 }
 
 func newComposeArtifact(t *testing.T, composeFile string) composeArtifact {
@@ -54,7 +55,7 @@ func newComposeArtifact(t *testing.T, composeFile string) composeArtifact {
 		Layers:       []spec.Descriptor{{MediaType: oci.ComposeYAMLMediaType, Digest: digest.FromBytes(layer), Size: int64(len(layer))}},
 	})
 	assert.NilError(t, err)
-	return composeArtifact{manifest: manifest, claimed: digest.FromBytes(manifest), layer: layer}
+	return composeArtifact{manifest: manifest, claimed: digest.FromBytes(manifest), layer: layer, layerDigest: digest.FromBytes(layer)}
 }
 
 func (a composeArtifact) serve(t *testing.T) string {
@@ -69,7 +70,7 @@ func (a composeArtifact) serve(t *testing.T) string {
 			if r.Method != http.MethodHead {
 				_, _ = w.Write(a.manifest)
 			}
-		case r.URL.Path == "/v2/test/artifact/blobs/"+digest.FromBytes(a.layer).String():
+		case r.URL.Path == "/v2/test/artifact/blobs/"+a.layerDigest.String():
 			_, _ = w.Write(a.layer)
 		default:
 			w.WriteHeader(http.StatusNotFound)
@@ -77,13 +78,6 @@ func (a composeArtifact) serve(t *testing.T) string {
 	}))
 	t.Cleanup(server.Close)
 	return server.Listener.Addr().String()
-}
-
-func newTestOCILoader(host string) *ociRemoteLoader {
-	l := &ociRemoteLoader{known: map[string]string{}, insecureRegistries: []string{host}}
-	l.transportOnce.Do(func() { l.transport = &http.Transport{} })
-	l.credentialsOnce.Do(func() { l.credentials = &configfile.ConfigFile{} })
-	return l
 }
 
 // A registry can't make Compose cache its content as the one of another digest: what it serves is
@@ -106,14 +100,14 @@ func TestOCILoaderCacheIsNotPoisonedByAnotherRegistry(t *testing.T) {
 			t.Setenv("XDG_CACHE_HOME", cache)
 
 			// the rogue registry's content is refused...
-			_, err := newTestOCILoader(rogueHost).Load(t.Context(), ref)
+			_, err := newCacheTestLoader(rogueHost).Load(t.Context(), ref)
 			assert.ErrorContains(t, err, "digest mismatch")
-			entries, err := os.ReadDir(filepath.Join(cache, "docker-compose"))
+			entries, err := os.ReadDir(filepath.Join(cache, "docker-compose", cacheOCIDir))
 			assert.Assert(t, err == nil || os.IsNotExist(err))
 			assert.Equal(t, len(entries), 0, "nothing is cached by the rejected load")
 
 			// ...so the pinned digest gives the trusted registry's
-			file, err := newTestOCILoader(trustedHost).Load(t.Context(), "oci://"+trustedHost+"/test/artifact@"+trusted.claimed.String())
+			file, err := newCacheTestLoader(trustedHost).Load(t.Context(), "oci://"+trustedHost+"/test/artifact@"+trusted.claimed.String())
 			assert.NilError(t, err)
 			content, err := os.ReadFile(file)
 			assert.NilError(t, err)
