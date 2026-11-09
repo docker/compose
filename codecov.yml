@@ -19,3 +19,5 @@ ignore:
   - "e2e"
   - "pkg/e2e"
   - "**/*_test.go"
+  # generated from the engine's jobs extension point
+  - "internal/jobsapi/protogen"
