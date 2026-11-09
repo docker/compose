@@ -18,6 +18,7 @@ package compose
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -32,6 +33,9 @@ func encodeDependsOnLabel(dependsOn types.DependsOnConfig) string {
 	for dep, d := range dependsOn {
 		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", dep, d.Condition, d.Restart))
 	}
+	// map iteration is random: the label is part of a job's spec, hashed by the
+	// engine, so its entries must come in a stable order
+	slices.Sort(dependencies)
 	return strings.Join(dependencies, ",")
 }
 

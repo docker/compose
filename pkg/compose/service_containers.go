@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -70,13 +71,29 @@ func getScale(config types.ServiceConfig) (int, error) {
 // shared namespaces. The containersByService map provides the observed containers
 // grouped by service name.
 func resolveServiceReferences(service *types.ServiceConfig, containersByService map[string]Containers) error {
-	if err := resolveVolumeFrom(service, containersByService); err != nil {
-		return err
-	}
-	return resolveSharedNamespaces(service, containersByService)
+	return resolveReferences(service, func(name string) (string, bool) {
+		dependencies := containersByService[name]
+		if len(dependencies) == 0 {
+			return "", false
+		}
+		return dependencies.sorted()[0].ID, true
+	})
 }
 
-func resolveVolumeFrom(service *types.ServiceConfig, containersByService map[string]Containers) error {
+// containerRef gives what names a container of the service in another
+// container's configuration, false when there is none.
+type containerRef func(service string) (string, bool)
+
+func resolveReferences(service *types.ServiceConfig, ref containerRef) error {
+	// resolveVolumeFrom writes in place: not into a slice shared with the project
+	service.VolumesFrom = slices.Clone(service.VolumesFrom)
+	if err := resolveVolumeFrom(service, ref); err != nil {
+		return err
+	}
+	return resolveSharedNamespaces(service, ref)
+}
+
+func resolveVolumeFrom(service *types.ServiceConfig, ref containerRef) error {
 	for i, vol := range service.VolumesFrom {
 		spec := strings.Split(vol, ":")
 		if len(spec) == 0 {
@@ -87,38 +104,38 @@ func resolveVolumeFrom(service *types.ServiceConfig, containersByService map[str
 			continue
 		}
 		name := spec[0]
-		dependencies := containersByService[name]
-		if len(dependencies) == 0 {
+		target, ok := ref(name)
+		if !ok {
 			return fmt.Errorf("cannot share volume with service %s: container missing", name)
 		}
-		service.VolumesFrom[i] = dependencies.sorted()[0].ID
+		service.VolumesFrom[i] = target
 	}
 	return nil
 }
 
-func resolveSharedNamespaces(service *types.ServiceConfig, containersByService map[string]Containers) error {
+func resolveSharedNamespaces(service *types.ServiceConfig, ref containerRef) error {
 	if name := getDependentServiceFromMode(service.NetworkMode); name != "" {
-		dependencies := containersByService[name]
-		if len(dependencies) == 0 {
+		target, ok := ref(name)
+		if !ok {
 			return fmt.Errorf("cannot share network namespace with service %s: container missing", name)
 		}
-		service.NetworkMode = types.ContainerPrefix + dependencies.sorted()[0].ID
+		service.NetworkMode = types.ContainerPrefix + target
 	}
 
 	if name := getDependentServiceFromMode(service.Ipc); name != "" {
-		dependencies := containersByService[name]
-		if len(dependencies) == 0 {
+		target, ok := ref(name)
+		if !ok {
 			return fmt.Errorf("cannot share IPC namespace with service %s: container missing", name)
 		}
-		service.Ipc = types.ContainerPrefix + dependencies.sorted()[0].ID
+		service.Ipc = types.ContainerPrefix + target
 	}
 
 	if name := getDependentServiceFromMode(service.Pid); name != "" {
-		dependencies := containersByService[name]
-		if len(dependencies) == 0 {
+		target, ok := ref(name)
+		if !ok {
 			return fmt.Errorf("cannot share PID namespace with service %s: container missing", name)
 		}
-		service.Pid = types.ContainerPrefix + dependencies.sorted()[0].ID
+		service.Pid = types.ContainerPrefix + target
 	}
 
 	return nil
