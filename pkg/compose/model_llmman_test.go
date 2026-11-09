@@ -197,6 +197,11 @@ func llmmanProject(env types.Mapping, models types.Models, bindings map[string]*
 	}
 }
 
+// oneModelProject returns a project with the service "app" bound to the model "llm".
+func oneModelProject(env types.Mapping, model string) *types.Project {
+	return llmmanProject(env, types.Models{"llm": {Model: model}}, map[string]*types.ServiceModelConfig{"llm": nil})
+}
+
 func llmmanEnv(extra ...string) types.Mapping {
 	env := types.Mapping{modelProviderEnv: modelProviderLLMMan}
 	for i := 0; i+1 < len(extra); i += 2 {
@@ -209,20 +214,18 @@ func TestModelProviderSelection(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	s := &composeService{events: &recordedEvents{}}
 
-	models := types.Models{"llm": {Model: "smollm2"}}
-	bindings := map[string]*types.ServiceModelConfig{"llm": nil}
-
 	t.Run("llmman is selected by COMPOSE_MODEL_PROVIDER", func(t *testing.T) {
-		m, err := s.newModelAPI(llmmanProject(llmmanEnv(), models, bindings))
+		m, err := s.newModelAPI(oneModelProject(llmmanEnv(), "smollm2"))
 		assert.NilError(t, err)
 		_, ok := m.(*llmmanModelAPI)
 		assert.Assert(t, ok, "got %T", m)
+		m.Close()
 	})
 
 	for _, value := range []string{"LLMMAN", "ollama", "llmman,docker-model-runner"} {
 		t.Run("unknown provider "+value, func(t *testing.T) {
 			env := types.Mapping{modelProviderEnv: value}
-			err := s.ensureModels(t.Context(), llmmanProject(env, models, bindings), false)
+			err := s.ensureModels(t.Context(), oneModelProject(env, "smollm2"), false)
 			assert.ErrorContains(t, err, "unsupported COMPOSE_MODEL_PROVIDER")
 			assert.ErrorContains(t, err, value)
 			assert.ErrorContains(t, err, modelProviderDMR)
@@ -231,17 +234,10 @@ func TestModelProviderSelection(t *testing.T) {
 
 	t.Run("the default is Docker Model Runner", func(t *testing.T) {
 		// llmman is on PATH, yet Docker Model Runner wins when its plugin is installed
-		dir := t.TempDir()
-		script := "#!/bin/sh\ncase \"$1\" in docker-cli-plugin-metadata) echo '{\"SchemaVersion\":\"0.1.0\",\"Vendor\":\"test\",\"Version\":\"v1.2.6\"}' ;; esac\n"
-		assert.NilError(t, os.WriteFile(filepath.Join(dir, "docker-model"), []byte(script), 0o700))
-		cli := mocks.NewMockCli(gomock.NewController(t))
-		cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{CLIPluginsExtraDirs: []string{dir}}).AnyTimes()
-		cli.EXPECT().CurrentContext().Return("default").AnyTimes()
-		cli.EXPECT().DockerEndpoint().Return(docker.Endpoint{}).AnyTimes()
-		dmr := &composeService{dockerCli: cli}
+		dmr := fallbackService(t, validPluginMetadata)
 
 		for _, env := range []types.Mapping{{}, {modelProviderEnv: ""}, {modelProviderEnv: " " + modelProviderDMR + " "}} {
-			m, err := dmr.newModelAPI(llmmanProject(env, models, bindings))
+			m, err := dmr.newModelAPI(oneModelProject(env, "smollm2"))
 			assert.NilError(t, err)
 			_, ok := m.(*dmrModelAPI)
 			assert.Assert(t, ok, "got %T for %v", m, env)
@@ -289,9 +285,6 @@ const (
 )
 
 func TestLLMManFallbackWhenPluginIsMissing(t *testing.T) {
-	models := types.Models{"llm": {Model: "smollm2"}}
-	bindings := map[string]*types.ServiceModelConfig{"llm": nil}
-
 	for name, env := range map[string]types.Mapping{
 		"unset":      {},
 		"empty":      {modelProviderEnv: ""},
@@ -300,7 +293,7 @@ func TestLLMManFallbackWhenPluginIsMissing(t *testing.T) {
 		t.Run("llmman is selected and used when the provider is "+name, func(t *testing.T) {
 			fake := newFakeLLMMan(t)
 			s := fallbackService(t, "")
-			project := llmmanProject(env, models, bindings)
+			project := oneModelProject(env, "smollm2")
 
 			m, err := s.newModelAPI(project)
 			assert.NilError(t, err)
@@ -317,7 +310,7 @@ func TestLLMManFallbackWhenPluginIsMissing(t *testing.T) {
 	t.Run("explicit docker-model-runner never falls back", func(t *testing.T) {
 		fake := newFakeLLMMan(t)
 		s := fallbackService(t, "")
-		project := llmmanProject(types.Mapping{modelProviderEnv: modelProviderDMR}, models, bindings)
+		project := oneModelProject(types.Mapping{modelProviderEnv: modelProviderDMR}, "smollm2")
 
 		err := s.ensureModels(t.Context(), project, false)
 		assert.Error(t, err, dmrPluginMissingText)
@@ -328,14 +321,14 @@ func TestLLMManFallbackWhenPluginIsMissing(t *testing.T) {
 	t.Run("no plugin and no llmman keeps the original error", func(t *testing.T) {
 		s := fallbackService(t, "")
 		t.Setenv("PATH", t.TempDir())
-		err := s.ensureModels(t.Context(), llmmanProject(types.Mapping{}, models, bindings), false)
+		err := s.ensureModels(t.Context(), oneModelProject(types.Mapping{}, "smollm2"), false)
 		assert.Error(t, err, dmrPluginMissingText)
 	})
 
 	t.Run("Docker Model Runner wins when its plugin is installed", func(t *testing.T) {
 		fake := newFakeLLMMan(t)
 		s := fallbackService(t, validPluginMetadata)
-		m, err := s.newModelAPI(llmmanProject(types.Mapping{}, models, bindings))
+		m, err := s.newModelAPI(oneModelProject(types.Mapping{}, "smollm2"))
 		assert.NilError(t, err)
 		_, ok := m.(*dmrModelAPI)
 		assert.Assert(t, ok, "got %T", m)
@@ -346,7 +339,7 @@ func TestLLMManFallbackWhenPluginIsMissing(t *testing.T) {
 	t.Run("a broken plugin does not fall back", func(t *testing.T) {
 		fake := newFakeLLMMan(t)
 		s := fallbackService(t, brokenPluginMetadata)
-		_, err := s.newModelAPI(llmmanProject(types.Mapping{}, models, bindings))
+		_, err := s.newModelAPI(oneModelProject(types.Mapping{}, "smollm2"))
 		assert.ErrorContains(t, err, "failed to load Docker Model plugin")
 		assert.Assert(t, !errors.Is(err, errDMRPluginNotFound))
 		assert.Equal(t, len(fake.log(t)), 0, "llmman must not be run")
@@ -359,7 +352,7 @@ func TestLLMManMissingBinary(t *testing.T) {
 	}
 	t.Setenv("PATH", t.TempDir())
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 	err := s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "requires the llmman CLI in PATH")
 	assert.ErrorContains(t, err, "https://github.com/llmmanorg/llmman")
@@ -369,7 +362,7 @@ func TestLLMManDaemonUnreachable(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	fake.set(t, "down", "")
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 
 	err := s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "start it with `llmman serve`")
@@ -421,7 +414,7 @@ func TestLLMManPullsOnlyMissingModels(t *testing.T) {
 func TestLLMManEmptyStoreSkipsResolution(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 	assert.NilError(t, s.ensureModels(t.Context(), project, false))
 	assert.DeepEqual(t, fake.log(t), []string{"ps", "list --format {{.Name}}", "pull smollm2"})
 }
@@ -431,7 +424,7 @@ func TestLLMManPullFailure(t *testing.T) {
 	fake.set(t, "pullfail", "")
 	events := &recordedEvents{}
 	s := &composeService{events: events}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 
 	err := s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "registry exploded")
@@ -446,7 +439,7 @@ func TestLLMManPullDrainsOutputTooLongToScan(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	fake.set(t, "longline", "")
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 
 	done := make(chan error, 1)
 	go func() { done <- s.ensureModels(t.Context(), project, false) }()
@@ -465,12 +458,12 @@ func TestLLMManPullFailureHintsAtDockerHubReferences(t *testing.T) {
 	fake.set(t, "pullfail", "")
 	s := &composeService{events: &recordedEvents{}}
 
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "ai/smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "ai/smollm2")
 	err := s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "registry exploded")
 	assert.ErrorContains(t, err, `use "smollm2" or "docker.io/ai/smollm2" for Docker Hub`)
 
-	project = llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "unsloth/qwen"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project = oneModelProject(llmmanEnv(), "unsloth/qwen")
 	err = s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "registry exploded")
 	assert.Assert(t, !strings.Contains(err.Error(), "Docker Hub"), err.Error())
@@ -481,7 +474,7 @@ func TestLLMManListFailureIsNotFatal(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	fake.set(t, "listfail", "")
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 	assert.NilError(t, s.ensureModels(t.Context(), project, false))
 	assert.DeepEqual(t, fake.log(t), []string{"ps", "list --format {{.Name}}", "pull smollm2"})
 }
@@ -491,7 +484,7 @@ func TestLLMManResolveFailure(t *testing.T) {
 	fake.set(t, "store", "docker.io/ai/other:latest\n")
 	fake.set(t, "resolvefail", "")
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 	err := s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "error checking model smollm2")
 	assert.ErrorContains(t, err, "cannot resolve")
@@ -601,8 +594,7 @@ func TestLLMManVariables(t *testing.T) {
 func TestLLMManPropagatesProjectEnvironment(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	s := &composeService{events: &recordedEvents{}}
-	project := llmmanProject(llmmanEnv("LLMMAN_HOST", "10.0.0.5:9999", "LLMMAN_API_KEY", "s3cret"),
-		types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv("LLMMAN_HOST", "10.0.0.5:9999", "LLMMAN_API_KEY", "s3cret"), "smollm2")
 	assert.NilError(t, s.ensureModels(t.Context(), project, false))
 
 	data, err := os.ReadFile(fake.calls)
@@ -650,7 +642,7 @@ func TestLLMManDryRunDoesNotPull(t *testing.T) {
 	fake := newFakeLLMMan(t)
 	events := &recordedEvents{}
 	s := &composeService{events: events, dryRun: true}
-	project := llmmanProject(llmmanEnv(), types.Models{"llm": {Model: "smollm2"}}, map[string]*types.ServiceModelConfig{"llm": nil})
+	project := oneModelProject(llmmanEnv(), "smollm2")
 	assert.NilError(t, s.ensureModels(t.Context(), project, false))
 
 	for _, call := range fake.log(t) {
@@ -664,4 +656,54 @@ func TestLLMManDryRunDoesNotPull(t *testing.T) {
 	fake.set(t, "down", "")
 	err := s.ensureModels(t.Context(), project, false)
 	assert.ErrorContains(t, err, "start it with `llmman serve`")
+}
+
+// TestLLMManBinaryInCurrentDirectory: a relative PATH entry is refused by exec.LookPath.
+func TestLLMManBinaryInCurrentDirectory(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("PATH lookup differs on windows")
+	}
+	dir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, "llmman"), []byte("#!/bin/sh\n"), 0o700))
+	t.Chdir(dir)
+	t.Setenv("PATH", ".")
+	s := &composeService{events: &recordedEvents{}}
+	_, err := s.newLLMManModelAPI(oneModelProject(llmmanEnv(), "smollm2"))
+	assert.ErrorIs(t, err, exec.ErrDot)
+	assert.ErrorContains(t, err, "failed to locate llmman")
+}
+
+func TestDMRPullModel(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("relies on the true and false commands")
+	}
+	model := types.ModelConfig{Name: "llm", Model: "smollm2"}
+	noop := func(context.Context, *exec.Cmd) error { return nil }
+
+	t.Run("pulled", func(t *testing.T) {
+		events := &recordedEvents{}
+		m := &dmrModelAPI{path: "true", prepare: noop}
+		assert.NilError(t, m.PullModel(t.Context(), model, false, events))
+		assert.Assert(t, events.has("llm", api.Working, api.StatusPulled))
+	})
+
+	t.Run("failure is reported", func(t *testing.T) {
+		events := &recordedEvents{}
+		m := &dmrModelAPI{path: "false", prepare: noop}
+		assert.Error(t, m.PullModel(t.Context(), model, false, events), "exit status 1")
+		assert.Assert(t, events.has("llm", api.Error, api.StatusError))
+	})
+
+	t.Run("dry run runs nothing", func(t *testing.T) {
+		events := &recordedEvents{}
+		m := &dmrModelAPI{path: "false", prepare: noop, dryRun: true}
+		assert.NilError(t, m.PullModel(t.Context(), model, false, events))
+		assert.Assert(t, events.has("llm", api.Working, api.StatusPulled))
+	})
+}
+
+func TestDMRSupportsRuntimeFlags(t *testing.T) {
+	for version, want := range map[string]bool{"": false, "v1.0.5": false, "v1.0.6": true, "1.0.6": true, "v1.2.0": true} {
+		assert.Equal(t, (&dmrModelAPI{version: version}).supportsRuntimeFlags(), want, "version %q", version)
+	}
 }

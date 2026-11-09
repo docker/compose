@@ -176,14 +176,7 @@ func (m *llmmanModelAPI) HasModel(ctx context.Context, available []string, model
 }
 
 func (m *llmmanModelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events api.EventProcessor) error {
-	events.On(api.Resource{
-		ID:     model.Name,
-		Status: api.Working,
-		Text:   api.StatusPulling,
-	})
-	if m.dryRun {
-		// llmman is an external process the dry-run API client cannot intercept
-		events.On(api.Resource{ID: model.Name, Status: api.Working, Text: api.StatusPulled})
+	if !startPull(model.Name, m.dryRun, events) {
 		return nil
 	}
 

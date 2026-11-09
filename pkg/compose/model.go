@@ -199,14 +199,7 @@ func (m *dmrModelAPI) HasModel(_ context.Context, available []string, model stri
 }
 
 func (m *dmrModelAPI) PullModel(ctx context.Context, model types.ModelConfig, quietPull bool, events api.EventProcessor) error {
-	events.On(api.Resource{
-		ID:     model.Name,
-		Status: api.Working,
-		Text:   api.StatusPulling,
-	})
-	if m.dryRun {
-		// the plugin is an external process the dry-run API client cannot intercept
-		events.On(api.Resource{ID: model.Name, Status: api.Working, Text: api.StatusPulled})
+	if !startPull(model.Name, m.dryRun, events) {
 		return nil
 	}
 
@@ -225,6 +218,17 @@ func (m *dmrModelAPI) PullModel(ctx context.Context, model types.ModelConfig, qu
 		Text:   api.StatusPulled,
 	})
 	return err
+}
+
+// startPull reports a pull as started and tells whether to go on. The backends
+// are external processes the dry-run API client cannot intercept: on a dry run
+// the pull is reported as done and nothing is run.
+func startPull(name string, dryRun bool, events api.EventProcessor) bool {
+	events.On(api.Resource{ID: name, Status: api.Working, Text: api.StatusPulling})
+	if dryRun {
+		events.On(api.Resource{ID: name, Status: api.Working, Text: api.StatusPulled})
+	}
+	return !dryRun
 }
 
 // streamPull runs a pull command and reports a pulling event for each line it
