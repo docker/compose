@@ -94,7 +94,7 @@ func newCacheTestLoader(host string) *ociRemoteLoader {
 	return l
 }
 
-// setCacheRoot points the cache of extracted projects to a new directory, which it returns.
+// setCacheRoot points the cache to a new directory, and returns the one of the OCI artifacts in it.
 func setCacheRoot(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -103,9 +103,9 @@ func setCacheRoot(t *testing.T) string {
 }
 
 // An entry of the cache of extracted projects is complete or is not there: it
-// is extracted aside and moved in place in one step, so that a run never uses
-// what an interrupted or a concurrent run is still writing, and it is marked
-// as complete, so that a directory which is not one is not taken for an entry.
+// is extracted aside, with its manifest, and moved in place in one step, so that
+// a run never uses what an interrupted or a concurrent run is still writing, and
+// a directory which holds no manifest is not taken for an entry.
 func TestOCILoaderCacheEntryIsComplete(t *testing.T) {
 	registry := newCacheTestRegistry(t)
 	host := registry.serve(t)
@@ -120,9 +120,10 @@ func TestOCILoaderCacheEntryIsComplete(t *testing.T) {
 
 	entries, err := os.ReadDir(cache)
 	assert.NilError(t, err)
-	assert.Equal(t, len(entries), 1, "no directory is left aside")
-	_, err = os.Stat(filepath.Join(cache, registry.digest.Hex(), cacheEntryComplete))
+	assert.DeepEqual(t, entryNames(entries), []string{registry.digest.Hex()}) // no directory is left aside
+	manifest, err := os.ReadFile(filepath.Join(cache, registry.digest.Hex(), cacheEntryManifestDir, cacheEntryManifestFile))
 	assert.NilError(t, err)
+	assert.Equal(t, string(manifest), string(registry.manifest), "the entry holds the manifest it is named after")
 
 	t.Run("a complete entry is used as it is", func(t *testing.T) {
 		kept := filepath.Join(cache, registry.digest.Hex(), "kept")
@@ -134,23 +135,32 @@ func TestOCILoaderCacheEntryIsComplete(t *testing.T) {
 	})
 }
 
-// A directory of the cache which is not marked as complete is extracted again,
-// whatever it holds: an interrupted extraction leaves some of the files, and an
-// entry written by a release which did not mark them looks like a complete one.
+// A directory of the cache which holds no manifest of its digest is extracted
+// again, whatever else it holds: an interrupted extraction leaves some of the
+// files, an entry written by a release which did not verify what it fetched looks
+// like a complete one, and so does a directory holding another manifest.
 func TestOCILoaderExtractsAgainWhatIsNotACompleteEntry(t *testing.T) {
 	registry := newCacheTestRegistry(t)
 	host := registry.serve(t)
 
-	for name, compose := range map[string]string{
-		"an interrupted extraction":                    "services:\n  app:\n    ima",
-		"an entry of a release that did not mark them": string(registry.compose),
+	evil := "services:\n  app:\n    image: evil/image\n"
+	for name, tt := range map[string]struct {
+		compose  string
+		manifest *string // what the directory holds as its manifest, if anything
+	}{
+		"an interrupted extraction":                                 {compose: "services:\n  app:\n    ima"},
+		"an entry of a release that did not verify what it fetched": {compose: evil},
+		"a directory holding the manifest of another digest":        {compose: evil, manifest: ptr(`{"schemaVersion":2}`)},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cache := setCacheRoot(t)
 			entry := filepath.Join(cache, registry.digest.Hex())
-			assert.NilError(t, os.MkdirAll(entry, 0o700))
-			assert.NilError(t, os.WriteFile(filepath.Join(entry, "compose.yaml"), []byte(compose), 0o600))
+			assert.NilError(t, os.MkdirAll(filepath.Join(entry, cacheEntryManifestDir), 0o700))
+			assert.NilError(t, os.WriteFile(filepath.Join(entry, "compose.yaml"), []byte(tt.compose), 0o600))
 			assert.NilError(t, os.WriteFile(filepath.Join(entry, "stale"), nil, 0o600))
+			if tt.manifest != nil {
+				assert.NilError(t, os.WriteFile(filepath.Join(entry, cacheEntryManifestDir, cacheEntryManifestFile), []byte(*tt.manifest), 0o600))
+			}
 
 			file, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
 			assert.NilError(t, err)
@@ -160,8 +170,7 @@ func TestOCILoaderExtractsAgainWhatIsNotACompleteEntry(t *testing.T) {
 			assert.Equal(t, string(content), string(registry.compose))
 			_, err = os.Stat(filepath.Join(entry, "stale"))
 			assert.Assert(t, os.IsNotExist(err), "the directory is replaced, not completed")
-			_, err = os.Stat(filepath.Join(entry, cacheEntryComplete))
-			assert.NilError(t, err)
+			assert.Assert(t, cacheEntryMatches(cache, registry.digest))
 		})
 	}
 }
@@ -182,38 +191,45 @@ func TestOCILoaderFailedPullLeavesNothingBehind(t *testing.T) {
 	assert.Equal(t, len(entries), 0)
 }
 
-// Runs that load the same artifact at the same time, whether the cache has the
-// entry already, has none or has a directory that is not one, leave a single
-// complete entry, and nothing aside. A run that loses to another while it
-// replaces a directory which is not an entry may return an error, so what is
-// pinned for every run is the path of the entry when it succeeds, and the state
-// of the cache once the runs are over.
+// Runs that load the same artifact at the same time, whether the cache has none
+// or has a directory that is not an entry, leave a single complete entry, and
+// nothing aside. When the cache has none, which is what a cold cache is, the
+// path every run gets is the one of a file that is there as it gets it: the entry
+// is in place complete or it is not there. Replacing a directory which is not an
+// entry takes two steps, which a run that loses to another may see in between,
+// and may fail on: what is pinned then is the path of the entry when the run
+// succeeds, and the state of the cache once the runs are over.
 func TestOCILoaderConcurrentRunsLeaveOneCompleteEntry(t *testing.T) {
 	registry := newCacheTestRegistry(t)
 	host := registry.serve(t)
 
-	for name, seed := range map[string]func(t *testing.T, entry string){
-		"no entry": func(*testing.T, string) {},
-		"a directory that is not an entry": func(t *testing.T, entry string) {
+	for name, tt := range map[string]struct {
+		seed        func(t *testing.T, entry string)
+		alwaysThere bool // the file of the path a run gets is there as it gets it
+	}{
+		"no entry": {seed: func(*testing.T, string) {}, alwaysThere: true},
+		"a directory that is not an entry": {seed: func(t *testing.T, entry string) {
 			assert.NilError(t, os.MkdirAll(entry, 0o700))
 			assert.NilError(t, os.WriteFile(filepath.Join(entry, "compose.yaml"), []byte("services:\n  app:\n    ima"), 0o600))
 			assert.NilError(t, os.WriteFile(filepath.Join(entry, "stale"), nil, 0o600))
-		},
+		}},
 	} {
 		t.Run(name, func(t *testing.T) {
 			cache := setCacheRoot(t)
 			entry := filepath.Join(cache, registry.digest.Hex())
-			seed(t, entry)
+			tt.seed(t, entry)
 
 			const runs = 8
 			files := make([]string, runs)
 			errs := make([]error, runs)
+			there := make([]bool, runs) // whether the file a run got is there when it gets it
 			var wg sync.WaitGroup
 			for i := range runs {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
 					files[i], errs[i] = newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+					there[i] = errs[i] != nil || fileExists(files[i])
 				}()
 			}
 			wg.Wait()
@@ -221,32 +237,35 @@ func TestOCILoaderConcurrentRunsLeaveOneCompleteEntry(t *testing.T) {
 			for i := range runs {
 				if errs[i] == nil {
 					assert.Equal(t, files[i], filepath.Join(entry, "compose.yaml"))
+					if tt.alwaysThere {
+						assert.Assert(t, there[i], "run %d got a path to a file which was not there", i)
+					}
 				}
 			}
 			content, err := os.ReadFile(filepath.Join(entry, "compose.yaml"))
 			assert.NilError(t, err)
 			assert.Equal(t, string(content), string(registry.compose))
-			assert.Assert(t, cacheEntryIsComplete(entry))
+			assert.Assert(t, cacheEntryMatches(cache, registry.digest))
 			_, err = os.Stat(filepath.Join(entry, "stale"))
 			assert.Assert(t, os.IsNotExist(err))
 			entries, err := os.ReadDir(cache)
 			assert.NilError(t, err)
-			assert.Equal(t, len(entries), 1, "no directory is left aside")
+			assert.DeepEqual(t, entryNames(entries), []string{registry.digest.Hex()}) // no directory is left aside
 		})
 	}
 }
 
-// A directory which is not an entry that is replaced, and whose replacement
-// then fails, is not put back: only a complete entry is worth restoring. Put
-// back, it would be in the way of the run that set aside the entry which took
-// its place (see moveCacheEntry), and would leave the cache with it instead.
-func TestMoveCacheEntryDoesNotRestoreADirectoryWhichIsNotAnEntry(t *testing.T) {
+// What is replaced and whose replacement then fails is not put back, whatever it
+// is, and nothing of it is left aside: it would be in the way of the run that set
+// aside the entry which took its place (see moveCacheEntry).
+func TestMoveCacheEntryLeavesNothingAsideWhenItFails(t *testing.T) {
 	cache := t.TempDir()
-	local := filepath.Join(cache, "entry")
+	dgst := digest.FromString("entry")
+	local := filepath.Join(cache, dgst.Hex())
 	assert.NilError(t, os.MkdirAll(local, 0o700))
 	assert.NilError(t, os.WriteFile(filepath.Join(local, "compose.yaml"), []byte("services:\n  app:\n    ima"), 0o600))
 
-	err := moveCacheEntry(filepath.Join(cache, "missing"), local)
+	err := moveCacheEntry(cache, filepath.Join(cache, "missing"), dgst)
 	assert.Assert(t, err != nil)
 
 	entries, err := os.ReadDir(cache)
@@ -254,17 +273,20 @@ func TestMoveCacheEntryDoesNotRestoreADirectoryWhichIsNotAnEntry(t *testing.T) {
 	assert.Equal(t, len(entries), 0, "neither the directory nor anything aside is left")
 }
 
-// The extracted artifacts are kept in a directory of the cache for OCI artifacts: an
-// entry, even a complete one, which an earlier release left at the root of the
-// cache is not looked for, and the artifact is extracted again in the directory.
+// The extracted artifacts are kept in a directory of the cache for OCI artifacts.
+// What an earlier release cached is at the root of the cache, where nothing looks
+// for it any more, whatever it holds, even what looks like a complete entry: a
+// release which did not verify what it fetched may have cached what a registry
+// chose, and the artifact is extracted again in the directory.
 func TestOCILoaderKeepsEntriesInTheDirectoryForOCI(t *testing.T) {
 	registry := newCacheTestRegistry(t)
 	host := registry.serve(t)
 	cache := setCacheRoot(t)
 	legacy := filepath.Join(filepath.Dir(cache), registry.digest.Hex())
-	assert.NilError(t, os.MkdirAll(legacy, 0o700))
-	assert.NilError(t, os.WriteFile(filepath.Join(legacy, "compose.yaml"), []byte("services: {}\n"), 0o600))
-	assert.NilError(t, os.WriteFile(filepath.Join(legacy, cacheEntryComplete), nil, 0o600))
+	assert.NilError(t, os.MkdirAll(filepath.Join(legacy, cacheEntryManifestDir), 0o700))
+	evil := []byte("services:\n  app:\n    image: evil/image\n")
+	assert.NilError(t, os.WriteFile(filepath.Join(legacy, "compose.yaml"), evil, 0o600))
+	assert.NilError(t, os.WriteFile(filepath.Join(legacy, cacheEntryManifestDir, cacheEntryManifestFile), registry.manifest, 0o600))
 
 	file, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
 	assert.NilError(t, err)
@@ -273,4 +295,97 @@ func TestOCILoaderKeepsEntriesInTheDirectoryForOCI(t *testing.T) {
 	content, err := os.ReadFile(file)
 	assert.NilError(t, err)
 	assert.Equal(t, string(content), string(registry.compose))
+}
+
+// The cache holds an entry for a digest when it has a directory named after it
+// which holds the manifest that has it, in a directory which an artifact can't
+// write: its files have no path separator in their names.
+func TestCacheEntryMatchesTheDirectoryHoldingTheManifestOfItsDigest(t *testing.T) {
+	manifest := []byte(`{"schemaVersion":2}`)
+	dgst := digest.FromBytes(manifest)
+	other := digest.FromString("another")
+
+	for name, tt := range map[string]struct {
+		dir      string // directory of the entry, if any
+		manifest []byte // its manifest, if any
+		dgst     digest.Digest
+		want     bool
+	}{
+		"the directory and its manifest": {dgst.Hex(), manifest, dgst, true},
+		"no manifest":                    {dgst.Hex(), nil, dgst, false},
+		"no directory":                   {"", manifest, dgst, false},
+		"a manifest that has not the digest the directory has":          {dgst.Hex(), []byte(`{}`), dgst, false},
+		"the manifest of another digest, in a directory named after it": {other.Hex(), manifest, other, false},
+		"not a digest": {dgst.Hex(), manifest, digest.Digest("sha256:short"), false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cache := t.TempDir()
+			if tt.dir != "" {
+				holder := filepath.Join(cache, tt.dir, cacheEntryManifestDir)
+				assert.NilError(t, os.MkdirAll(holder, 0o700))
+				if tt.manifest != nil {
+					assert.NilError(t, os.WriteFile(filepath.Join(holder, cacheEntryManifestFile), tt.manifest, 0o600))
+				}
+			}
+			assert.Equal(t, cacheEntryMatches(cache, tt.dgst), tt.want)
+		})
+	}
+}
+
+// An artifact which writes a file named as the directory that holds the manifest
+// of its entry is refused, rather than have the entry made of what it chose.
+func TestWriteCacheEntryManifestRefusesAnArtifactWhichHasTheDirectory(t *testing.T) {
+	dir := t.TempDir()
+	assert.NilError(t, os.WriteFile(filepath.Join(dir, cacheEntryManifestDir), []byte("services: {}\n"), 0o600))
+
+	err := writeCacheEntryManifest(dir, []byte(`{"schemaVersion":2}`))
+	assert.ErrorContains(t, err, "invalid OCI artifact")
+}
+
+// An artifact which has a file named as the directory that holds the manifest of
+// its entry, which its annotations let it choose, is refused whole, and nothing of
+// it is cached: it can't make an entry of what it wrote.
+func TestOCILoaderRefusesAnArtifactWritingTheDirectoryOfTheManifest(t *testing.T) {
+	compose := []byte("services:\n  app:\n    image: alpine\n")
+	manifest, err := json.Marshal(spec.Manifest{
+		Versioned:    specs.Versioned{SchemaVersion: 2},
+		MediaType:    spec.MediaTypeImageManifest,
+		ArtifactType: oci.ComposeProjectArtifactType,
+		Config:       spec.Descriptor{MediaType: oci.ComposeEmptyConfigMediaType, Digest: digest.FromString("{}"), Size: 2},
+		Layers: []spec.Descriptor{
+			{MediaType: oci.ComposeYAMLMediaType, Digest: digest.FromBytes(compose), Size: int64(len(compose))},
+			{
+				MediaType: oci.ComposeEnvFileMediaType, Digest: digest.FromBytes(compose), Size: int64(len(compose)),
+				Annotations: map[string]string{"com.docker.compose.envfile": cacheEntryManifestDir},
+			},
+		},
+	})
+	assert.NilError(t, err)
+	registry := &cacheTestRegistry{manifest: manifest, digest: digest.FromBytes(manifest), compose: compose, blob: compose}
+	host := registry.serve(t)
+	cache := setCacheRoot(t)
+
+	_, err = newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.ErrorContains(t, err, "invalid OCI artifact")
+
+	entries, err := os.ReadDir(cache)
+	assert.Assert(t, err == nil || os.IsNotExist(err))
+	assert.Equal(t, len(entries), 0, "nothing is cached")
+}
+
+func ptr[T any](v T) *T { return &v }
+
+// fileExists tells whether the path is a file.
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
+// entryNames is the sorted names of the entries of a directory.
+func entryNames(entries []os.DirEntry) []string {
+	names := make([]string, 0, len(entries))
+	for _, e := range entries {
+		names = append(names, e.Name())
+	}
+	return names
 }
