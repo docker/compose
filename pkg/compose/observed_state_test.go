@@ -814,3 +814,43 @@ func TestCollectObservedState_SelectionDoesNotMakeDisabledServicesOrphans(t *tes
 	assert.Equal(t, len(state.Orphans), 1)
 	assert.Equal(t, state.Orphans[0].ID, "c3", "only the service absent from the model is an orphan")
 }
+
+// A run of a job is not a service replica: the project does not define its
+// "service", so it reads as an orphan. up --remove-orphans sweeps the finished
+// ones, the failures kept for postmortem, but must leave a run still going
+// alone, like a live `compose run` session: a cron firing while the user
+// deploys would otherwise be killed.
+func TestCollectObservedState_RunningJobRunIsNotAnOrphan(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{Name: "myproject", Services: types.Services{"web": {Name: "web"}}}
+
+	jobRun := func(id string, state container.ContainerState) container.Summary {
+		return container.Summary{
+			ID:    id,
+			Names: []string{"/job-myproject.backup-1-" + id},
+			State: state,
+			Labels: map[string]string{
+				api.ServiceLabel:         "backup",
+				api.ProjectLabel:         "myproject",
+				api.ConfigHashLabel:      "hash-backup",
+				api.ContainerNumberLabel: "1",
+				api.OneoffLabel:          "False",
+				jobContainerIDLabel:      "job-1",
+			},
+		}
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{
+			jobRun("running", container.StateRunning),
+			jobRun("failed", container.StateExited),
+		},
+	}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreateStart)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(state.Orphans), 1)
+	assert.Equal(t, state.Orphans[0].ID, "failed", "the finished run is swept, the running one is left alone")
+}

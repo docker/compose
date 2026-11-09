@@ -1,0 +1,8 @@
+jobs:
+  # Fails on purpose: a failed run keeps its container
+  cron:
+    image: alpine
+    command: sh -c 'exit 1'
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"

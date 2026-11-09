@@ -21,6 +21,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -38,6 +39,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/concurrency"
+	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
 	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
@@ -61,11 +63,25 @@ func TestDownRejectsInvalidImagePruneModeUpfront(t *testing.T) {
 	assert.ErrorContains(t, err, `invalid image prune mode "bogus"`)
 }
 
+// expectNoJobsEngine makes down's lookup of the jobs the engine has for the
+// project (no compose file to read them from, or --remove-orphans) see an
+// engine whose API predates jobs: no jobs, and no gRPC call to mock.
+func expectNoJobsEngine(api *mocks.MockAPIClient) {
+	expectEngineAPIVersion(api, noJobsEngine)
+}
+
+func expectEngineAPIVersion(api *mocks.MockAPIClient, version string) {
+	api.EXPECT().Ping(gomock.Any(), client.PingOptions{NegotiateAPIVersion: true}).
+		Return(client.PingResult{APIVersion: version}, nil).AnyTimes()
+	api.EXPECT().ClientVersion().Return(version).AnyTimes()
+}
+
 func TestDown(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -175,6 +191,7 @@ func TestDown_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
 // TestDown_ConcurrencyIsBoundedAcrossServices guards for container removal.
 func TestDown_ImagePruningSharesConcurrencyBudgetAcrossOps(t *testing.T) {
 	svc, apiClient := newTestService(t, WithMaxConcurrency(2))
+	expectNoJobsEngine(apiClient)
 
 	project := &types.Project{Name: "prj"}
 
@@ -225,6 +242,7 @@ func TestDown_ImagePruningSharesConcurrencyBudgetAcrossOps(t *testing.T) {
 // between the two image ops.
 func TestDown_NetworkAndImageRemovalShareConcurrencyBudget(t *testing.T) {
 	svc, apiClient := newTestService(t, WithMaxConcurrency(2))
+	expectNoJobsEngine(apiClient)
 
 	project := &types.Project{
 		Name: "prj",
@@ -288,6 +306,7 @@ func TestDownWithGivenServices(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -339,11 +358,111 @@ func TestDownWithGivenServices(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// down --remove-orphans also removes the jobs a previous up registered from a
+// file that declared more; without the flag it removes the declared ones only.
+func TestDownRemoveOrphansRemovesRegisteredJobsTheFileDroppedKeeps(t *testing.T) {
+	for name, tc := range map[string]struct {
+		removeOrphans bool
+		want          []string
+	}{
+		"without the flag":      {removeOrphans: false, want: []string{"prj.backup"}},
+		"with --remove-orphans": {removeOrphans: true, want: []string{"prj.backup", "prj.old"}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			svc, apiClient := newTestService(t)
+			expectEngineAPIVersion(apiClient, apiVersionJobs)
+			jobs := &fakeJobsClient{listReply: &jobsv0.ListReply{Jobs: []jobsv0.Job{{Name: "prj.backup"}, {Name: "prj.old"}}}}
+			svc.jobsGRPCOnce.Do(func() {})
+			svc.jobsAPI = jobs
+
+			apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil).Times(2)
+			apiClient.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+				Filters: naming.ProjectFilter("prj").Add("label", compose.RelayNetworkLabel),
+			}).Return(client.NetworkListResult{}, nil)
+
+			project := &types.Project{Name: "prj", Jobs: types.Jobs{"backup": {Name: "backup"}}}
+			assert.NilError(t, svc.down(t.Context(), "prj", compose.DownOptions{Project: project, RemoveOrphans: tc.removeOrphans}))
+
+			var removed []string
+			for _, call := range jobs.removeCalls {
+				removed = append(removed, call.JobRef)
+			}
+			slices.Sort(removed)
+			assert.DeepEqual(t, removed, tc.want)
+		})
+	}
+}
+
+// down with a selection of services leaves the project's jobs alone: unlike a
+// network, which stays while a container still uses it, nothing keeps a job.
+func TestDownWithGivenServicesKeepsJobs(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	api, cli := prepareMocks(mockCtrl)
+	expectEngineAPIVersion(api, apiVersionJobs)
+	tested, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	jobs := &fakeJobsClient{listReply: &jobsv0.ListReply{Jobs: []jobsv0.Job{{Name: strings.ToLower(testProject) + ".backup"}}}}
+	tested.(*composeService).jobsGRPCOnce.Do(func() {})
+	tested.(*composeService).jobsAPI = jobs
+
+	api.EXPECT().ContainerList(gomock.Any(), projectFilterListOpt(false)).Return(client.ContainerListResult{
+		Items: []container.Summary{
+			testContainer("service1", "123", false),
+			testContainer("service2", "456", false),
+			testContainer("service2", "789", false),
+			testContainer("service_orphan", "321", true),
+		},
+	}, nil)
+	api.EXPECT().VolumeList(
+		gomock.Any(),
+		client.VolumeListOptions{
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
+		}).
+		Return(client.VolumeListResult{}, nil)
+
+	// network names are not guaranteed to be unique, ensure Compose handles
+	// cleanup properly if duplicates are inadvertently created
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
+		Return(client.NetworkListResult{Items: []network.Summary{
+			{Network: network.Network{ID: "abc123", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
+			{Network: network.Network{ID: "def456", Name: "myProject_default", Labels: map[string]string{compose.NetworkLabel: "default"}}},
+		}}, nil)
+
+	api.EXPECT().ContainerStop(gomock.Any(), "123", client.ContainerStopOptions{}).Return(client.ContainerStopResult{}, nil)
+
+	api.EXPECT().ContainerRemove(gomock.Any(), "123", client.ContainerRemoveOptions{Force: true}).Return(client.ContainerRemoveResult{}, nil)
+
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", networkFilter("default")),
+	}).Return(client.NetworkListResult{Items: []network.Summary{
+		{Network: network.Network{ID: "abc123", Name: "myProject_default"}},
+	}}, nil)
+	api.EXPECT().NetworkInspect(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkInspectResult{Network: network.Inspect{Network: network.Network{ID: "abc123"}}}, nil)
+	api.EXPECT().NetworkRemove(gomock.Any(), "abc123", gomock.Any()).Return(client.NetworkRemoveResult{}, nil)
+
+	// no relay-link network for this project (no provider service involved)
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.RelayNetworkLabel),
+	}).Return(client.NetworkListResult{}, nil)
+
+	api.EXPECT().ContainerList(gomock.Any(), hookFilterListOpt("service1")).Return(client.ContainerListResult{}, nil)
+
+	err = tested.Down(t.Context(), strings.ToLower(testProject), compose.DownOptions{
+		Services: []string{"service1", "not-running-service"},
+	})
+	assert.NilError(t, err)
+	assert.Equal(t, len(jobs.listCalls), 0, "a partial down does not look the jobs up")
+	assert.Equal(t, len(jobs.removeCalls), 0, "a partial down must not remove the project's jobs")
+}
+
 func TestDownWithSpecifiedServiceButTheServicesAreNotRunning(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -381,6 +500,7 @@ func TestDownRemoveOrphans(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -450,6 +570,7 @@ func TestDownRemoveVolumes(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -684,6 +805,7 @@ func TestDownRemoveImagesWithSelectedServices(t *testing.T) {
 			t.Run(fmt.Sprintf("%s/orphans=%t", mode, removeOrphans), func(t *testing.T) {
 				mockCtrl := gomock.NewController(t)
 				apiClient, cli := prepareMocks(mockCtrl)
+				expectNoJobsEngine(apiClient)
 				tested, err := NewComposeService(cli)
 				assert.NilError(t, err)
 
@@ -751,6 +873,7 @@ func TestDownRemoveImages_NoLabel(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -1401,6 +1524,7 @@ func TestDownRemovesRetainedPreStartHookContainers(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 
@@ -1447,6 +1571,7 @@ func TestDownHookContainerRemovalFailureIsNonFatal(t *testing.T) {
 	defer mockCtrl.Finish()
 
 	api, cli := prepareMocks(mockCtrl)
+	expectNoJobsEngine(api)
 	tested, err := NewComposeService(cli)
 	assert.NilError(t, err)
 

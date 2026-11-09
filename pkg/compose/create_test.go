@@ -21,7 +21,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
@@ -166,9 +165,6 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(client.ImageInspectResult{}, nil)
 
 	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
-	sort.Slice(mounts, func(i, j int) bool {
-		return mounts[i].Target < mounts[j].Target
-	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 4)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
@@ -178,9 +174,6 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
 	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
-	sort.Slice(mounts, func(i, j int) bool {
-		return mounts[i].Target < mounts[j].Target
-	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 4)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")

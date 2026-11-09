@@ -90,6 +90,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	if err != nil {
 		return err
 	}
+	s.loadJobsToRemove(ctx, project, projectName, options)
 
 	// keep only the requested services that exist in the model
 	var services []string
@@ -149,6 +150,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 
 	ops := s.ensureNetworksDown(ctx, project, limiter)
 	ops = append(ops, s.ensureRelayLinkNetworksDown(ctx, project, limiter)...)
+	// unlike a network, which stays while a container still uses it, nothing
+	// keeps a job that a partial down must leave alone
+	if len(options.Services) == 0 {
+		ops = append(ops, s.ensureJobsDown(ctx, project)...)
+	}
 
 	if imageProject != nil {
 		ops = append(ops, s.ensureImagesDown(ctx, imageProject, options, limiter)...)

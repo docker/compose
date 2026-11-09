@@ -180,20 +180,33 @@ services:
 	assert.Assert(t, !strings.Contains(fmt.Sprint(err), "invalid ip address"), fmt.Sprint(err))
 }
 
-func TestRejectScheduledJobs(t *testing.T) {
+func TestManualJobNames(t *testing.T) {
 	yes := true
 	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
 	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
 		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
 	}}
 
-	assert.NilError(t, rejectScheduledJobs(&types.Project{}))
-	assert.NilError(t, rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual}}))
-	// profile-disabled scheduled jobs don't block up
-	assert.NilError(t, rejectScheduledJobs(&types.Project{DisabledJobs: types.Jobs{"backup": scheduled}}))
+	assert.DeepEqual(t, manualJobNames(&types.Project{}), []string{})
+	assert.DeepEqual(t, manualJobNames(&types.Project{Jobs: types.Jobs{"backup": scheduled}}), []string{})
+	assert.DeepEqual(t,
+		manualJobNames(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": manual, "migrate": manual}}),
+		[]string{"migrate", "sync"},
+	)
+}
 
-	err := rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": scheduled, "migrate": manual}})
-	assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
+// A project with no service still has something for up to do when a job is
+// scheduled: only then is the "no service selected" error not the right answer.
+func TestHasScheduledJobs(t *testing.T) {
+	yes := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
+	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
+		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+	}}
+
+	assert.Assert(t, !hasScheduledJobs(&types.Project{}))
+	assert.Assert(t, !hasScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual}}))
+	assert.Assert(t, hasScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual, "backup": scheduled}}))
 }
 
 // warnIgnoredJobs must only name profile-enabled jobs: a job disabled by
@@ -203,9 +216,11 @@ func TestRejectScheduledJobs(t *testing.T) {
 func TestWarnIgnoredJobs(t *testing.T) {
 	hook := logrustest.NewGlobal()
 
+	yes := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
 	warnIgnoredJobs(&types.Project{
-		Jobs:         types.Jobs{"migrate": {}},
-		DisabledJobs: types.Jobs{"backup": {}},
+		Jobs:         types.Jobs{"migrate": manual},
+		DisabledJobs: types.Jobs{"backup": manual},
 	})
 
 	assert.Equal(t, len(hook.AllEntries()), 1)

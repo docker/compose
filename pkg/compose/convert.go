@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	compose "github.com/compose-spec/compose-go/v2/types"
@@ -36,6 +37,10 @@ func ToMobyEnv(environment compose.MappingWithEquals) []string {
 			env = append(env, fmt.Sprintf("%s=%s", k, *v))
 		}
 	}
+	// environment is a map: iteration order is random, and Env ends up
+	// marshaled verbatim into the job spec sent to the Engine, whose spec
+	// hash is order-sensitive. Keys are unique, so sorting is safe.
+	slices.Sort(env)
 	return env
 }
 
