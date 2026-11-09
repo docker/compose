@@ -60,6 +60,16 @@ const (
 	//  - The daemon silently ignores HostConfig.Umask, so the container would
 	//    run with the runtime's default umask instead of the requested one
 	apiVersion156 = "1.56"
+
+	// apiVersionJobs is the first Docker Engine API version of an engine
+	// shipping the jobs extension (one-shot and scheduled jobs). The extension
+	// is disabled by default (dockerd --extension-enable org.mobyproject.jobs.v0),
+	// so this version only says it is compiled in: jobsAvailability probes it.
+	//
+	// Before this version, or with the extension disabled:
+	//  - Scheduled jobs cannot be registered, they are refused
+	//  - Manual jobs run as one-off service containers
+	apiVersionJobs = "1.57"
 )
 
 // Docker Engine version strings for user-facing error messages.

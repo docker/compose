@@ -47,7 +47,6 @@ func attestationManifest() image.ManifestSummary {
 	return image.ManifestSummary{ID: "sha256:att", Kind: image.ManifestKindAttestation, Available: true}
 }
 
-//nolint:unparam // the tests of older engines moved to internal/images
 func newTestComposeService(t *testing.T, mockCtrl *gomock.Controller, apiVersion string) (*mocks.MockAPIClient, *composeService) {
 	t.Helper()
 	api, cli := prepareMocks(mockCtrl)

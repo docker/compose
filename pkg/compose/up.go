@@ -53,12 +53,22 @@ func (s *composeService) Up(ctx context.Context, project *types.Project, options
 	detached := options.Start.Attach == nil || (options.Start.Wait && s.dryRun)
 	var created *createdUp
 	err := Run(ctx, tracing.SpanWrapFunc("project/up", tracing.ProjectOptions(ctx, project), func(ctx context.Context) error {
-		if detached {
-			return s.upDetached(ctx, project, options)
+		if err := s.rejectUnsupportedScheduledJobs(ctx, project); err != nil {
+			return err
 		}
 		var err error
-		created, err = s.upCreatePhase(ctx, project, options)
-		return err
+		if detached {
+			err = s.upDetached(ctx, project, options)
+		} else {
+			created, err = s.upCreatePhase(ctx, project, options)
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.registerScheduledJobs(ctx, project); err != nil {
+			return err
+		}
+		return s.handleOrphanJobs(ctx, project, options.Create.RemoveOrphans, options.Create.IgnoreOrphans)
 	}), "up", s.events)
 	if err != nil {
 		return err

@@ -28,6 +28,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/versions"
 	"gotest.tools/v3/icmd"
 )
@@ -674,17 +675,41 @@ func ContainerdImageStore(t testing.TB, c *CLI) string {
 	return ""
 }
 
-// EngineAPIVersionAtLeast requires a minimum Engine API version (for example
-// "1.56"), the unit in which the daemon's features are versioned.
-func EngineAPIVersionAtLeast(minimum string) Requirement {
+// EngineAPIVersionAtLeast requires the API version Compose negotiates with the
+// daemon to be at least the given one, e.g. "1.57".
+func EngineAPIVersionAtLeast(version string) Requirement {
 	return func(t testing.TB, c *CLI) string {
 		t.Helper()
-		version := strings.TrimSpace(c.RunDockerCmd(t, "version", "-f", "{{.Server.APIVersion}}").Stdout())
-		if versions.LessThan(version, minimum) {
-			return fmt.Sprintf("engine API version %s < %s", version, minimum)
+		if v := engineAPIVersion(t, c); versions.LessThan(v, version) {
+			return fmt.Sprintf("engine API version %s < %s", v, version)
 		}
 		return ""
 	}
+}
+
+// EngineAPIVersionBelow requires the API version Compose negotiates with the
+// daemon to be older than the given one, for scenarios pinning the behavior of
+// Compose on an engine that lacks a feature.
+func EngineAPIVersionBelow(version string) Requirement {
+	return func(t testing.TB, c *CLI) string {
+		t.Helper()
+		if v := engineAPIVersion(t, c); !versions.LessThan(v, version) {
+			return fmt.Sprintf("engine API version %s >= %s", v, version)
+		}
+		return ""
+	}
+}
+
+// engineAPIVersion returns the API version Compose negotiates with the daemon:
+// the daemon's, capped at what the client library Compose is built with
+// supports.
+func engineAPIVersion(t testing.TB, c *CLI) string {
+	t.Helper()
+	v := strings.TrimSpace(c.RunDockerCmd(t, "version", "-f", "{{.Server.APIVersion}}").Stdout())
+	if versions.LessThan(client.MaxAPIVersion, v) {
+		return client.MaxAPIVersion
+	}
+	return v
 }
 
 // EngineVersionAtLeast requires a minimum daemon major version.
