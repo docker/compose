@@ -20,6 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"strconv"
 	"sync"
@@ -203,9 +204,17 @@ func TestExecutePlanStopRemoveContainer(t *testing.T) {
 
 // Regression test for docker/compose#14476.
 func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
-	project := &types.Project{Name: "test", Services: types.Services{
-		"web": {Name: "web", PreStop: []types.ServiceHook{{Command: types.ShellCommand{"drain"}}}},
-	}}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStop:       []types.ServiceHook{{Command: types.ShellCommand{"drain"}}},
+	}
+	project := &types.Project{Name: "test", Services: types.Services{"web": service}}
+	webContainer := func(extraLabels map[string]string) container.Summary {
+		labels := map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1"}
+		maps.Copy(labels, extraLabels)
+		return container.Summary{ID: "c1", Names: []string{"/test-web-1"}, State: container.StateRunning, Labels: labels}
+	}
 	stopPlan := func(ctr container.Summary) *Plan {
 		plan := &Plan{}
 		plan.addNode(Operation{
@@ -216,13 +225,52 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 		}, "")
 		return plan
 	}
-	webContainer := func(state container.ContainerState, service string) container.Summary {
-		return container.Summary{
-			ID:     "c1",
-			Names:  []string{"/test-web-1"},
-			State:  state,
-			Labels: map[string]string{api.ServiceLabel: service, api.ContainerNumberLabel: "1"},
-		}
+	// the nodes of a recreate, as reconcile plans them: the replacement is
+	// created under a temporary name before the old container is stopped
+	recreatePlan := func(old container.Summary) *Plan {
+		plan := &Plan{}
+		create := plan.addNode(Operation{
+			Type:       OpCreateContainer,
+			ResourceID: "service:web:1",
+			Cause:      "config changed",
+			Service:    &service,
+			Name:       "abc123456789_test-web-1",
+			Number:     1,
+		}, "")
+		stop := plan.addNode(Operation{
+			Type:       OpStopContainer,
+			ResourceID: "service:web:1",
+			Cause:      fmt.Sprintf("replaced by #%d", create.ID),
+			Container:  &old,
+		}, "", create)
+		remove := plan.addNode(Operation{
+			Type:       OpRemoveContainer,
+			ResourceID: "service:web:1",
+			Cause:      "replaced",
+			Container:  &old,
+		}, "", stop)
+		plan.addNode(Operation{
+			Type:         OpRenameContainer,
+			ResourceID:   "service:web:1",
+			Cause:        "finalize recreate",
+			Name:         "test-web-1",
+			Service:      &service,
+			CreateNodeID: create.ID,
+		}, "", remove)
+		return plan
+	}
+	expectReplacementCreated := func(apiClient *mocks.MockAPIClient) *gomock.Call {
+		apiClient.EXPECT().Ping(gomock.Any(), gomock.Any()).Return(client.PingResult{APIVersion: "1.44"}, nil).AnyTimes()
+		apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
+		apiClient.EXPECT().ContainerCreate(gomock.Any(), gomock.Any()).
+			Return(client.ContainerCreateResult{ID: "new-id"}, nil)
+		return apiClient.EXPECT().ContainerInspect(gomock.Any(), "new-id", gomock.Any()).
+			Return(client.ContainerInspectResult{Container: container.InspectResponse{
+				ID:              "new-id",
+				Name:            "/abc123456789_test-web-1",
+				Config:          &container.Config{},
+				NetworkSettings: &container.NetworkSettings{},
+			}}, nil)
 	}
 	expectHook := func(apiClient *mocks.MockAPIClient, exitCode int) *gomock.Call {
 		serverConn, clientConn := net.Pipe()
@@ -249,7 +297,7 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 		apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
 			Return(client.ContainerStopResult{}, nil).After(hook)
 
-		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(container.StateRunning, "web")))
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(nil)))
 		assert.NilError(t, err)
 	})
 
@@ -257,13 +305,24 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 		svc, apiClient := newTestService(t)
 		expectHook(apiClient, 1)
 
-		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(container.StateRunning, "web")))
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(nil)))
 		assert.ErrorContains(t, err, "web hook exited with status 1")
 	})
 
+	t.Run("a container stopped since the plan was built is still stopped", func(t *testing.T) {
+		svc, apiClient := newTestService(t)
+		exec := apiClient.EXPECT().ExecCreate(gomock.Any(), "c1", gomock.Any()).
+			Return(client.ExecCreateResult{}, conflictError{})
+		apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+			Return(client.ContainerStopResult{}, nil).After(exec)
+
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), stopPlan(webContainer(nil)))
+		assert.NilError(t, err)
+	})
+
 	for name, ctr := range map[string]container.Summary{
-		"a container that is not running has no hook to run":   webContainer(container.StateExited, "web"),
-		"a container of no service of the project has no hook": webContainer(container.StateRunning, "orphan"),
+		"a container of no service of the project has no hook": webContainer(map[string]string{api.ServiceLabel: "orphan"}),
+		"a relay container has no hook":                        webContainer(map[string]string{api.RelayLabel: "relay-identity"}),
 	} {
 		t.Run(name, func(t *testing.T) {
 			svc, apiClient := newTestService(t)
@@ -274,6 +333,31 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 			assert.NilError(t, err)
 		})
 	}
+
+	t.Run("a recreate runs the hook of the replaced container", func(t *testing.T) {
+		svc, apiClient := newTestService(t)
+		created := expectReplacementCreated(apiClient)
+		hook := expectHook(apiClient, 0)
+		hook.After(created)
+		apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
+			Return(client.ContainerStopResult{}, nil).After(hook)
+		apiClient.EXPECT().ContainerRemove(gomock.Any(), "c1", gomock.Any()).
+			Return(client.ContainerRemoveResult{}, nil)
+		apiClient.EXPECT().ContainerRename(gomock.Any(), "new-id", client.ContainerRenameOptions{NewName: "test-web-1"}).
+			Return(client.ContainerRenameResult{}, nil)
+
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), recreatePlan(webContainer(nil)))
+		assert.NilError(t, err)
+	})
+
+	t.Run("a failing hook leaves the replaced container running and its replacement created", func(t *testing.T) {
+		svc, apiClient := newTestService(t)
+		expectReplacementCreated(apiClient)
+		expectHook(apiClient, 1)
+
+		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), recreatePlan(webContainer(nil)))
+		assert.ErrorContains(t, err, "web hook exited with status 1")
+	})
 }
 
 // emptyObservedState returns an ObservedState with no containers/networks/volumes,
