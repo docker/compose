@@ -209,3 +209,54 @@ func TestJobTargetErr(t *testing.T) {
 		assert.Equal(t, err, original)
 	})
 }
+
+func noLookup(string) (string, bool) {
+	return "", false
+}
+
+func Test_getEnvironment(t *testing.T) {
+	t.Run("merges env-from-file with -e, -e takes precedence", func(t *testing.T) {
+		dir := t.TempDir()
+		envFile := filepath.Join(dir, ".env")
+		writeFile(t, envFile, "FOO=from-file\nBAR=from-file\n")
+
+		options := runOptions{
+			environment: []string{"FOO=from-flag"},
+			envFiles:    []string{envFile},
+		}
+		env, err := options.getEnvironment(noLookup)
+		assert.NilError(t, err)
+		assert.Equal(t, env["FOO"], "from-flag")
+		assert.Equal(t, env["BAR"], "from-file")
+	})
+
+	t.Run("missing env-from-file returns an error", func(t *testing.T) {
+		options := runOptions{
+			envFiles: []string{filepath.Join(t.TempDir(), "does-not-exist.env")},
+		}
+		_, err := options.getEnvironment(noLookup)
+		assert.ErrorContains(t, err, "no such file")
+	})
+
+	t.Run("malformed env-from-file returns an error instead of silently dropping variables", func(t *testing.T) {
+		dir := t.TempDir()
+		envFile := filepath.Join(dir, ".env")
+		// a required-variable reference without a default and without the
+		// referenced variable being set fails to parse.
+		writeFile(t, envFile, "FOO=${REQUIRED_VAR:?required variable is missing}\n")
+
+		options := runOptions{
+			environment: []string{"BAR=from-flag"},
+			envFiles:    []string{envFile},
+		}
+		env, err := options.getEnvironment(noLookup)
+		assert.ErrorContains(t, err, "required variable is missing")
+		assert.Assert(t, env == nil)
+	})
+}
+
+func writeFile(t *testing.T, path, content string) {
+	t.Helper()
+	err := os.WriteFile(path, []byte(content), 0o644)
+	assert.NilError(t, err)
+}
