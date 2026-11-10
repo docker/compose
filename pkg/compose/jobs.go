@@ -42,6 +42,7 @@ import (
 	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
 	jobspb "github.com/docker/compose/v5/internal/jobsapi/protogen"
 	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -415,6 +416,8 @@ func (s *composeService) registerScheduledJobs(ctx context.Context, project *typ
 	eg.SetLimit(s.maxConcurrency)
 	for _, name := range names {
 		eg.Go(func() error {
+			eventID := "Job " + name
+			s.events.On(progress.Creating(eventID))
 			job := project.Jobs[name]
 			scoped, err := s.useAPISocket(scopedProjectForJob(project, name, job))
 			if err != nil {
@@ -443,13 +446,24 @@ func (s *composeService) registerScheduledJobs(ctx context.Context, project *typ
 				return err
 			}
 			if s.dryRun {
-				return nil // the jobs gRPC dials the real engine, bypassing the dry-run client
+				// the jobs gRPC dials the real engine, bypassing the dry-run client
+				s.events.On(progress.Created(eventID))
+				return nil
 			}
-			_, err = jc.Create(ctx, &jobsv0.CreateRequest{
+			registered, err := jc.Create(ctx, &jobsv0.CreateRequest{
 				Name: engineJobName(project, name),
 				Spec: spec,
 			})
-			return mapAlreadyExists(err, name, "up")
+			if err != nil {
+				return mapAlreadyExists(err, name, "up")
+			}
+			// an identical job already registered by an earlier up is armed, not created
+			outcome := api.StatusCreated
+			if !registered.Created {
+				outcome = api.StatusRunning
+			}
+			s.events.On(progress.New(eventID, api.Done, outcome))
+			return nil
 		})
 	}
 	return eg.Wait()
@@ -486,9 +500,6 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	if err := refuseScheduledJobOverrides(project, name, job, options); err != nil {
 		return 0, err
 	}
-	if s.dryRun {
-		return 0, nil // the jobs gRPC dials the real engine, see registerScheduledJobs
-	}
 	if options.Name != "" {
 		logrus.Warnf("--name has no effect on a job: the engine names its run containers itself")
 	}
@@ -518,6 +529,15 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 	}
 	if err := s.ensureModels(ctx, project, false); err != nil {
 		return 0, err
+	}
+
+	// The dependencies above went through the dry-run client, the run itself
+	// would dial the real engine: see registerScheduledJobs.
+	if s.dryRun {
+		eventID := "Job " + name
+		s.events.On(progress.Creating(eventID))
+		s.events.On(progress.Created(eventID))
+		return 0, nil
 	}
 
 	svc, err := project.GetService(name)
