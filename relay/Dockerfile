@@ -15,7 +15,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
-ARG GO_VERSION=1.26.10
+ARG GO_VERSION=1.27.3
 ARG GOLANGCI_LINT_VERSION=v2.15.0
 
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
