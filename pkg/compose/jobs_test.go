@@ -221,6 +221,7 @@ type fakeJobsClient struct {
 	mu                sync.Mutex // registerScheduledJobs calls Create concurrently
 	createCalls       []*jobsv0.CreateRequest
 	createErr         error
+	createNoop        bool // an identical job is already registered
 	createAndRunCalls []*jobsv0.CreateAndRunRequest
 	createAndRunReply *jobsv0.CreateAndRunReply
 	createAndRunErr   error
@@ -246,7 +247,7 @@ func (f *fakeJobsClient) Create(_ context.Context, req *jobsv0.CreateRequest) (*
 	if f.createErr != nil {
 		return nil, f.createErr
 	}
-	return &jobsv0.CreateReply{Job: &jobsv0.Job{Name: req.Name}}, nil
+	return &jobsv0.CreateReply{Job: &jobsv0.Job{Name: req.Name}, Created: !f.createNoop}, nil
 }
 
 func (f *fakeJobsClient) CreateAndRun(_ context.Context, req *jobsv0.CreateAndRunRequest) (*jobsv0.CreateAndRunReply, error) {
@@ -488,6 +489,29 @@ func TestRegisterScheduledJobs(t *testing.T) {
 		s.dryRun = true
 		assert.NilError(t, s.registerScheduledJobs(t.Context(), project()))
 		assert.Equal(t, len(fake.createCalls), 0)
+	})
+
+	// Jobs show up in the progress like any other resource, a dry run included:
+	// it is the only way a dry run tells what up and create would do for them.
+	t.Run("each scheduled job reports what happened to it", func(t *testing.T) {
+		for name, tc := range map[string]struct {
+			fake   *fakeJobsClient
+			dryRun bool
+			want   []string
+		}{
+			"registered":         {fake: &fakeJobsClient{}, want: []string{api.StatusCreating, api.StatusCreated}},
+			"already registered": {fake: &fakeJobsClient{createNoop: true}, want: []string{api.StatusCreating, api.StatusRunning}},
+			"dry run":            {fake: &fakeJobsClient{}, dryRun: true, want: []string{api.StatusCreating, api.StatusCreated}},
+		} {
+			t.Run(name, func(t *testing.T) {
+				s := newService(t, tc.fake)
+				events := newRecordingEvents()
+				s.events = events
+				s.dryRun = tc.dryRun
+				assert.NilError(t, s.registerScheduledJobs(t.Context(), project()))
+				assert.DeepEqual(t, events.byID, map[string][]string{"Job backup": tc.want, "Job sync": tc.want})
+			})
+		}
 	})
 }
 
@@ -932,14 +956,32 @@ func TestRunJobDetachAndDryRun(t *testing.T) {
 		assert.ErrorIs(t, err, api.ErrJobsNotSupported)
 	})
 
-	t.Run("a dry run starts nothing on the real engine", func(t *testing.T) {
+	// The dependencies are simulated by the dry-run client like for any service;
+	// the run itself is reported, not started.
+	t.Run("a dry run reports the run and starts nothing on the real engine", func(t *testing.T) {
+		tested, mockAPI := newPreStartTestServiceWithVersion(t, apiVersionJobs)
+		mockAPI.EXPECT().ImageInspect(gomock.Any(), gomock.Any(), gomock.Any()).Return(client.ImageInspectResult{}, nil).AnyTimes()
+		mockAPI.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil).AnyTimes()
+		mockAPI.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil).AnyTimes()
+		mockAPI.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil).AnyTimes()
 		fake := &fakeJobsClient{}
-		tested := newJobsTestService(t, apiVersionJobs, fake)
+		tested.jobsGRPCOnce.Do(func() {})
+		tested.jobsAPI = fake
+		events := newRecordingEvents()
+		tested.events = events
 		tested.dryRun = true
-		code, err := tested.RunJob(t.Context(), scheduledJobsProject(), "migrate", options)
+
+		project := scheduledJobsProject()
+		project.Services = types.Services{"migrate": {Name: "migrate", ContainerSpec: types.ContainerSpec{Image: "alpine"}}}
+		job := project.Jobs["migrate"]
+		job.Image = "alpine"
+		project.Jobs["migrate"] = job
+
+		code, err := tested.RunJob(t.Context(), project, "migrate", options)
 		assert.NilError(t, err)
 		assert.Equal(t, code, 0)
 		assert.Equal(t, len(fake.createAndRunCalls)+len(fake.createCalls)+len(fake.runCalls), 0)
+		assert.DeepEqual(t, events.byID["Job migrate"], []string{api.StatusCreating, api.StatusCreated})
 	})
 }
 
