@@ -183,5 +183,6 @@ func runBuild(ctx context.Context, dockerCli command.Cli, backendOptions *Backen
 	}
 	apiBuildOptions.Attestations = true
 
-	return backend.Build(ctx, project, apiBuildOptions)
+	err = backend.Build(ctx, project, apiBuildOptions)
+	return jobTargetErrOr(ctx, dockerCli, opts.ProjectOptions, services, err)
 }

@@ -27,6 +27,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/mock/gomock"
@@ -129,6 +130,16 @@ func TestJobChangedErr(t *testing.T) {
 		`job "migrate" has changed: run `+"`docker compose down`"+` to remove it, then `+"`run`"+` again`)
 }
 
+func TestManualTriggerDisabledErr(t *testing.T) {
+	assert.Error(t, ManualTriggerDisabledErr("rotation"),
+		`job "rotation" is declared with manual: false, it cannot be run manually`)
+}
+
+// scopedProjectForJob is what lets registerScheduledJobs run a scheduled
+// job through the same useAPISocket/ensureImagesExists/ensureModels passes
+// a manually-run job gets for free from materializeManualJob — without the
+// job ever joining the real project.Services the reconciliation loop
+// iterates over.
 func TestScopedProjectForJob(t *testing.T) {
 	project := &types.Project{
 		Name:             "myproject",
@@ -200,20 +211,32 @@ func TestScopedProjectForJob(t *testing.T) {
 	})
 }
 
-// fakeJobsClient is a minimal jobsv0.Jobs double: only the methods a test
-// exercises are implemented, every other one is left to the embedded nil
-// interface — calling one would panic, which is exactly the loud failure a
-// test relying on it deserves.
+// fakeJobsClient is a minimal jobsv0.Jobs double for createJobRun's routing:
+// only Create/Run/CreateAndRun are ever exercised by RunJob, so every other
+// method is left to the embedded nil interface — calling one would panic,
+// which is exactly the loud failure a test relying on it deserves.
 type fakeJobsClient struct {
 	jobsv0.Jobs
 
-	mu          sync.Mutex // registerScheduledJobs calls Create concurrently
-	createCalls []*jobsv0.CreateRequest
-	createErr   error
-	listCalls   []*jobsv0.ListRequest
-	listReply   *jobsv0.ListReply
-	listErr     error
-	removeCalls []*jobsv0.RemoveRequest
+	mu                sync.Mutex // registerScheduledJobs calls Create concurrently
+	createCalls       []*jobsv0.CreateRequest
+	createErr         error
+	createAndRunCalls []*jobsv0.CreateAndRunRequest
+	createAndRunReply *jobsv0.CreateAndRunReply
+	createAndRunErr   error
+	runCalls          []*jobsv0.RunRequest
+	runReply          *jobsv0.RunReply
+	runErr            error
+	listCalls         []*jobsv0.ListRequest
+	listReply         *jobsv0.ListReply
+	listErr           error
+	waitCalls         []*jobsv0.WaitRequest
+	waitReply         *jobsv0.WaitReply
+	waitErr           error
+	removeCalls       []*jobsv0.RemoveRequest
+	cancelCalls       []*jobsv0.CancelRequest
+	cancelErr         error
+	removeErr         error
 }
 
 func (f *fakeJobsClient) Create(_ context.Context, req *jobsv0.CreateRequest) (*jobsv0.CreateReply, error) {
@@ -226,11 +249,31 @@ func (f *fakeJobsClient) Create(_ context.Context, req *jobsv0.CreateRequest) (*
 	return &jobsv0.CreateReply{Job: &jobsv0.Job{Name: req.Name}}, nil
 }
 
+func (f *fakeJobsClient) CreateAndRun(_ context.Context, req *jobsv0.CreateAndRunRequest) (*jobsv0.CreateAndRunReply, error) {
+	f.createAndRunCalls = append(f.createAndRunCalls, req)
+	return f.createAndRunReply, f.createAndRunErr
+}
+
+func (f *fakeJobsClient) Run(_ context.Context, req *jobsv0.RunRequest) (*jobsv0.RunReply, error) {
+	f.runCalls = append(f.runCalls, req)
+	return f.runReply, f.runErr
+}
+
 func (f *fakeJobsClient) Remove(_ context.Context, req *jobsv0.RemoveRequest) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.removeCalls = append(f.removeCalls, req)
-	return nil
+	return f.removeErr
+}
+
+func (f *fakeJobsClient) Cancel(_ context.Context, req *jobsv0.CancelRequest) (*jobsv0.CancelReply, error) {
+	f.cancelCalls = append(f.cancelCalls, req)
+	return &jobsv0.CancelReply{}, f.cancelErr
+}
+
+func (f *fakeJobsClient) Wait(_ context.Context, req *jobsv0.WaitRequest) (*jobsv0.WaitReply, error) {
+	f.waitCalls = append(f.waitCalls, req)
+	return f.waitReply, f.waitErr
 }
 
 func (f *fakeJobsClient) List(_ context.Context, req *jobsv0.ListRequest) (*jobsv0.ListReply, error) {
@@ -242,6 +285,58 @@ func (f *fakeJobsClient) List(_ context.Context, req *jobsv0.ListRequest) (*jobs
 		return &jobsv0.ListReply{}, nil
 	}
 	return f.listReply, nil
+}
+
+// createJobRun routes on the job's declared trigger, not on how it happens
+// to be invoked: the engine's CreateAndRun refuses a schedule-trigger spec
+// outright ("create-and-run serves manual jobs only"), because registering
+// a cron must never imply an immediate run. A manual-trigger job (the
+// opt-out default included) still goes through CreateAndRun unchanged.
+func TestCreateJobRun(t *testing.T) {
+	s := &composeService{}
+	project := &types.Project{Name: "myproject"}
+	spec := &jobsv0.JobSpec{}
+
+	t.Run("a manual-trigger job uses CreateAndRun", func(t *testing.T) {
+		yes := true
+		job := types.JobConfig{Name: "migrate", Triggers: &types.TriggerConfig{Manual: &yes}}
+		fake := &fakeJobsClient{createAndRunReply: &jobsv0.CreateAndRunReply{Run: &jobsv0.Run{ID: "run-1", JobID: "job-1"}}}
+
+		run, err := s.createJobRun(t.Context(), fake, project, "migrate", job, spec)
+		assert.NilError(t, err)
+		assert.Equal(t, run.ID, "run-1")
+		assert.Equal(t, len(fake.createAndRunCalls), 1)
+		assert.Equal(t, fake.createAndRunCalls[0].Name, "myproject.migrate")
+		assert.Equal(t, len(fake.createCalls), 0, "a manual job must never call Create")
+		assert.Equal(t, len(fake.runCalls), 0, "a manual job must never call the schedule-job Run path")
+	})
+
+	t.Run("a scheduled job is Run as registered, never Created or CreateAndRun", func(t *testing.T) {
+		job := types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{
+			Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+		}}
+		fake := &fakeJobsClient{runReply: &jobsv0.RunReply{Run: &jobsv0.Run{ID: "run-2", JobID: "job-2"}}}
+
+		run, err := s.createJobRun(t.Context(), fake, project, "backup", job, nil)
+		assert.NilError(t, err)
+		assert.Equal(t, run.ID, "run-2")
+		assert.Equal(t, len(fake.runCalls), 1)
+		assert.Equal(t, fake.runCalls[0].JobRef, "myproject.backup")
+		assert.Assert(t, !fake.runCalls[0].Reschedule, "a manual fire must add to the cron cadence, not replace its next occurrence")
+		assert.Equal(t, len(fake.createCalls)+len(fake.createAndRunCalls), 0, "Create would arm the schedule of a job up never registered")
+	})
+
+	t.Run("a scheduled job the engine does not know says up comes first", func(t *testing.T) {
+		job := types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{
+			Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+		}}
+		fake := &fakeJobsClient{runErr: status.Error(codes.NotFound, "no such job")}
+
+		_, err := s.createJobRun(t.Context(), fake, project, "backup", job, nil)
+		assert.ErrorContains(t, err, `job "backup" is not registered with the engine`)
+		assert.ErrorContains(t, err, "docker compose up")
+		assert.Equal(t, len(fake.createCalls), 0)
+	})
 }
 
 // TestBuildJobSpecIsDeterministic guards against the spec hash churning
@@ -465,6 +560,144 @@ func TestCreateHandlesOrphanJobs(t *testing.T) {
 	})
 }
 
+// A scheduled job runs as `up` registered it: what `run` was asked to change in
+// it, on the command line, would not reach the engine, so it is refused rather
+// than ignored. The cmd layer applies -v and -p to the service itself.
+func TestScheduledJobOverrides(t *testing.T) {
+	job := types.JobConfig{
+		Name:          "backup",
+		Triggers:      &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}},
+		ContainerSpec: types.ContainerSpec{Image: "alpine", Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Target: "/data"}}},
+		WorkloadSpec:  types.WorkloadSpec{Ports: []types.ServicePortConfig{{Target: 80}}},
+	}
+	project := &types.Project{Name: "prj"}
+	declared := JobAsService(project, "backup", job)
+
+	assert.Equal(t, len(scheduledJobOverrides(api.RunOptions{}, declared, job)), 0, "a run with no option is the job as registered")
+
+	got := scheduledJobOverrides(api.RunOptions{
+		Command:     []string{"sh"},
+		Entrypoint:  []string{"/bin/sh"},
+		User:        "root",
+		WorkingDir:  "/tmp",
+		Environment: []string{"X=1"},
+		CapAdd:      []string{"NET_ADMIN"},
+		CapDrop:     []string{"ALL"},
+		Labels:      types.Labels{"a": "b"},
+	}, declared, job)
+	assert.DeepEqual(t, got, []string{"a command", "--entrypoint", "--user", "--workdir", "--env/--env-from-file", "--cap-add", "--cap-drop", "--label"})
+
+	changed := declared
+	changed.Volumes = append(slices.Clone(declared.Volumes), types.ServiceVolumeConfig{Type: types.VolumeTypeBind, Source: "/a", Target: "/b"})
+	changed.Ports = []types.ServicePortConfig{{Target: 443}}
+	assert.DeepEqual(t, scheduledJobOverrides(api.RunOptions{}, changed, job), []string{"--volume", "--publish"})
+}
+
+func TestRunJobRefusesOverridesOfAScheduledJob(t *testing.T) {
+	project := scheduledJobsProject()
+	project.Services["backup"] = JobAsService(project, "backup", project.Jobs["backup"])
+	fake := &fakeJobsClient{}
+
+	_, err := newJobsTestService(t, apiVersionJobs, fake).RunJob(t.Context(), project, "backup",
+		api.RunOptions{Service: "backup", Environment: []string{"X=1"}, User: "root"})
+
+	assert.ErrorContains(t, err, `scheduled job "backup" runs as registered by up`)
+	assert.ErrorContains(t, err, "--user, --env")
+	assert.Equal(t, len(fake.createCalls)+len(fake.createAndRunCalls)+len(fake.runCalls), 0)
+}
+
+// A manual job does not outlive its run: removed from the engine, its spec is
+// not held against the next `run`, which may carry other options. The run
+// containers stay, Remove keeps the history.
+func TestEndJobRun(t *testing.T) {
+	s := &composeService{}
+
+	t.Run("a manual job is removed once its run is over", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		s.endJobRun(t.Context(), fake, "migrate", "job-1", true)
+		assert.Equal(t, len(fake.removeCalls), 1)
+		assert.Equal(t, fake.removeCalls[0].JobRef, "job-1")
+		assert.Equal(t, len(fake.cancelCalls), 0)
+	})
+
+	t.Run("an interrupted run is cancelled, then its job removed", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		ctx, interrupt := context.WithCancel(t.Context())
+		interrupt()
+		s.endJobRun(ctx, fake, "migrate", "job-1", true)
+		assert.Equal(t, len(fake.cancelCalls), 1)
+		assert.Equal(t, len(fake.removeCalls), 1, "the context is done, the removal still goes through")
+	})
+
+	t.Run("a scheduled job stays registered", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		s.endJobRun(t.Context(), fake, "backup", "job-2", false)
+		assert.Equal(t, len(fake.removeCalls), 0)
+	})
+
+	t.Run("a job already gone is not worth a word, a failure is", func(t *testing.T) {
+		out := captureWarnings(t)
+		s.endJobRun(t.Context(), &fakeJobsClient{removeErr: status.Error(codes.NotFound, "no such job")}, "migrate", "job-1", true)
+		assert.Equal(t, out.String(), "")
+
+		s.endJobRun(t.Context(), &fakeJobsClient{removeErr: errors.New("engine unreachable")}, "migrate", "job-1", true)
+		assert.Assert(t, strings.Contains(out.String(), "engine unreachable"), out.String())
+	})
+}
+
+// Interrupting `run` only detaches its Wait: the engine keeps running the job
+// unless it is told to stop, so an interrupted run cancels its run, even though
+// the context that carried the interruption is already done.
+func TestCancelInterruptedJobRun(t *testing.T) {
+	t.Run("a run that ended on its own is left alone", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		cancelInterruptedJobRun(t.Context(), fake, "migrate", "job-1")
+		assert.Equal(t, len(fake.cancelCalls), 0)
+	})
+
+	t.Run("an interrupted run is cancelled", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		ctx, interrupt := context.WithCancel(t.Context())
+		interrupt()
+		cancelInterruptedJobRun(ctx, fake, "migrate", "job-1")
+		assert.Equal(t, len(fake.cancelCalls), 1)
+		assert.Equal(t, fake.cancelCalls[0].JobRef, "job-1")
+	})
+
+	t.Run("a failed cancel is reported, the job keeps running", func(t *testing.T) {
+		warnings := captureWarnings(t)
+		fake := &fakeJobsClient{cancelErr: errors.New("engine unreachable")}
+		ctx, interrupt := context.WithCancel(t.Context())
+		interrupt()
+		cancelInterruptedJobRun(ctx, fake, "migrate", "job-1")
+		assert.Assert(t, strings.Contains(warnings.String(), "engine unreachable"), warnings.String())
+	})
+}
+
+// The engine drops a scheduled job's container as soon as a run succeeds; a
+// manual job's is kept so RunJob can read its logs. The policy is a function of
+// the job alone: `run` must send a scheduled job exactly the spec up registered.
+func TestBuildJobSpecRemoveOnSuccess(t *testing.T) {
+	s, _ := newPreStartTestService(t)
+	project := &types.Project{Name: "myproject"}
+	svc := types.ServiceConfig{Name: "backup", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	manual := true
+
+	for name, tc := range map[string]struct {
+		job  types.JobConfig
+		want bool
+	}{
+		"manual":    {job: types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{Manual: &manual}}, want: false},
+		"scheduled": {job: types.JobConfig{Name: "backup", Triggers: &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}}}, want: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			spec, err := s.buildJobSpec(t.Context(), project, svc, tc.job, false)
+			assert.NilError(t, err)
+			assert.Equal(t, spec.RemoveOnSuccess, tc.want)
+		})
+	}
+}
+
 // scheduledJobsProject declares one scheduled and one manual job next to a
 // service, the shape the degraded-mode tests below run against.
 func scheduledJobsProject() *types.Project {
@@ -638,6 +871,37 @@ func TestScheduledJobsRefusedWithoutJobsEngine(t *testing.T) {
 	}
 }
 
+// RunJob reports the missing engine support with a sentinel before doing any
+// work, so the CLI can fall back to running the job like a one-off service:
+// the error says why. An extension that is enabled but not ready is not
+// missing support, it is a failure: no sentinel, no fallback.
+func TestRunJobWithoutJobsEngine(t *testing.T) {
+	run := func(t *testing.T, version string, listErr error) error {
+		t.Helper()
+		tested := newJobsTestService(t, version, &fakeJobsClient{listErr: listErr})
+		_, err := tested.RunJob(t.Context(), scheduledJobsProject(), "migrate", api.RunOptions{Service: "migrate"})
+		return err
+	}
+
+	t.Run("API predates jobs", func(t *testing.T) {
+		err := run(t, noJobsEngine, nil)
+		assert.ErrorIs(t, err, api.ErrJobsNotSupported)
+		assert.ErrorContains(t, err, "API version "+noJobsEngine)
+	})
+
+	t.Run("extension off", func(t *testing.T) {
+		err := run(t, apiVersionJobs, jobsExtensionOffErr)
+		assert.ErrorIs(t, err, api.ErrJobsNotSupported)
+		assert.ErrorContains(t, err, "--extension-enable org.mobyproject.jobs.v0")
+	})
+
+	t.Run("extension not ready", func(t *testing.T) {
+		err := run(t, apiVersionJobs, jobsExtensionNotReadyErr)
+		assert.ErrorIs(t, err, errJobsExtensionNotReady)
+		assert.Assert(t, !errors.Is(err, api.ErrJobsNotSupported), "no sentinel: the CLI must not degrade to a one-off")
+	})
+}
+
 // captureWarnings captures what the code under test tells the user.
 func captureWarnings(t *testing.T) *bytes.Buffer {
 	t.Helper()
@@ -645,6 +909,38 @@ func captureWarnings(t *testing.T) *bytes.Buffer {
 	logrus.SetOutput(&buf)
 	t.Cleanup(func() { logrus.SetOutput(os.Stderr) })
 	return &buf
+}
+
+// A job runs until it is done and its run is not simulated by a dry run: the
+// jobs gRPC dials the real engine, bypassing the dry-run client.
+func TestRunJobDetachAndDryRun(t *testing.T) {
+	options := api.RunOptions{Service: "migrate"}
+
+	t.Run("a job cannot be detached", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		options := options
+		options.Detach = true
+		_, err := newJobsTestService(t, apiVersionJobs, fake).RunJob(t.Context(), scheduledJobsProject(), "migrate", options)
+		assert.ErrorContains(t, err, "--detach is not supported for a job")
+		assert.Equal(t, len(fake.createAndRunCalls), 0)
+	})
+
+	t.Run("a degraded run keeps honouring detach: it is a one-off service", func(t *testing.T) {
+		options := options
+		options.Detach = true
+		_, err := newJobsTestService(t, noJobsEngine, &fakeJobsClient{}).RunJob(t.Context(), scheduledJobsProject(), "migrate", options)
+		assert.ErrorIs(t, err, api.ErrJobsNotSupported)
+	})
+
+	t.Run("a dry run starts nothing on the real engine", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		tested := newJobsTestService(t, apiVersionJobs, fake)
+		tested.dryRun = true
+		code, err := tested.RunJob(t.Context(), scheduledJobsProject(), "migrate", options)
+		assert.NilError(t, err)
+		assert.Equal(t, code, 0)
+		assert.Equal(t, len(fake.createAndRunCalls)+len(fake.createCalls)+len(fake.runCalls), 0)
+	})
 }
 
 // Down only talks to the engine's jobs registry when the engine has one.
@@ -673,11 +969,13 @@ func TestDownJobsWithoutJobsEngine(t *testing.T) {
 		assert.Assert(t, strings.Contains(out.String(), jobsExtensionNotReady), out.String())
 	})
 
-	t.Run("with the extension every declared job is removed from the engine", func(t *testing.T) {
+	// a manual job left behind by a `run` that was killed before it could remove
+	// it goes too, with the others
+	t.Run("with the extension the jobs are removed from the engine", func(t *testing.T) {
 		fake := &fakeJobsClient{}
 		tested := newJobsTestService(t, apiVersionJobs, fake)
 		ops := tested.ensureJobsDown(t.Context(), project)
-		assert.Equal(t, len(ops), len(project.Jobs))
+		assert.Equal(t, len(ops), 3)
 		for _, op := range ops {
 			assert.NilError(t, op())
 		}
@@ -687,6 +985,17 @@ func TestDownJobsWithoutJobsEngine(t *testing.T) {
 		}
 		slices.Sort(refs)
 		assert.DeepEqual(t, refs, []string{"prj.backup", "prj.migrate", "prj.sync"})
+	})
+
+	// without a compose file the jobs come from the engine's registry, with no
+	// trigger to tell: all of them go
+	t.Run("a job known by its name only is removed", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		tested := newJobsTestService(t, apiVersionJobs, fake)
+		ops := tested.ensureJobsDown(t.Context(), &types.Project{Name: "prj", Jobs: types.Jobs{"old": {Name: "old"}}})
+		assert.Equal(t, len(ops), 1)
+		assert.NilError(t, ops[0]())
+		assert.Equal(t, fake.removeCalls[0].JobRef, "prj.old")
 	})
 
 	t.Run("a dry run removes nothing from the real engine", func(t *testing.T) {
@@ -732,6 +1041,107 @@ func TestActualJobs(t *testing.T) {
 		got := newJobsTestService(t, apiVersionJobs, fake).actualJobs(t.Context(), "prj")
 		assert.DeepEqual(t, sortedJobNames(got, nil), []string{"backup", "sync"})
 	})
+}
+
+// The engine removes a quick job's container, logs included, as soon as it
+// succeeds: losing them must be said, anything else going wrong while
+// following them stays a debug detail.
+func TestReportJobLogsError(t *testing.T) {
+	t.Run("a container gone before its logs were read is a warning", func(t *testing.T) {
+		out := captureWarnings(t)
+		reportJobLogsError("backup", errdefs.ErrNotFound.WithMessage("No such container: abc"))
+		assert.Assert(t, strings.Contains(out.String(), "level=warning"), out.String())
+		assert.Assert(t, strings.Contains(out.String(), "its logs are gone"), out.String())
+	})
+
+	t.Run("any other error stays silent", func(t *testing.T) {
+		out := captureWarnings(t)
+		reportJobLogsError("backup", errors.New("stream reset"))
+		assert.Equal(t, out.String(), "")
+	})
+}
+
+// Failing to remove a manual job's kept container is worth a warning, not a
+// failed run.
+func TestRemoveJobRunContainer(t *testing.T) {
+	removal := client.ContainerRemoveOptions{RemoveVolumes: true}
+
+	t.Run("removes the run container", func(t *testing.T) {
+		mockAPI, tested := newTestComposeService(t, gomock.NewController(t), apiVersionJobs)
+		mockAPI.EXPECT().ContainerRemove(gomock.Any(), "abc", removal).Return(client.ContainerRemoveResult{}, nil)
+		tested.removeJobRunContainer(t.Context(), "backup", "abc")
+	})
+
+	t.Run("a failed removal is a warning", func(t *testing.T) {
+		out := captureWarnings(t)
+		mockAPI, tested := newTestComposeService(t, gomock.NewController(t), apiVersionJobs)
+		mockAPI.EXPECT().ContainerRemove(gomock.Any(), "abc", removal).Return(client.ContainerRemoveResult{}, errors.New("boom"))
+		tested.removeJobRunContainer(t.Context(), "backup", "abc")
+		assert.Assert(t, strings.Contains(out.String(), "level=warning"), out.String())
+		assert.Assert(t, strings.Contains(out.String(), "abc"), out.String())
+	})
+}
+
+func TestRunContainerID(t *testing.T) {
+	t.Run("a container already created is used without waiting", func(t *testing.T) {
+		fake := &fakeJobsClient{}
+		id, err := runContainerID(t.Context(), fake, &jobsv0.Run{ID: "r1", ContainerID: "abc"})
+		assert.NilError(t, err)
+		assert.Equal(t, id, "abc")
+		assert.Equal(t, len(fake.waitCalls), 0)
+	})
+
+	t.Run("a container not created yet is awaited by waiting for the run to leave pending", func(t *testing.T) {
+		fake := &fakeJobsClient{waitReply: &jobsv0.WaitReply{Run: &jobsv0.Run{ContainerID: "def"}}}
+		id, err := runContainerID(t.Context(), fake, &jobsv0.Run{ID: "r1", JobID: "j1"})
+		assert.NilError(t, err)
+		assert.Equal(t, id, "def")
+		assert.Equal(t, len(fake.waitCalls), 1)
+		assert.Equal(t, fake.waitCalls[0].Condition, jobsv0.WaitConditionRunning)
+		assert.Equal(t, fake.waitCalls[0].RunRef, "r1")
+	})
+
+	t.Run("a run with no container says why its output is missing", func(t *testing.T) {
+		out := captureWarnings(t)
+		fake := &fakeJobsClient{waitReply: &jobsv0.WaitReply{}}
+		id, err := runContainerID(t.Context(), fake, &jobsv0.Run{ID: "r1", JobID: "j1"})
+		assert.NilError(t, err)
+		assert.Equal(t, id, "")
+		assert.Assert(t, strings.Contains(out.String(), "r1"), out.String())
+		assert.Assert(t, strings.Contains(out.String(), "no container"), out.String())
+	})
+
+	t.Run("a wait failure is returned", func(t *testing.T) {
+		fake := &fakeJobsClient{waitErr: status.Error(codes.NotFound, "no such run")}
+		_, err := runContainerID(t.Context(), fake, &jobsv0.Run{ID: "r1"})
+		assert.Assert(t, errdefs.IsNotFound(err), err)
+	})
+}
+
+// run ends with the exit code a one-off container's exit status would give.
+func TestJobRunExit(t *testing.T) {
+	for name, tc := range map[string]struct {
+		run     *jobsv0.Run
+		code    int
+		wantErr string
+	}{
+		"succeeded":                {run: &jobsv0.Run{State: jobsv0.RunStateSucceeded}},
+		"failed with an exit code": {run: &jobsv0.Run{State: jobsv0.RunStateFailed, ExitCode: &jobsv0.ExitCode{Value: 3}}, code: 3},
+		"failed without exit code": {run: &jobsv0.Run{ID: "r1", State: jobsv0.RunStateFailed, Error: "oom"}, code: 1, wantErr: `job "backup" run r1 failed: oom`},
+		"timed out":                {run: &jobsv0.Run{State: jobsv0.RunStateTimedOut}, code: 124, wantErr: `job "backup" timed out`},
+		"cancelled":                {run: &jobsv0.Run{State: jobsv0.RunStateCancelled}, code: 130, wantErr: `job "backup" was cancelled`},
+		"unexpected state":         {run: &jobsv0.Run{ID: "r2", State: "bogus"}, code: 1, wantErr: `job "backup" run r2 ended in unexpected state "bogus"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			code, err := jobRunExit("backup", tc.run)
+			assert.Equal(t, code, tc.code)
+			if tc.wantErr == "" {
+				assert.NilError(t, err)
+			} else {
+				assert.Error(t, err, tc.wantErr)
+			}
+		})
+	}
 }
 
 func strPtr(s string) *string { return &s }
