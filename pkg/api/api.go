@@ -176,6 +176,23 @@ type ImageManager interface {
 type Runner interface {
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
+	// RunJob triggers a Run of the job on the engine's jobs API, starts its
+	// dependencies first, streams the logs and returns the Run's exit code
+	// (124 on timeout, 130 when cancelled). A manual job goes through
+	// CreateAndRun; a scheduled job is run as `up` or `create` registered it: an
+	// override in options, or a job the engine does not know, is an error. The job must already be in
+	// project.Services, the way the CLI materializes it, and options.Service
+	// must be name. options carries the same CLI overrides RunOneOffContainer
+	// accepts (User, Command, Entrypoint, WorkingDir, CapAdd/CapDrop,
+	// Environment, Labels, NoDeps). Name has no effect: the jobs API assigns the
+	// run container's identity itself. A manual job is registered under the
+	// project and job name and removed when its run ends, so concurrent runs of
+	// the same manual job are not supported: the first to end cancels the others.
+	// Detach is refused, a run is waited for;
+	// a dry run starts the dependencies and stops there. When the engine cannot
+	// run jobs, the error wraps ErrJobsNotSupported and nothing was done, so the
+	// caller can fall back to RunOneOffContainer.
+	RunJob(ctx context.Context, project *types.Project, name string, options RunOptions) (int, error)
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, projectName string, options RunOptions) (int, error)
 	// Attach STDIN,STDOUT,STDERR to a running service container

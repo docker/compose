@@ -7,6 +7,12 @@ jobs:
   migrate:
     image: alpine
     command: sh -c 'echo "migration done"'
+    # run is invoked twice below and must build the identical spec hash each time
+    environment:
+      A: "1"
+      B: "2"
+      C: "3"
+      D: "4"
     triggers:
       manual: true
     depends_on:

@@ -65,6 +65,9 @@ var (
 	// ErrInvalidOption is returned when an option is set to a value it does
 	// not accept. See InvalidOptionError.
 	ErrInvalidOption = errors.New("invalid option")
+
+	// ErrJobsNotSupported is returned when a job operation requires an engine with usable jobs support (the jobs API and its extension enabled)
+	ErrJobsNotSupported = errors.New("jobs are not supported by the engine")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound

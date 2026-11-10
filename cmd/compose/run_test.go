@@ -17,13 +17,24 @@
 package compose
 
 import (
+	"bytes"
+	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/docker/cli/cli"
+	cliopts "github.com/docker/cli/opts"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 func TestMaterializeManualJob(t *testing.T) {
@@ -150,6 +161,45 @@ func TestMaterializeManualJob(t *testing.T) {
 // error, ...) must not trigger that retry, since it would only duplicate
 // side effects (remote include: fetches, unsupported-attribute warnings)
 // before falling through to the same, unrecoverable error anyway.
+// `run` publishes no port by default, but a scheduled job runs with the ports it
+// was registered with: clearing them would make the spec differ from the one
+// `up` registered, and the engine refuse it.
+func TestRunOptionsApplyJobPorts(t *testing.T) {
+	yes := true
+	ports := []types.ServicePortConfig{{Target: 80, Published: "18080"}}
+	project := func() *types.Project {
+		return &types.Project{
+			Services: types.Services{"db": {Name: "db"}},
+			Jobs: types.Jobs{
+				"backup": {
+					Name:          "backup",
+					Triggers:      &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}},
+					ContainerSpec: types.ContainerSpec{Image: "alpine"},
+					WorkloadSpec:  types.WorkloadSpec{Ports: ports},
+				},
+				"migrate": {
+					Name:          "migrate",
+					Triggers:      &types.TriggerConfig{Manual: &yes},
+					ContainerSpec: types.ContainerSpec{Image: "alpine"},
+					WorkloadSpec:  types.WorkloadSpec{Ports: ports},
+				},
+			},
+		}
+	}
+	portsAfter := func(t *testing.T, options runOptions) []types.ServicePortConfig {
+		t.Helper()
+		applied, err := options.apply(project())
+		assert.NilError(t, err)
+		return applied.Services[options.Service].Ports
+	}
+
+	assert.DeepEqual(t, portsAfter(t, runOptions{Service: "backup"}), ports)
+	assert.Equal(t, len(portsAfter(t, runOptions{Service: "migrate"})), 0, "a manual job is run like a service")
+	published := portsAfter(t, runOptions{Service: "backup", publish: []string{"9090:80"}})
+	assert.Equal(t, len(published), 1)
+	assert.Equal(t, published[0].Published, "9090", "--publish still replaces them")
+}
+
 func TestIsNoSuchServiceErr(t *testing.T) {
 	assert.Assert(t, isNoSuchServiceErr(errors.New("no such service: migrate")))
 	assert.Assert(t, !isNoSuchServiceErr(errors.New("interpolation error: bad substitution")))
@@ -207,5 +257,114 @@ func TestJobTargetErr(t *testing.T) {
 		err, replaced := jobTargetErr(t.Context(), nil, opts, []string{"migrate"}, original)
 		assert.Assert(t, !replaced)
 		assert.Equal(t, err, original)
+	})
+}
+
+// run targets a job through the engine's jobs API when it has one, and
+// degrades to a one-off service container, exactly like a service run, when
+// it does not.
+func TestRunRunJob(t *testing.T) {
+	yes := true
+	newProject := func() *types.Project {
+		return &types.Project{
+			Name:     "prj",
+			Services: types.Services{},
+			Jobs: types.Jobs{"migrate": {
+				Name:          "migrate",
+				Triggers:      &types.TriggerConfig{Manual: &yes},
+				ContainerSpec: types.ContainerSpec{Image: "migrator"},
+			}},
+		}
+	}
+	run := func(t *testing.T, ctrl *gomock.Controller, backend api.Compose) error {
+		t.Helper()
+		return runRun(t.Context(), backend, newProject(),
+			runOptions{composeOptions: &composeOptions{ProjectOptions: &ProjectOptions{}}, Service: "migrate", noTty: true, capAdd: cliopts.NewListOpts(nil), capDrop: cliopts.NewListOpts(nil)},
+			createOptions{}, buildOptions{ProjectOptions: &ProjectOptions{}}, mocks.NewMockCli(ctrl))
+	}
+
+	t.Run("an engine with the jobs API runs the job through it", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, nil)
+		assert.NilError(t, run(t, ctrl, backend))
+	})
+
+	t.Run("a failing job reports its exit code", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(3, nil)
+		err := run(t, ctrl, backend)
+		var statusErr cli.StatusError
+		assert.Assert(t, errors.As(err, &statusErr), err)
+		assert.Equal(t, statusErr.StatusCode, 3)
+	})
+
+	t.Run("an engine without the jobs API runs the job like a one-off service", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, api.ErrJobsNotSupported)
+		backend.EXPECT().RunOneOffContainer(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, project *types.Project, opts api.RunOptions) (int, error) {
+				assert.Equal(t, opts.Service, "migrate")
+				_, materialized := project.Services["migrate"]
+				assert.Assert(t, materialized, "the job must be materialized as a service")
+				return 0, nil
+			})
+		assert.NilError(t, run(t, ctrl, backend))
+	})
+
+	// apply keeps the ports a scheduled job registered with, for the engine to
+	// run it as registered: a one-off service publishes none by default
+	t.Run("the fallback does not publish the ports of a scheduled job", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "backup", gomock.Any()).Return(0, api.ErrJobsNotSupported)
+		backend.EXPECT().RunOneOffContainer(gomock.Any(), gomock.Any(), gomock.Any()).
+			DoAndReturn(func(_ context.Context, project *types.Project, _ api.RunOptions) (int, error) {
+				assert.Equal(t, len(project.Services["backup"].Ports), 0)
+				return 0, nil
+			})
+		project := &types.Project{
+			Name:     "prj",
+			Services: types.Services{"db": {Name: "db"}},
+			Jobs: types.Jobs{"backup": {
+				Name:          "backup",
+				Triggers:      &types.TriggerConfig{Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}}},
+				ContainerSpec: types.ContainerSpec{Image: "alpine"},
+				WorkloadSpec:  types.WorkloadSpec{Ports: []types.ServicePortConfig{{Target: 80, Published: "18080"}}},
+			}},
+		}
+		options := runOptions{
+			composeOptions: &composeOptions{ProjectOptions: &ProjectOptions{}}, Service: "backup", noTty: true,
+			capAdd: cliopts.NewListOpts(nil), capDrop: cliopts.NewListOpts(nil),
+		}
+		assert.NilError(t, runRun(t.Context(), backend, project, options, createOptions{},
+			buildOptions{ProjectOptions: &ProjectOptions{}}, mocks.NewMockCli(ctrl)))
+	})
+
+	t.Run("the fallback warns with the reason the engine cannot run the job", func(t *testing.T) {
+		var out bytes.Buffer
+		logrus.SetOutput(&out)
+		t.Cleanup(func() { logrus.SetOutput(os.Stderr) })
+
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl)
+		reason := fmt.Errorf("%w: start dockerd with --extension-enable org.mobyproject.jobs.v0", api.ErrJobsNotSupported)
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, reason)
+		backend.EXPECT().RunOneOffContainer(gomock.Any(), gomock.Any(), gomock.Any()).Return(0, nil)
+		assert.NilError(t, run(t, ctrl, backend))
+
+		assert.Assert(t, strings.Contains(out.String(), "level=warning"), out.String())
+		assert.Assert(t, strings.Contains(out.String(), "--extension-enable org.mobyproject.jobs.v0"), out.String())
+		assert.Assert(t, strings.Contains(out.String(), "migrate"), out.String())
+	})
+
+	t.Run("an engine whose jobs extension is not ready fails instead of degrading", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		backend := mocks.NewMockCompose(ctrl) // no RunOneOffContainer expectation: degrading would fail the test
+		notReady := errors.New("the engine's jobs extension is enabled but not ready")
+		backend.EXPECT().RunJob(gomock.Any(), gomock.Any(), "migrate", gomock.Any()).Return(0, notReady)
+		assert.ErrorIs(t, run(t, ctrl, backend), notReady)
 	})
 }
