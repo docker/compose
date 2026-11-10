@@ -17,6 +17,7 @@ package compose
 
 import (
 	"context"
+	"fmt"
 	"maps"
 	"slices"
 
@@ -46,6 +47,9 @@ func applyReplicas(project *types.Project, replicas map[string]int) error {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err
+		}
+		if scale < 0 {
+			return fmt.Errorf("invalid replica count %d for service %q: must be a non-negative integer", scale, name)
 		}
 		service.SetScale(scale)
 		project.Services[name] = service

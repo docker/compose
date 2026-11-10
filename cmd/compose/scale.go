@@ -100,6 +100,9 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 	if err != nil {
 		return err
 	}
+	if replicas < 0 {
+		return fmt.Errorf("invalid replica count %d for service %q: must be a non-negative integer", replicas, name)
+	}
 	service.SetScale(replicas)
 	project.Services[name] = service
 	return nil
@@ -115,6 +118,9 @@ func parseServicesReplicasArgs(args []string) (map[string]int, error) {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
 			return nil, fmt.Errorf("invalid scale specifier: can't parse replica value as int: %v", arg)
+		}
+		if intValue < 0 {
+			return nil, fmt.Errorf("invalid scale specifier: replica count must be a non-negative integer: %s", arg)
 		}
 		serviceReplicaTuples[key] = intValue
 	}

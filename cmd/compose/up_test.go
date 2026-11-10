@@ -82,6 +82,14 @@ func TestApplyScaleOpt(t *testing.T) {
 
 	err = applyScaleOpts(&p, []string{"=2"})
 	assert.Error(t, err, `invalid --scale option "=2". Should be SERVICE=NUM`)
+
+	err = applyScaleOpts(&p, []string{"foo=-1"})
+	assert.Error(t, err, `invalid --scale option "foo=-1": replica count must be a non-negative integer`)
+}
+
+func TestParseServicesReplicasArgs(t *testing.T) {
+	_, err := parseServicesReplicasArgs([]string{"foo=-1"})
+	assert.ErrorContains(t, err, "replica count must be a non-negative integer")
 }
 
 func TestUpOptions_OnExit(t *testing.T) {
