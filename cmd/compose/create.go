@@ -224,6 +224,9 @@ func applyScaleOpts(project *types.Project, opts []string) error {
 		if err != nil {
 			return err
 		}
+		if replicas < 0 {
+			return fmt.Errorf("invalid --scale option %q: replica count must be a non-negative integer", scale)
+		}
 		err = setServiceScale(project, name, replicas)
 		if err != nil {
 			return err
