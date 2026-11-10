@@ -149,6 +149,21 @@ func TestUpRejectsScheduledJobsWithExtensionOff(t *testing.T) {
 			ServiceNotCreated("web"))
 }
 
+// Manual execution never needs the engine's help: without usable jobs support
+// run degrades to a one-off service, scheduled jobs included, and says so.
+func TestRunJobWithoutJobsExtension(t *testing.T) {
+	NewScenario(t, "run must execute a job as a one-off service, with a warning, when the engine cannot run jobs").
+		Requires(JobsExtensionDisabled).
+		Step("a manual job runs as a one-off service and the warning says so",
+			ComposeCmd("run", "--rm", "migrate"),
+			StderrContains("as a one-off service"),
+			OutputContains("migration done")).
+		Step("a scheduled job launched by hand degrades the same way",
+			ComposeCmd("run", "--rm", "backup"),
+			StderrContains("as a one-off service"),
+			OutputContains("backup done"))
+}
+
 // Without usable jobs support the engine has no job of the project to
 // remove: down must not turn that into an error nor into noise.
 func TestDownWithoutJobsExtension(t *testing.T) {
@@ -177,6 +192,47 @@ func TestUpRegistersScheduledJobs(t *testing.T) {
 			ComposeCmd("up", "-d"),
 			ServiceState("web", "running"),
 			Eventually(ServiceState("backup", "exited"), 90*time.Second))
+}
+
+// run must build the exact same spec `up` already registered a scheduled
+// job with: CreateAndRun refuses schedule-trigger jobs outright, so run
+// routes through Create (idempotent on SpecHash) then Run instead. A run
+// invocation carries CLI/terminal-context defaults (Tty, StdinOpen,
+// ContainerName) that up's own registration never does — if those leaked
+// into the spec sent to Create, this would spuriously conflict with the
+// job up already registered, even though nothing in the compose file
+// changed.
+func TestRunAlreadyRegisteredScheduledJob(t *testing.T) {
+	NewScenario(t, "run must not conflict with a scheduled job up already registered with the identical spec").
+		Requires(JobsExtensionEnabled).
+		Step("up registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		// no output check: the engine removes a scheduled job's container, logs
+		// included, as soon as it succeeds, so its output may never be readable
+		Step("run fires it manually without a SpecHash conflict",
+			ComposeCmd("run", "--rm", "backup")).
+		// --no-deps narrows the dependencies the run waits for, not the ones the
+		// registered spec declares
+		Step("run --no-deps does not conflict either",
+			ComposeCmd("run", "--rm", "--no-deps", "backup")).
+		// the registered job runs as it is: an override would not reach it
+		Step("run refuses an override rather than ignoring it",
+			ComposeCmd("run", "-e", "X=1", "backup").MayFail(),
+			StderrContains("scheduled job \"backup\" runs as registered by up"))
+}
+
+// run must not register a job: Create would arm its schedule, which up alone
+// decides.
+func TestRunUnregisteredScheduledJob(t *testing.T) {
+	NewScenario(t, "run must refuse a scheduled job up never registered, and leave it unregistered").
+		Requires(JobsExtensionEnabled).
+		Step("run says that up comes first",
+			ComposeCmd("run", "backup").MayFail(),
+			StderrContains("is not registered with the engine")).
+		Step("the job was not registered by the failed run",
+			ComposeCmd("up", "-d"),
+			OutputContains("Job backup Created"))
 }
 
 // up --no-start stops after creating the containers, and must still register
@@ -227,9 +283,17 @@ func TestRunManualJob(t *testing.T) {
 			ComposeCmd("run", "--rm", "migrate"),
 			OutputContains("migration done"),
 			ServiceState("db", "running")).
-		Step("a scheduled job without explicit opt-out can be run manually",
-			ComposeCmd("run", "--rm", "backup"),
-			OutputContains("backup")).
+		Step("re-running the same manual job with several env vars must not conflict on spec hash",
+			ComposeCmd("run", "--rm", "migrate"),
+			OutputContains("migration done")).
+		// the engine holds a job to the spec it was registered with: a manual
+		// job is removed after its run, so another run may carry other options
+		Step("a manual job can be run again with other options",
+			ComposeCmd("run", "--rm", "-e", "EXTRA=1", "migrate"),
+			OutputContains("migration done")).
+		// a scheduled job is run as up registered it: TestRunAlreadyRegisteredScheduledJob
+		// and TestRunUnregisteredScheduledJob, and TestRunJobWithoutJobsExtension
+		// without the extension
 		Step("manual: false explicitly forbids manual execution",
 			ComposeCmd("run", "--rm", "rotation").MayFail(),
 			StderrContains(`job "rotation" is declared with manual: false`))
@@ -278,6 +342,15 @@ func TestCreateRefusesJob(t *testing.T) {
 	NewScenario(t, "create must refuse a job by name, naming run as the right command").
 		Step("create fails naming the job",
 			ComposeCmd("create", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
+// up shares WithServices with create: the same translation must apply there too.
+func TestUpRefusesJob(t *testing.T) {
+	NewScenario(t, "up must refuse a job by name, naming run as the right command").
+		Step("up fails naming the job",
+			ComposeCmd("up", "-d", "migrate").MayFail(),
 			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
 			ServiceNotCreated("migrate"))
 }

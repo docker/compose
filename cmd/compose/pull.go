@@ -106,7 +106,7 @@ func runPull(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 
 	project, _, err := opts.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, cli.WithoutEnvironmentResolution)
 	if err != nil {
-		return err
+		return jobTargetErrOr(ctx, dockerCli, opts.ProjectOptions, services, err)
 	}
 
 	project, err = opts.apply(project, services)

@@ -48,6 +48,9 @@ var (
 	// ErrIncompatibleOptions is returned when a set of options that cannot be
 	// honored together is requested. See IncompatibleOptionsError.
 	ErrIncompatibleOptions = errors.New("incompatible options")
+
+	// ErrJobsNotSupported is returned when a job operation requires an engine with usable jobs support (the jobs API and its extension enabled)
+	ErrJobsNotSupported = errors.New("jobs are not supported by the engine")
 )
 
 // IsNotFoundError returns true if the unwrapped error is ErrNotFound

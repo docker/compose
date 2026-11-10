@@ -1,0 +1,12 @@
+jobs:
+  migrate:
+    image: alpine
+    command: sh -c 'echo "migration done"'
+    triggers:
+      manual: true
+  backup:
+    image: alpine
+    command: echo backup done
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"
