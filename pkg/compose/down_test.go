@@ -512,7 +512,7 @@ func TestEnsureVolumesDown_SkipsVolumeNotOwnedByProject(t *testing.T) {
 	apiClient.EXPECT().VolumeRemove(gomock.Any(), "own-data", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
 	// no VolumeRemove expectation for shared-data and unlabeled-data — a call for either fails the test
 
-	for _, op := range svc.ensureVolumesDown(t.Context(), project, nil) {
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, nil, nil) {
 		assert.NilError(t, op())
 	}
 
@@ -557,7 +557,7 @@ func TestEnsureVolumesDown_KeepsVolumeWhenInspectFails(t *testing.T) {
 		Return(client.VolumeInspectResult{}, errors.New("engine unavailable"))
 	// no VolumeRemove expectation — a call for prj-data fails the test
 
-	ops := svc.ensureVolumesDown(t.Context(), project, nil)
+	ops := svc.ensureVolumesDown(t.Context(), project, nil, nil)
 	assert.Equal(t, len(ops), 1)
 	assert.Error(t, ops[0](), "failed to inspect volume prj-data: engine unavailable")
 }
@@ -1512,4 +1512,48 @@ func runningOneOff(service, id string) container.Summary {
 	c := testContainer(service, id, true)
 	c.State = container.StateRunning
 	return c
+}
+
+// TestEnsureVolumesDown_KeepsVolumesOfServicesStayingUp guards #14448:
+// `down -v web` removes web and its dependents, so the named volumes of the
+// services it leaves alone -- including a db that web depends_on -- must
+// survive. They were being removed whenever the dependency's container was
+// already gone.
+func TestEnsureVolumesDown_KeepsVolumesOfServicesStayingUp(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	svcIface, err := NewComposeService(cli, WithEventProcessor(&capturingEvents{}))
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{
+		Name: "prj",
+		Services: types.Services{
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "webcache", Target: "/cache"},
+				},
+			}},
+			"db": {Name: "db", ContainerSpec: types.ContainerSpec{
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeVolume, Source: "dbdata", Target: "/data"},
+				},
+			}},
+		},
+		Volumes: types.Volumes{
+			"webcache": {Name: "prj_webcache"},
+			"dbdata":   {Name: "prj_dbdata"},
+		},
+	}
+
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "prj_webcache", gomock.Any()).
+		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "prj_webcache", Labels: map[string]string{compose.ProjectLabel: "prj"}}}, nil)
+	apiClient.EXPECT().VolumeRemove(gomock.Any(), "prj_webcache", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
+	// no VolumeInspect or VolumeRemove expectation for prj_dbdata -- db stays, so a call for it fails the test
+
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, []string{"web"}, nil) {
+		assert.NilError(t, op())
+	}
 }

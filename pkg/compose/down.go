@@ -155,7 +155,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, project, limiter)...)
+		downProject, err := project.WithSelectedServices(options.Services, types.IncludeDependents)
+		if err != nil {
+			return err
+		}
+		ops = append(ops, s.ensureVolumesDown(ctx, project, downProject.ServiceNames(), limiter)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -176,10 +180,39 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
+// volumesHeldByRemainingServices returns the project volume keys still mounted
+// by a service this down is not removing. `down -v web` only removes web and
+// its dependents, so the data volumes of everything left standing must survive
+// -- including a db that web depends_on, whose volume was being deleted
+// whenever its container was already gone (#14448). Removing every service
+// holds nothing back, so a plain `down -v` is unaffected.
+func volumesHeldByRemainingServices(project *types.Project, removing []string) map[string]bool {
+	going := make(map[string]bool, len(removing))
+	for _, name := range removing {
+		going[name] = true
+	}
+	held := map[string]bool{}
+	for _, service := range project.Services {
+		if going[service.Name] {
+			continue
+		}
+		for _, mount := range service.Volumes {
+			if mount.Type == types.VolumeTypeVolume && mount.Source != "" {
+				held[mount.Source] = true
+			}
+		}
+	}
+	return held
+}
+
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, removing []string, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
-	for _, vol := range project.Volumes {
+	held := volumesHeldByRemainingServices(project, removing)
+	for key, vol := range project.Volumes {
 		if vol.External {
+			continue
+		}
+		if held[key] {
 			continue
 		}
 		volumeName := vol.Name
