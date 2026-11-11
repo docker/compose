@@ -19,6 +19,7 @@ package remote
 import (
 	"cmp"
 	"encoding/json"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -353,6 +354,16 @@ func TestWriteCacheEntryManifestRefusesAnArtifactWhichHasTheDirectory(t *testing
 	assert.ErrorContains(t, err, "invalid OCI artifact")
 }
 
+// A failure of the host to make the directory, which is no fault of the artifact,
+// is reported as it is, not as an invalid artifact.
+func TestWriteCacheEntryManifestReportsAFailureOfTheHostAsIs(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "missing")
+
+	err := writeCacheEntryManifest(dir, []byte(`{"schemaVersion":2}`))
+	assert.ErrorIs(t, err, fs.ErrNotExist)
+	assert.Assert(t, !strings.Contains(err.Error(), "invalid OCI artifact"), err.Error())
+}
+
 // An artifact which has a file named as the directory that holds the manifest of
 // its entry, which its annotations let it choose, is refused whole, and nothing of
 // it is cached: it can't make an entry of what it wrote.
@@ -399,6 +410,25 @@ func entryNames(entries []os.DirEntry) []string {
 		names = append(names, e.Name())
 	}
 	return names
+}
+
+// A document with no media type is an index when it has a list of manifests,
+// which a "manifests" of null is not.
+func TestIsIndexDocumentWithNoMediaType(t *testing.T) {
+	for name, tt := range map[string]struct {
+		content string
+		want    bool
+	}{
+		"a list of manifests": {`{"manifests":[]}`, true},
+		"no manifests":        {`{"schemaVersion":2}`, false},
+		"null manifests":      {`{"manifests":null}`, false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got, err := isIndexDocument(spec.Descriptor{Digest: digest.FromString(tt.content)}, []byte(tt.content))
+			assert.NilError(t, err)
+			assert.Equal(t, got, tt.want)
+		})
+	}
 }
 
 // What the registry reports as the media type of a manifest is not authenticated,

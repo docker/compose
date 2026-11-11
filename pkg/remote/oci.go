@@ -21,6 +21,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -241,7 +242,9 @@ func isIndexDocument(descriptor spec.Descriptor, content []byte) (bool, error) {
 	if err := json.Unmarshal(content, &document); err != nil {
 		return false, fmt.Errorf("invalid manifest %s: %w", descriptor.Digest, err)
 	}
-	isIndex := images.IsIndexType(document.MediaType) || (document.MediaType == "" && document.Manifests != nil)
+	// a "manifests" of null is no more a list of manifests than no "manifests" is
+	hasManifests := document.Manifests != nil && string(document.Manifests) != "null"
+	isIndex := images.IsIndexType(document.MediaType) || (document.MediaType == "" && hasManifests)
 	reported := descriptor.MediaType
 	if (images.IsIndexType(reported) || images.IsManifestType(reported)) && images.IsIndexType(reported) != isIndex {
 		return false, fmt.Errorf("manifest %s is reported as %s, which it is not", descriptor.Digest, reported)
@@ -273,12 +276,15 @@ func cacheEntryDir(cache string, dgst digest.Digest) string {
 }
 
 // writeCacheEntryManifest puts the manifest in the directory extracted in dir,
-// which fails when the artifact has a file of the name of the directory that
-// holds it.
+// which fails as an invalid artifact when it has a file of the name of the
+// directory that holds it, and as it does for any other failure of the host.
 func writeCacheEntryManifest(dir string, manifest []byte) error {
 	holder := filepath.Join(dir, cacheEntryManifestDir)
 	if err := os.Mkdir(holder, 0o700); err != nil {
-		return fmt.Errorf("invalid OCI artifact: %w", err)
+		if errors.Is(err, fs.ErrExist) {
+			return fmt.Errorf("invalid OCI artifact: %w", err)
+		}
+		return err
 	}
 	return os.WriteFile(filepath.Join(holder, cacheEntryManifestFile), manifest, 0o600)
 }
