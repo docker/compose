@@ -63,6 +63,26 @@ func TestScaleWithDepsCases(t *testing.T) {
 			ServiceScale("db", 1))
 }
 
+// Regression test for scale recreating containers with empty anonymous volumes,
+// the bug #14357 fixed for run.
+func TestScaleInheritsAnonymousVolumes(t *testing.T) {
+	NewScenario(t, "scale must keep the anonymous volumes of the containers it recreates, as up does").
+		Step("up starts the services",
+			ComposeCmd("up", "-d").WithEnv("TAG=one"),
+			ServiceState("dep", "running")).
+		Step("data lands in the dependency's anonymous volume",
+			ComposeCmd("exec", "dep", "sh", "-c", "echo kept > /data/marker")).
+		Step("scaling a service recreates its diverged dependency, which still sees that data",
+			ComposeCmd("scale", "app=2").WithEnv("TAG=two"),
+			ServiceScale("app", 2),
+			Recreated("dep"),
+			ExecOutputContains("dep", "cat /data/marker", "kept")).
+		Step("scaling a diverged service recreates it, and it still sees that data",
+			ComposeCmd("scale", "dep=1").WithEnv("TAG=three"),
+			Recreated("dep"),
+			ExecOutputContains("dep", "cat /data/marker", "kept"))
+}
+
 func TestScaleUpAndDownPreserveContainerNumber(t *testing.T) {
 	NewScenario(t, "scaling down then up must reuse replica numbers instead of drifting").
 		Step("up creates replicas #1 and #2",
