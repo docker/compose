@@ -175,7 +175,12 @@ func (o *ProjectOptions) WithServices(dockerCli command.Cli, fn ProjectServicesF
 
 		project, metrics, err := o.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes, cli.WithoutEnvironmentResolution)
 		if err != nil {
-			return err
+			// a service name among services can genuinely be a declared job:
+			// every WithServices caller has nothing to act on for it, so
+			// report that clearly instead of the raw "no such service" — same
+			// translation projectOrName already centralizes for its own callers
+			// (start/stop/down/...).
+			return jobTargetErrOr(ctx, dockerCli, o, services, err)
 		}
 
 		ctx = context.WithValue(ctx, tracing.MetricsKey{}, metrics)

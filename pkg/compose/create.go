@@ -68,7 +68,16 @@ type createConfigs struct {
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
 	return Run(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, options)
+		if err := s.rejectUnsupportedScheduledJobs(ctx, project); err != nil {
+			return err
+		}
+		if err := s.create(ctx, project, options); err != nil {
+			return err
+		}
+		if err := s.registerScheduledJobs(ctx, project); err != nil {
+			return err
+		}
+		return s.handleOrphanJobs(ctx, project, options.RemoveOrphans, options.IgnoreOrphans)
 	}, "create", s.events)
 }
 
@@ -164,11 +173,22 @@ func (s *composeService) preparePlan(ctx context.Context, project *types.Project
 	// requested services get created too
 	warnIgnoredFileReferences(project, project.ServiceNames())
 
-	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
+	// A kept job run container (RemoveOnFailure: false) has no matching
+	// service by design — it's not something the user forgot to clean up, so
+	// it shouldn't trigger this warning. It's still a real orphan for
+	// reconcileOrphans (down/up --remove-orphans can sweep it), so the
+	// exclusion is scoped to this warning's own name list, not observed.Orphans.
+	var nonJobOrphans []string
+	for _, o := range observed.Orphans {
+		if !isJobRun(o.Summary) {
+			nonJobOrphans = append(nonJobOrphans, o.Name)
+		}
+	}
+	if len(nonJobOrphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
 		logrus.Warnf("Found orphan containers (%s) for this project. If "+
 			"you removed or renamed this service in your compose "+
 			"file, you can run this command with the "+
-			"--remove-orphans flag to clean it up.", observed.orphanNames())
+			"--remove-orphans flag to clean it up.", strings.Join(nonJobOrphans, ", "))
 	}
 
 	reconcileOptions := toReconcileOptions(options)
@@ -434,6 +454,11 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		dnsIPs = append(dnsIPs, dnsIP)
 	}
 
+	// Same ordering requirement as ToMobyEnv: AsList's map iteration order
+	// is random, and this ends up in the job spec hash.
+	extraHosts := service.ExtraHosts.AsList(":")
+	slices.Sort(extraHosts)
+
 	hostConfig := container.HostConfig{
 		AutoRemove:     options.AutoRemove,
 		Annotations:    service.Annotations,
@@ -456,7 +481,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		DNS:            dnsIPs,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
-		ExtraHosts:     service.ExtraHosts.AsList(":"),
+		ExtraHosts:     extraHosts,
 		SecurityOpt:    securityOpts,
 		StorageOpt:     service.StorageOpt,
 		UsernsMode:     container.UsernsMode(service.UserNSMode),
@@ -883,6 +908,11 @@ func toUlimits(m map[string]*types.UlimitsConfig) []*container.Ulimit {
 			Soft: int64(soft),
 		})
 	}
+	// Same ordering requirement as ToMobyEnv: m is a map, so iteration
+	// order is random, and this ends up in the job spec hash.
+	slices.SortFunc(ulimits, func(a, b *container.Ulimit) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 	return ulimits
 }
 
@@ -1220,6 +1250,12 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	for _, v := range mounts {
 		values = append(values, v)
 	}
+	// Same ordering requirement as ToMobyEnv: mounts is keyed by target
+	// path, so iteration order is random, and this ends up in the job
+	// spec hash.
+	slices.SortFunc(values, func(a, b mount.Mount) int {
+		return strings.Compare(a.Target, b.Target)
+	})
 	return values, nil
 }
 

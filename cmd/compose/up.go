@@ -20,9 +20,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"maps"
 	"os"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -139,7 +137,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 
 			up.resolveNavigationMenu(dockerCli)
 
-			if !p.All && len(project.Services) == 0 {
+			if !p.All && len(project.Services) == 0 && !hasScheduledJobs(project) {
 				return errors.New("no service selected")
 			}
 
@@ -236,9 +234,6 @@ func runUp(
 		return err
 	}
 
-	if err := rejectScheduledJobs(project); err != nil {
-		return err
-	}
 	warnIgnoredJobs(project)
 
 	err := createOptions.Apply(project)
@@ -296,7 +291,9 @@ func runUp(
 
 	var consumer api.LogConsumer
 	var attach []string
-	if !upOptions.Detach {
+	// a project with no service, only scheduled jobs to register, has nothing
+	// to follow: attaching would pick up the containers of the jobs' runs
+	if !upOptions.Detach && len(project.Services) > 0 {
 		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 
 		attach, err = upOptions.attachedServices(project, services)
@@ -361,30 +358,43 @@ func (opts upOptions) attachedServices(project *types.Project, services []string
 	return attachSet.Elements(), nil
 }
 
-// warnIgnoredJobs names the declared jobs up will not act on: manual jobs
-// wait for an explicit `compose run <job>` trigger.
+// warnIgnoredJobs names the declared manual jobs up will not act on: they
+// wait for an explicit `compose run <job>` trigger. Scheduled jobs are not
+// ignored — they are registered with the engine (see pkg/compose Up).
 func warnIgnoredJobs(project *types.Project) {
-	jobs := project.Jobs
-	if len(jobs) == 0 {
+	names := manualJobNames(project)
+	if len(names) == 0 {
 		return
 	}
-	names := slices.Sorted(maps.Keys(jobs))
 	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
 }
 
-// rejectScheduledJobs refuses to bring a project up when it declares active
-// scheduled jobs: silently not scheduling them would break the user's
-// expectations, unlike manual jobs which simply wait for an explicit trigger.
-func rejectScheduledJobs(project *types.Project) error {
+// manualJobNames returns the sorted names of the project's jobs that up
+// leaves untouched: a job with a schedule is registered with the engine
+// (see pkg/compose Up), so only jobs without one wait for an explicit
+// `compose run <job>` trigger — unless they opt out with `manual: false`.
+func manualJobNames(project *types.Project) []string {
 	names := make([]string, 0, len(project.Jobs))
 	for name, job := range project.Jobs {
-		if job.Triggers != nil && len(job.Triggers.Schedule) > 0 {
-			names = append(names, name)
+		if compose.HasSchedule(job) {
+			continue
 		}
-	}
-	if len(names) == 0 {
-		return nil
+		if compose.ManualTriggerDisabled(job) {
+			continue
+		}
+		names = append(names, name)
 	}
 	sort.Strings(names)
-	return fmt.Errorf("scheduled jobs are not supported in this version: %s", strings.Join(names, ", "))
+	return names
+}
+
+// hasScheduledJobs reports whether up has jobs to register, which is enough to
+// run on a project that has no service.
+func hasScheduledJobs(project *types.Project) bool {
+	for _, job := range project.Jobs {
+		if compose.HasSchedule(job) {
+			return true
+		}
+	}
+	return false
 }

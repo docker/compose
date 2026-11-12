@@ -92,8 +92,13 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 	target.Tty = !options.noTty
 	target.StdinOpen = options.interactive
 
+	// A scheduled job runs with the ports it was registered with, unless
+	// --publish says otherwise: clearing them would make its spec differ from the
+	// one `up` registered, which the engine refuses.
+	keepPorts := options.servicePorts || keepsJobPorts(project, options)
+
 	// --service-ports and --publish are incompatible
-	if !options.servicePorts {
+	if !keepPorts {
 		if len(target.Ports) > 0 {
 			logrus.Debug("Running service without ports exposed as --service-ports=false")
 		}
@@ -122,6 +127,14 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 		}
 	}
 	return project, nil
+}
+
+// keepsJobPorts tells whether run leaves the ports of the job as declared: a
+// scheduled job runs as registered, unless --publish says otherwise, and
+// --service-ports asks for them.
+func keepsJobPorts(project *types.Project, options runOptions) bool {
+	job, isJob := project.AllJobs()[options.Service]
+	return isJob && compose.HasSchedule(job) && !options.servicePorts && len(options.publish) == 0
 }
 
 func (options runOptions) getEnvironment(resolve func(string) (string, bool)) (types.Mapping, error) {
@@ -365,6 +378,17 @@ func jobTargetErr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions,
 	return err, false
 }
 
+// jobTargetErrOr applies jobTargetErr's translation to err when it matches,
+// and returns err unchanged otherwise — the wrap every caller loading a
+// project outside WithServices/projectOrName's own centralized handling
+// (build, pull, push) needs around its own selection error.
+func jobTargetErrOr(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, names []string, err error) error {
+	if jobErr, replaced := jobTargetErr(ctx, dockerCli, p, names, err); replaced {
+		return jobErr
+	}
+	return err
+}
+
 func runRun(ctx context.Context, backend api.Compose, project *types.Project, options runOptions, createOpts createOptions, buildOpts buildOptions, dockerCli command.Cli) error {
 	project, err := options.apply(project)
 	if err != nil {
@@ -435,9 +459,31 @@ func runRun(ctx context.Context, backend api.Compose, project *types.Project, op
 		Index:             0,
 	}
 
+	if _, ok := project.AllJobs()[options.Service]; ok {
+		exitCode, err := backend.RunJob(ctx, project, options.Service, runOpts)
+		// An engine without usable jobs support runs the job like a one-off
+		// service: fall through, the job is already materialized as one.
+		if !errors.Is(err, api.ErrJobsNotSupported) {
+			if exitCode != 0 {
+				errMsg := ""
+				if err != nil {
+					errMsg = err.Error()
+				}
+				return cli.StatusError{StatusCode: exitCode, Status: errMsg, Cause: err}
+			}
+			return err
+		}
+		logrus.Warnf("%v: running %q as a one-off service", err, options.Service)
+	}
+
 	for name, service := range project.Services {
 		if name == options.Service {
 			service.StdinOpen = options.interactive
+			// apply kept the ports of a scheduled job for the engine to run it as
+			// registered; a one-off service publishes none unless asked to
+			if keepsJobPorts(project, options) {
+				service.Ports = []types.ServicePortConfig{}
+			}
 			project.Services[name] = service
 		}
 	}
@@ -472,8 +518,8 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	if !ok {
 		return project, nil
 	}
-	if job.Triggers != nil && job.Triggers.Manual != nil && !*job.Triggers.Manual {
-		return nil, fmt.Errorf("job %q is declared with manual: false, it cannot be run manually", name)
+	if compose.ManualTriggerDisabled(job) {
+		return nil, compose.ManualTriggerDisabledErr(name)
 	}
 	project, err := project.WithSelectedJob(name)
 	if err != nil {
@@ -488,7 +534,7 @@ func materializeManualJob(project *types.Project, name string) (*types.Project, 
 	if err := materializeJobClosure(project, jobs, job, map[string]bool{name: true}); err != nil {
 		return nil, err
 	}
-	project.Services[name] = jobAsService(project, name, job)
+	project.Services[name] = compose.JobAsService(project, name, job)
 	return project, nil
 }
 
@@ -509,39 +555,13 @@ func materializeJobClosure(project *types.Project, jobs types.Jobs, job types.Jo
 		if !isJob {
 			continue
 		}
-		if depJob.Triggers != nil && depJob.Triggers.Manual != nil && !*depJob.Triggers.Manual {
+		if compose.ManualTriggerDisabled(depJob) {
 			return fmt.Errorf("job %q is declared with manual: false, it cannot be triggered even as a dependency of another job", dep)
 		}
 		if err := materializeJobClosure(project, jobs, depJob, seen); err != nil {
 			return err
 		}
-		project.Services[dep] = jobAsService(project, dep, depJob)
+		project.Services[dep] = compose.JobAsService(project, dep, depJob)
 	}
 	return nil
-}
-
-// jobAsService materializes a job as a service for the one-off machinery: a
-// job is a ContainerSpec+WorkloadSpec, the same layers a service is made of.
-// It carries the standard custom labels the loader stamps on every service —
-// materialization happens after loading, so without them the containers
-// created for a dependency job would be invisible to every label-driven
-// path: start would silently skip them, ps/down would not see them, and the
-// dependency wait would report the job as a missing dependency.
-func jobAsService(project *types.Project, name string, job types.JobConfig) types.ServiceConfig {
-	svc := types.ServiceConfig{
-		Name:          name,
-		Profiles:      job.Profiles,
-		Extensions:    job.Extensions,
-		ContainerSpec: job.ContainerSpec,
-		WorkloadSpec:  job.WorkloadSpec,
-	}
-	svc.CustomLabels = types.Labels{
-		api.ProjectLabel:     project.Name,
-		api.ServiceLabel:     name,
-		api.VersionLabel:     api.ComposeVersion,
-		api.WorkingDirLabel:  project.WorkingDir,
-		api.ConfigFilesLabel: strings.Join(project.ComposeFiles, ","),
-		api.OneoffLabel:      "False",
-	}
-	return svc
 }

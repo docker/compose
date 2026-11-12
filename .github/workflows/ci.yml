@@ -186,7 +186,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}, ${{ matrix.store }})
+    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}, ${{ matrix.store }}${{ matrix.name-suffix }})
     strategy:
       fail-fast: false
       matrix:
@@ -226,6 +226,16 @@ jobs:
             version: type=image,tag=28
             channel: oldstable
             store: graphdriver
+
+          # first engine shipping the jobs extension (disabled by default, not
+          # stable yet): the jobs scenarios needing it only run here
+          - mode: plugin
+            engine: 29-jobs
+            version: type=archive,version=29.10.0-rc.1,channel=test
+            channel: test
+            store: graphdriver
+            daemon-extra: ', "extensions": {"enable": ["org.mobyproject.jobs.v0"]}'
+            name-suffix: ', jobs extension'
     steps:
       - name: Prepare
         run: |
@@ -244,7 +254,7 @@ jobs:
           # the e2e framework forwards DOCKER_HOST to the commands it runs
           set-host: true
           daemon-config: |
-            {"features": {"containerd-snapshotter": ${{ matrix.store == 'containerd' }}}}
+            {"features": {"containerd-snapshotter": ${{ matrix.store == 'containerd' }}}${{ matrix.daemon-extra }}}
 
       - name: Check Docker Version
         run: docker version

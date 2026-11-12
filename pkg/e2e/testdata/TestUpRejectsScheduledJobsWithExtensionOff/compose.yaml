@@ -1,0 +1,12 @@
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  backup:
+    image: alpine
+    command: echo backup
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"

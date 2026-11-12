@@ -19,17 +19,258 @@
 package e2e
 
 import (
+	"strings"
 	"testing"
+	"time"
+
+	extensionclient "github.com/moby/extensions/client"
+	"github.com/moby/moby/client"
+	"github.com/moby/moby/client/pkg/versions"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
+	jobspb "github.com/docker/compose/v5/internal/jobsapi/protogen"
 )
 
-// Scheduled jobs cannot run in this version: silently not scheduling them
-// would break the user's expectations, so up must refuse the whole project.
+// jobsAPIVersion is the first engine API version shipping the jobs
+// extension, see apiVersionJobs in pkg/compose/api_versions.go, which it must
+// follow. The extension is disabled by default, so this version does not mean
+// jobs are usable. Below it, or with the extension disabled, Compose degrades:
+// manual jobs run as one-off services and scheduled jobs are refused.
+const jobsAPIVersion = "1.57"
+
+// JobsExtensionEnabled requires the daemon's jobs extension to be enabled and
+// ready: dockerd started with --extension-enable org.mobyproject.jobs.v0.
+func JobsExtensionEnabled(t testing.TB, c *CLI) string {
+	t.Helper()
+	if !jobsExtensionActive(t, c) {
+		return "the engine's jobs extension is not enabled"
+	}
+	return ""
+}
+
+// JobsExtensionDisabled requires the daemon to have no usable jobs extension:
+// either its API predates jobs or the extension is not enabled.
+func JobsExtensionDisabled(t testing.TB, c *CLI) string {
+	t.Helper()
+	if jobsExtensionActive(t, c) {
+		return "the engine's jobs extension is enabled"
+	}
+	return ""
+}
+
+// jobsExtensionActive probes the daemon the CLI under test talks to, the way
+// Compose does: the engine lists no extension, only the jobs service answering
+// tells (Unimplemented when the extension is off). An unreachable or not ready
+// extension fails the test rather than skipping it, so a misconfigured daemon
+// never silently skips every jobs scenario.
+func jobsExtensionActive(t testing.TB, c *CLI) bool {
+	t.Helper()
+	if versions.LessThan(engineAPIVersion(t, c), jobsAPIVersion) {
+		return false
+	}
+	// The CLI resolves its daemon from DOCKER_HOST/DOCKER_CONTEXT; so does
+	// `docker context inspect`, without a context name.
+	host := strings.TrimSpace(c.RunDockerCmd(t, "context", "inspect", "-f", "{{.Endpoints.docker.Host}}").Stdout())
+	apiClient, err := client.New(client.WithHost(host))
+	if err != nil {
+		t.Fatalf("connecting to the daemon at %s: %v", host, err)
+	}
+	defer apiClient.Close() //nolint:errcheck
+	exts, err := extensionclient.New(apiClient, extensionclient.WithGRPCPoint(jobspb.ClientPoint))
+	if err != nil {
+		t.Fatalf("extension client: %v", err)
+	}
+	defer exts.Close() //nolint:errcheck
+	jobs, err := extensionclient.Resolve(exts, jobsv0.Point)
+	if err != nil {
+		t.Fatalf("resolving the jobs extension: %v", err)
+	}
+	_, err = jobs.List(t.Context(), &jobsv0.ListRequest{})
+	switch status.Code(err) {
+	case codes.OK:
+		return true
+	case codes.Unimplemented:
+		return false
+	default:
+		t.Fatalf("probing the jobs extension at %s: %v", host, err)
+		return false
+	}
+}
+
+// scheduledJobsRefused is the error of an engine without the jobs API refusing
+// the project of TestUpRejectsScheduledJobs.
+const scheduledJobsRefused = "scheduled jobs are not supported by this version of the engine: backup"
+
+// scheduledJobsExtensionOffRefused is the error of an engine having the jobs
+// API but not the extension enabled, refusing the same project.
+const scheduledJobsExtensionOffRefused = "scheduled jobs need the engine's jobs extension, " +
+	"which is not enabled (start dockerd with --extension-enable org.mobyproject.jobs.v0): backup"
+
+// Without the jobs API, scheduled jobs cannot run: silently not scheduling
+// them would break the user's expectations, so every command bringing the
+// project up must refuse it as a whole, before creating anything.
 func TestUpRejectsScheduledJobs(t *testing.T) {
-	NewScenario(t, "up must reject a project declaring active scheduled jobs, before creating anything").
+	NewScenario(t, "up, create and start must reject a project declaring active scheduled jobs when the engine has no jobs API, before creating anything").
+		Requires(EngineAPIVersionBelow(jobsAPIVersion)).
 		Step("up fails naming the scheduled job",
 			ComposeCmd("up", "-d").MayFail(),
-			StderrContains("scheduled jobs are not supported in this version: backup"),
+			StderrContains(scheduledJobsRefused),
+			ServiceNotCreated("web")).
+		Step("create fails the same way",
+			ComposeCmd("create").MayFail(),
+			StderrContains(scheduledJobsRefused),
+			ServiceNotCreated("web")).
+		Step("start fails the same way",
+			ComposeCmd("start").MayFail(),
+			StderrContains(scheduledJobsRefused),
 			ServiceNotCreated("web"))
+}
+
+// The jobs API alone does not make jobs usable: the engine ships the extension
+// disabled by default, and an engine can only say so when asked. The refusal
+// must be the same as on an engine without the API, and just as early, naming
+// the dockerd flag that enables the extension.
+func TestUpRejectsScheduledJobsWithExtensionOff(t *testing.T) {
+	NewScenario(t, "up, create and start must reject a project declaring active scheduled jobs when the engine's jobs extension is not enabled, before creating anything").
+		Requires(EngineAPIVersionAtLeast(jobsAPIVersion), JobsExtensionDisabled).
+		Step("up fails naming the scheduled job and the flag enabling the extension",
+			ComposeCmd("up", "-d").MayFail(),
+			StderrContains(scheduledJobsExtensionOffRefused),
+			ServiceNotCreated("web")).
+		Step("create fails the same way",
+			ComposeCmd("create").MayFail(),
+			StderrContains(scheduledJobsExtensionOffRefused),
+			ServiceNotCreated("web")).
+		Step("start fails the same way",
+			ComposeCmd("start").MayFail(),
+			StderrContains(scheduledJobsExtensionOffRefused),
+			ServiceNotCreated("web"))
+}
+
+// Manual execution never needs the engine's help: without usable jobs support
+// run degrades to a one-off service, scheduled jobs included, and says so.
+func TestRunJobWithoutJobsExtension(t *testing.T) {
+	NewScenario(t, "run must execute a job as a one-off service, with a warning, when the engine cannot run jobs").
+		Requires(JobsExtensionDisabled).
+		Step("a manual job runs as a one-off service and the warning says so",
+			ComposeCmd("run", "--rm", "migrate"),
+			StderrContains("as a one-off service"),
+			OutputContains("migration done")).
+		Step("a scheduled job launched by hand degrades the same way",
+			ComposeCmd("run", "--rm", "backup"),
+			StderrContains("as a one-off service"),
+			OutputContains("backup done"))
+}
+
+// Without usable jobs support the engine has no job of the project to
+// remove: down must not turn that into an error nor into noise.
+func TestDownWithoutJobsExtension(t *testing.T) {
+	NewScenario(t, "down must clean up the project without a word about jobs when the engine cannot run jobs").
+		Requires(JobsExtensionDisabled).
+		Step("up starts the service, the manual job waits for run",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		Step("down removes the service and ignores the jobs silently",
+			ComposeCmd("down"),
+			ServiceNotCreated("web"),
+			OutputNotContains("Job "),
+			OutputNotContains("level=warning"))
+}
+
+// A scheduled job registers with the engine instead of being rejected: up is
+// safely re-runnable on an unchanged spec, and the schedule fires on the
+// engine's own clock, independent of the client.
+func TestUpRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "up must register a project's scheduled jobs with the engine and let them fire on their own").
+		Requires(JobsExtensionEnabled).
+		Step("up starts services and registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		Step("re-up is a no-op on the unchanged job spec, and the schedule fires on the engine's own clock",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
+}
+
+// run must build the exact same spec `up` already registered a scheduled
+// job with: CreateAndRun refuses schedule-trigger jobs outright, so run
+// routes through Create (idempotent on SpecHash) then Run instead. A run
+// invocation carries CLI/terminal-context defaults (Tty, StdinOpen,
+// ContainerName) that up's own registration never does — if those leaked
+// into the spec sent to Create, this would spuriously conflict with the
+// job up already registered, even though nothing in the compose file
+// changed.
+func TestRunAlreadyRegisteredScheduledJob(t *testing.T) {
+	NewScenario(t, "run must not conflict with a scheduled job up already registered with the identical spec").
+		Requires(JobsExtensionEnabled).
+		Step("up registers the scheduled job",
+			ComposeCmd("up", "-d"),
+			ServiceState("web", "running")).
+		// no output check: the engine removes a scheduled job's container, logs
+		// included, as soon as it succeeds, so its output may never be readable
+		Step("run fires it manually without a SpecHash conflict",
+			ComposeCmd("run", "--rm", "backup")).
+		// --no-deps narrows the dependencies the run waits for, not the ones the
+		// registered spec declares
+		Step("run --no-deps does not conflict either",
+			ComposeCmd("run", "--rm", "--no-deps", "backup")).
+		// the registered job runs as it is: an override would not reach it
+		Step("run refuses an override rather than ignoring it",
+			ComposeCmd("run", "-e", "X=1", "backup").MayFail(),
+			StderrContains("scheduled job \"backup\" runs as registered by up"))
+}
+
+// run must not register a job: Create would arm its schedule, which up alone
+// decides.
+func TestRunUnregisteredScheduledJob(t *testing.T) {
+	NewScenario(t, "run must refuse a scheduled job up never registered, and leave it unregistered").
+		Requires(JobsExtensionEnabled).
+		Step("run says that up comes first",
+			ComposeCmd("run", "backup").MayFail(),
+			StderrContains("is not registered with the engine")).
+		Step("the job was not registered by the failed run",
+			ComposeCmd("up", "-d"),
+			OutputContains("Job backup Created"))
+}
+
+// up --no-start stops after creating the containers, and must still register
+// the scheduled jobs: the engine's cron does not wait for a Start.
+func TestUpNoStartRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "up --no-start must still register a project's scheduled jobs with the engine").
+		Requires(JobsExtensionEnabled).
+		Step("up --no-start creates but never starts web, yet the schedule still fires on its own",
+			ComposeCmd("up", "--no-start"),
+			ServiceState("web", "created"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
+}
+
+// A project with no service has nothing to follow: an attached up registers
+// the jobs and returns, even if an earlier run left its container behind.
+func TestUpWithOnlyJobsReturns(t *testing.T) {
+	NewScenario(t, "up must register the scheduled jobs of a project without service and return").
+		Requires(JobsExtensionEnabled).
+		Step("up registers the scheduled job",
+			ComposeCmd("up", "-d")).
+		Step("a failed run leaves its container behind",
+			ComposeCmd("run", "cron").MayFail()).
+		// an up that attaches to that container never returns: Within kills it and
+		// fails the step
+		Step("an attached up does not wait for, or attach to, that container",
+			ComposeCmd("up").Within(20*time.Second),
+			OutputNotContains("Attaching to"))
+}
+
+// create arms the schedule like up does, whether or not the services are
+// started: a run that fails for want of them leaves its logs to read.
+func TestCreateRegistersScheduledJobs(t *testing.T) {
+	NewScenario(t, "create must register a project's scheduled jobs with the engine").
+		Requires(JobsExtensionEnabled).
+		Step("create makes web without starting it, yet the schedule fires on its own",
+			ComposeCmd("create"),
+			ServiceState("web", "created"),
+			Eventually(ServiceState("backup", "exited"), 90*time.Second))
 }
 
 // A job runs through `compose run` exactly like a service would: its
@@ -42,9 +283,17 @@ func TestRunManualJob(t *testing.T) {
 			ComposeCmd("run", "--rm", "migrate"),
 			OutputContains("migration done"),
 			ServiceState("db", "running")).
-		Step("a scheduled job without explicit opt-out can be run manually",
-			ComposeCmd("run", "--rm", "backup"),
-			OutputContains("backup")).
+		Step("re-running the same manual job with several env vars must not conflict on spec hash",
+			ComposeCmd("run", "--rm", "migrate"),
+			OutputContains("migration done")).
+		// the engine holds a job to the spec it was registered with: a manual
+		// job is removed after its run, so another run may carry other options
+		Step("a manual job can be run again with other options",
+			ComposeCmd("run", "--rm", "-e", "EXTRA=1", "migrate"),
+			OutputContains("migration done")).
+		// a scheduled job is run as up registered it: TestRunAlreadyRegisteredScheduledJob
+		// and TestRunUnregisteredScheduledJob, and TestRunJobWithoutJobsExtension
+		// without the extension
 		Step("manual: false explicitly forbids manual execution",
 			ComposeCmd("run", "--rm", "rotation").MayFail(),
 			StderrContains(`job "rotation" is declared with manual: false`))
@@ -93,6 +342,15 @@ func TestCreateRefusesJob(t *testing.T) {
 	NewScenario(t, "create must refuse a job by name, naming run as the right command").
 		Step("create fails naming the job",
 			ComposeCmd("create", "migrate").MayFail(),
+			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
+			ServiceNotCreated("migrate"))
+}
+
+// up shares WithServices with create: the same translation must apply there too.
+func TestUpRefusesJob(t *testing.T) {
+	NewScenario(t, "up must refuse a job by name, naming run as the right command").
+		Step("up fails naming the job",
+			ComposeCmd("up", "-d", "migrate").MayFail(),
 			StderrContains(`job "migrate" can only be triggered with "docker compose run"`),
 			ServiceNotCreated("migrate"))
 }
