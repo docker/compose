@@ -15,13 +15,24 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 
+# Keep the versions below in sync with the Dockerfile at the root: the relay is
+# built the way the compose binary is, on the build platform, cross-compiled
+# for the target with xx. A golang image per target platform does not scale: the
+# alpine tags do not carry every platform the relay ships for (riscv64 is
+# missing from golang:1.27-alpine).
 ARG GO_VERSION=1.27.4
+ARG XX_VERSION=1.9.0
 ARG GOLANGCI_LINT_VERSION=v2.15.0
+
+# xx is a helper for cross-compilation
+FROM --platform=${BUILDPLATFORM} tonistiigi/xx:${XX_VERSION} AS xx
 
 FROM golangci/golangci-lint:${GOLANGCI_LINT_VERSION}-alpine AS golangci-lint
 
-FROM golang:${GO_VERSION}-alpine AS base
+FROM --platform=${BUILDPLATFORM} golang:${GO_VERSION}-alpine3.23 AS base
+COPY --from=xx / /
 WORKDIR /src
+ENV CGO_ENABLED=0
 
 FROM base AS build-base
 COPY go.mod ./
@@ -45,8 +56,10 @@ RUN --mount=type=bind,target=. \
     go test -v ./...
 
 FROM base AS build
+ARG TARGETPLATFORM
 COPY go.mod main.go ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-w -s" -o /compose-relay .
+RUN xx-go build -trimpath -ldflags="-w -s" -o /compose-relay . && \
+    xx-verify --static /compose-relay
 
 FROM scratch
 COPY --from=build /compose-relay /compose-relay
