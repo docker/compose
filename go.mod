@@ -40,7 +40,7 @@ require (
 	github.com/sirupsen/logrus v1.10.2
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966
 	github.com/spf13/cobra v1.10.2
-	github.com/spf13/pflag v1.1.0
+	github.com/spf13/pflag v1.0.10
 	github.com/tilt-dev/fsnotify v1.4.8-0.20220602155310-fff9c274a375
 	github.com/tonistiigi/go-csvvalue v0.0.0-20240814133006-030d3b2625d0
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.71.0
