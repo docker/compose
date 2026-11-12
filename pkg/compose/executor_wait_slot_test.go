@@ -28,6 +28,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -96,15 +97,15 @@ func TestExecutePlanWaitNodesHoldNoConcurrencySlot(t *testing.T) {
 		Labels: map[string]string{api.ServiceLabel: dep, api.OneoffLabel: "False"},
 	}}
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpWaitCondition,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpWaitCondition,
 		ResourceID: "wait:" + dep,
 		Name:       dep,
 		Condition:  types.ServiceConditionHealthy,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpStartContainer,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpStartContainer,
 		ResourceID: "service:sibling:1",
 		Container:  &container.Summary{ID: siblingID, Names: []string{"/test-sibling-1"}},
 	}, "")

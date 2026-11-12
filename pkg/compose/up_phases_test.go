@@ -42,6 +42,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -684,7 +685,7 @@ func TestUpReportsTheContainersItLeavesRunning(t *testing.T) {
 // phase to its Start phase, for a plan the test writes itself: a Create phase
 // with nothing to do, and the Start phase of plan. It also returns the
 // executor, to give it what the daemon's listing would have.
-func (h *interactiveUpHarness) createdUpOf(t *testing.T, project *types.Project, plan *Plan) (*createdUp, *planExecutor) {
+func (h *interactiveUpHarness) createdUpOf(t *testing.T, project *types.Project, plan *planning.Plan) (*createdUp, *planExecutor) {
 	t.Helper()
 	exec := h.svc.newPlanExecutor(project, emptyObservedState(project.Name))
 	run, err := exec.begin(plan)
@@ -744,11 +745,11 @@ func TestUpInteractiveShowsTheHookLogsInTheSession(t *testing.T) {
 		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
 	h.api.EXPECT().ExecInspect(gomock.Any(), "exec1", gomock.Any()).Return(client.ExecInspectResult{ExitCode: 0}, nil)
 
-	plan := &Plan{}
-	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &web, Container: &ctr}, "start:web:1")
-	start.Phase = PhaseStart
-	post := plan.addNode(Operation{Type: OpRunPostStart, ResourceID: "service:web:1", Cause: "post_start hooks", Service: &web, Container: &ctr}, "start:web:1", start)
-	post.Phase = PhaseStart
+	plan := &planning.Plan{}
+	start := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &web, Container: &ctr}, "start:web:1")
+	start.Phase = planning.PhaseStart
+	post := plan.AddNode(planning.Operation{Type: planning.OpRunPostStart, ResourceID: "service:web:1", Cause: "post_start hooks", Service: &web, Container: &ctr}, "start:web:1", start)
+	post.Phase = planning.PhaseStart
 	created, _ := h.createdUpOf(t, project, plan)
 
 	consumer := &testLogConsumer{}
@@ -790,11 +791,11 @@ func TestUpInteractiveTranslatesAWaitTimeout(t *testing.T) {
 			State:  &container.State{Status: container.StateRunning, Health: &container.Health{Status: container.Starting}},
 		}}, nil)
 
-	plan := &Plan{}
-	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
-	wait.Phase = PhaseStart
-	start := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &web, Container: &ctr}, "start:web:1", wait)
-	start.Phase = PhaseStart
+	plan := &planning.Plan{}
+	wait := plan.AddNode(planning.Operation{Type: planning.OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	wait.Phase = planning.PhaseStart
+	start := plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Cause: "start", Service: &web, Container: &ctr}, "start:web:1", wait)
+	start.Phase = planning.PhaseStart
 	created, exec := h.createdUpOf(t, project, plan)
 	exec.waitTimeout = 50 * time.Millisecond
 	exec.containersByService["db"] = Containers{{ID: "db-id", Names: []string{"/test-db-1"}, Labels: map[string]string{api.ServiceLabel: "db"}}}

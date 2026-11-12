@@ -14,7 +14,7 @@
    limitations under the License.
 */
 
-package compose
+package planning
 
 import (
 	"fmt"
@@ -162,8 +162,8 @@ type Plan struct {
 	nextID int
 }
 
-// addNode appends a new node to the plan and returns it.
-func (p *Plan) addNode(op Operation, group string, deps ...*PlanNode) *PlanNode {
+// AddNode appends a new node to the plan and returns it.
+func (p *Plan) AddNode(op Operation, group string, deps ...*PlanNode) *PlanNode {
 	p.nextID++
 	node := &PlanNode{
 		ID:        p.nextID,
