@@ -489,20 +489,12 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	eventName := getContainerProgressName(ctr)
 	s.events.On(progress.New(eventName, api.Working, api.StatusStopping))
 
-	if service != nil && !isRelayContainer(ctr) {
-		for _, hook := range service.PreStop {
-			err := s.runHook(ctx, ctr, *service, hook, listener)
-			if err != nil {
-				// Ignore errors indicating that some containers were already stopped or removed.
-				if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
-					return nil
-				}
-				return err
-			}
-		}
+	gone, err := s.runPreStopHooks(ctx, ctr, service, listener)
+	if err != nil || gone {
+		return err
 	}
 
-	_, err := s.apiClient().ContainerStop(ctx, ctr.ID, client.ContainerStopOptions{
+	_, err = s.apiClient().ContainerStop(ctx, ctr.ID, client.ContainerStopOptions{
 		Timeout: utils.DurationSecondToInt(timeout),
 	})
 	if err != nil {

@@ -316,7 +316,16 @@ func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) er
 	return nil
 }
 
+// execStopContainer runs the pre_stop hooks itself rather than as nodes of the
+// plan, so that every stop of the plan runs them.
 func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) error {
+	if service, ok := exec.project.Services[op.Container.Labels[api.ServiceLabel]]; ok {
+		// a container already gone or stopped is still handed to ContainerStop,
+		// as before the plan ran the hooks
+		if _, err := exec.compose.runPreStopHooks(ctx, *op.Container, &service, exec.listener); err != nil {
+			return err
+		}
+	}
 	_, err := exec.compose.apiClient().ContainerStop(ctx, op.Container.ID, client.ContainerStopOptions{
 		Timeout: utils.DurationSecondToInt(op.Timeout),
 	})
