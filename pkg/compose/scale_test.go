@@ -39,4 +39,7 @@ func TestApplyReplicas(t *testing.T) {
 
 	err = applyReplicas(project, map[string]int{"unknown": 1})
 	assert.ErrorContains(t, err, "no such service: unknown")
+
+	err = applyReplicas(project, map[string]int{"web": -1})
+	assert.ErrorContains(t, err, "must be a non-negative integer")
 }
