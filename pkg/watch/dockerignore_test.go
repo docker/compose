@@ -51,7 +51,15 @@ func TestNewDockerPatternMatcher(t *testing.T) {
 			patterns:     []string{"*", "!file.txt"},
 			expectedErr:  false,
 			expectedRoot: "/repo",
-			expectedPat:  []string{"!/repo/file.txt"},
+			expectedPat:  []string{"/repo/*", "!/repo/file.txt"},
+		},
+		{
+			name:         "Wildcard with directory exclusion",
+			repoRoot:     "/repo",
+			patterns:     []string{"*", "!src"},
+			expectedErr:  false,
+			expectedRoot: "/repo",
+			expectedPat:  []string{"/repo/*", "!/repo/src"},
 		},
 		{
 			name:         "No patterns",
@@ -102,6 +110,158 @@ func TestNewDockerPatternMatcher(t *testing.T) {
 						t.Errorf("expected pattern: %v, got: %v", expectedPat, actualPatterns[i])
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestDockerPathMatcher_MatchesAllowList(t *testing.T) {
+	// Allow-list form: ignore everything, then re-include a subtree. The
+	// parsed patterns alone don't prove this works -- only Matches does.
+	tests := []struct {
+		name    string
+		content string
+		path    string
+		want    bool
+	}{
+		{
+			name:    "allow-list ignores unrelated dir",
+			content: "*\n!src\n",
+			path:    "data/log",
+			want:    true,
+		},
+		{
+			name:    "allow-list ignores dotfile at root",
+			content: "*\n!src\n",
+			path:    ".env",
+			want:    true,
+		},
+		{
+			name:    "allow-list ignores nested dir",
+			content: "*\n!src\n",
+			path:    "node_modules/foo/index.js",
+			want:    true,
+		},
+		{
+			name:    "allow-list keeps re-included dir",
+			content: "*\n!src\n",
+			path:    "src/index.js",
+			want:    false,
+		},
+		{
+			name:    "allow-list keeps re-included dir itself",
+			content: "*\n!src\n",
+			path:    "src",
+			want:    false,
+		},
+		{
+			name:    "allow-list keeps nested re-included dir",
+			content: "*\n!src\n",
+			path:    "src/nested/deep/file.go",
+			want:    false,
+		},
+		{
+			name:    "allow-list ignores sibling with same prefix",
+			content: "*\n!src\n",
+			path:    "src-old/index.js",
+			want:    true,
+		},
+		{
+			name:    "wildcard with single exclusion keeps excluded file",
+			content: "*\n!file.txt\n",
+			path:    "file.txt",
+			want:    false,
+		},
+		{
+			name:    "wildcard with single exclusion ignores other files",
+			content: "*\n!file.txt\n",
+			path:    "other.txt",
+			want:    true,
+		},
+		{
+			name:    "deny-list is unchanged",
+			content: "data/\n",
+			path:    "data/log",
+			want:    true,
+		},
+		{
+			name:    "deny-list keeps unrelated files",
+			content: "data/\n",
+			path:    "src/index.js",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matcher, err := DockerIgnoreTesterFromContents("/repo", tt.content)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got, err := matcher.Matches(tt.path)
+			if err != nil {
+				t.Fatalf("unexpected error matching %q: %v", tt.path, err)
+			}
+			if got != tt.want {
+				t.Errorf("Matches(%q) with .dockerignore %q = %v, want %v",
+					tt.path, tt.content, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDockerPathMatcher_MatchesEntireDirAllowList(t *testing.T) {
+	tests := []struct {
+		name    string
+		content string
+		path    string
+		want    bool
+	}{
+		{
+			name:    "allow-list matches unrelated dir entirely",
+			content: "*\n!src\n",
+			path:    "data",
+			want:    true,
+		},
+		{
+			name:    "allow-list matches nested unrelated dir entirely",
+			content: "*\n!src\n",
+			path:    "node_modules/foo",
+			want:    true,
+		},
+		{
+			name:    "allow-list keeps re-included dir",
+			content: "*\n!src\n",
+			path:    "src",
+			want:    false,
+		},
+		{
+			name:    "deny-list matches excluded dir entirely",
+			content: "data/\n",
+			path:    "data",
+			want:    true,
+		},
+		{
+			name:    "deny-list keeps unrelated dir",
+			content: "data/\n",
+			path:    "src",
+			want:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			matcher, err := DockerIgnoreTesterFromContents("/repo", tt.content)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			got, err := matcher.MatchesEntireDir(tt.path)
+			if err != nil {
+				t.Fatalf("unexpected error matching %q: %v", tt.path, err)
+			}
+			if got != tt.want {
+				t.Errorf("MatchesEntireDir(%q) with .dockerignore %q = %v, want %v",
+					tt.path, tt.content, got, tt.want)
 			}
 		})
 	}
