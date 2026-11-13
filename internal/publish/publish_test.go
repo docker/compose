@@ -34,7 +34,6 @@ import (
 	"github.com/google/go-cmp/cmp"
 	registrytypes "github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
-	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
@@ -47,8 +46,7 @@ import (
 )
 
 // fakeBackend is the engine of the publish tests: it answers the prompts with
-// the given function, resolves digests through its API client the way the
-// engine does, and ignores the events.
+// the given function, serves its API client and auth, and ignores the events.
 type fakeBackend struct {
 	apiClient client.APIClient
 	prompt    func(message string, defaultValue bool) (bool, error)
@@ -62,22 +60,6 @@ func (f *fakeBackend) DryRun() bool                        { return false }
 
 func (f *fakeBackend) Prompt(message string, defaultValue bool) (bool, error) {
 	return f.prompt(message, defaultValue)
-}
-
-func (f *fakeBackend) ImageDigestResolver(ctx context.Context) func(named reference.Named) (digest.Digest, error) {
-	return func(named reference.Named) (digest.Digest, error) {
-		auth, err := registry.EncodedAuth(named, f.auth)
-		if err != nil {
-			return "", err
-		}
-		inspect, err := f.apiClient.DistributionInspect(ctx, named.String(), client.DistributionInspectOptions{
-			EncodedRegistryAuth: auth,
-		})
-		if err != nil {
-			return "", fmt.Errorf("failed to resolve digest for %s: %w", named.String(), err)
-		}
-		return inspect.Descriptor.Digest, nil
-	}
 }
 
 func (f *fakeBackend) Push(context.Context, *types.Project, api.PushOptions) error {
