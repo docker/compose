@@ -17,11 +17,15 @@
 package compose
 
 import (
+	"context"
+	"errors"
 	"strings"
 	"testing"
 
 	"github.com/moby/moby/api/types/jsonstream"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/api"
 )
 
 func TestDecodeProgressStream(t *testing.T) {
@@ -41,4 +45,30 @@ func TestDecodeProgressStream(t *testing.T) {
 func TestProgressPercent(t *testing.T) {
 	assert.Equal(t, progressPercent(50, 200), 25)
 	assert.Equal(t, progressPercent(300, 200), 100)
+}
+
+// doneRecorder records the success flag passed to Done.
+type doneRecorder struct {
+	api.EventProcessor
+	calls []bool
+}
+
+func (r *doneRecorder) Start(context.Context, string) {}
+func (r *doneRecorder) Done(_ string, success bool)   { r.calls = append(r.calls, success) }
+
+func TestRunReportsSuccessToEventProcessor(t *testing.T) {
+	for name, tc := range map[string]struct {
+		err  error
+		want bool
+	}{
+		"operation succeeded": {err: nil, want: true},
+		"operation failed":    {err: errors.New("boom"), want: false},
+	} {
+		t.Run(name, func(t *testing.T) {
+			bus := &doneRecorder{}
+			err := Run(t.Context(), func(context.Context) error { return tc.err }, "test", bus)
+			assert.Equal(t, err, tc.err)
+			assert.DeepEqual(t, bus.calls, []bool{tc.want})
+		})
+	}
 }
