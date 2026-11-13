@@ -20,9 +20,7 @@ import (
 	"context"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/distribution/reference"
 	"github.com/moby/moby/client"
-	"github.com/opencontainers/go-digest"
 
 	"github.com/docker/compose/v5/internal/publish"
 	"github.com/docker/compose/v5/internal/registry"
@@ -63,10 +61,8 @@ func (b publishBackend) Prompt(message string, defaultValue bool) (bool, error) 
 	return b.s.prompt(message, defaultValue)
 }
 
-func (b publishBackend) ImageDigestResolver(ctx context.Context) func(named reference.Named) (digest.Digest, error) {
-	return imageDigestResolver(ctx, b.s.authProvider(), b.s.apiClient())
-}
-
+// Push must stay the unexported push: Publish already runs inside the "publish"
+// bracket, and the public Push would open a second one.
 func (b publishBackend) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	return b.s.push(ctx, project, options)
 }

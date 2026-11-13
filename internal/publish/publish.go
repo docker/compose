@@ -64,9 +64,6 @@ type Backend interface {
 	DryRun() bool
 	// Prompt asks the user a yes/no question.
 	Prompt(message string, defaultValue bool) (bool, error)
-	// ImageDigestResolver resolves an image reference to the digest the
-	// registry holds for it, the same way pull does.
-	ImageDigestResolver(ctx context.Context) func(named reference.Named) (digest.Digest, error)
 	// Push pushes the images built for the project, as part of the operation
 	// already running: it opens no progress bracket of its own.
 	Push(ctx context.Context, project *types.Project, options api.PushOptions) error
@@ -362,7 +359,7 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 }
 
 func (s *Service) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
-	project, err := project.WithImagesResolved(s.backend.ImageDigestResolver(ctx))
+	project, err := project.WithImagesResolved(registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.APIClient()))
 	if err != nil {
 		return nil, err
 	}
@@ -377,7 +374,7 @@ func (s *Service) generateImageDigestsOverride(ctx context.Context, project *typ
 				ContainerSpec: types.ContainerSpec{Image: job.Image},
 			}
 		}
-		jobsAsServices, err = jobsAsServices.WithImagesResolved(s.backend.ImageDigestResolver(ctx))
+		jobsAsServices, err = jobsAsServices.WithImagesResolved(registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.APIClient()))
 		if err != nil {
 			return nil, err
 		}
