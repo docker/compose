@@ -67,6 +67,8 @@ func (b publishBackend) ImageDigestResolver(ctx context.Context) func(named refe
 	return imageDigestResolver(ctx, b.s.authProvider(), b.s.apiClient())
 }
 
+// Push must stay the unexported push: Publish already runs inside the "publish"
+// bracket, and the public Push would open a second one.
 func (b publishBackend) Push(ctx context.Context, project *types.Project, options api.PushOptions) error {
 	return b.s.push(ctx, project, options)
 }
