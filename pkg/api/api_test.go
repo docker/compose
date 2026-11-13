@@ -123,3 +123,119 @@ func TestGetDependentImages(t *testing.T) {
 		})
 	}
 }
+
+func TestIsPureResourceProvider(t *testing.T) {
+	provider := &types.ServiceProviderConfig{Type: "awesomecloud"}
+	tests := []struct {
+		name     string
+		service  types.ServiceConfig
+		expected bool
+	}{
+		{
+			name:     "provider without image or build is a pure resource provider",
+			service:  types.ServiceConfig{Provider: provider},
+			expected: true,
+		},
+		{
+			name: "provider with an image is not a pure resource provider",
+			service: types.ServiceConfig{
+				Provider:      provider,
+				ContainerSpec: types.ContainerSpec{Image: "redis"},
+			},
+			expected: false,
+		},
+		{
+			name: "provider with a build is not a pure resource provider",
+			service: types.ServiceConfig{
+				Provider:     provider,
+				WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+			},
+			expected: false,
+		},
+		{
+			name: "service without provider is not a pure resource provider",
+			service: types.ServiceConfig{
+				ContainerSpec: types.ContainerSpec{Image: "nginx"},
+			},
+			expected: false,
+		},
+		{
+			name:     "service without provider, image or build is not a pure resource provider",
+			service:  types.ServiceConfig{},
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, IsPureResourceProvider(tt.service), tt.expected)
+		})
+	}
+}
+
+func TestHasNoImageReference(t *testing.T) {
+	provider := &types.ServiceProviderConfig{Type: "awesomecloud"}
+	tests := []struct {
+		name     string
+		service  types.ServiceConfig
+		expected bool
+	}{
+		{
+			name:     "no image and no build has no image reference",
+			service:  types.ServiceConfig{},
+			expected: true,
+		},
+		{
+			name: "an image is an image reference",
+			service: types.ServiceConfig{
+				ContainerSpec: types.ContainerSpec{Image: "nginx"},
+			},
+			expected: false,
+		},
+		{
+			name: "a build is an image reference",
+			service: types.ServiceConfig{
+				WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: "."}},
+			},
+			expected: false,
+		},
+		{
+			// a pure resource provider has no image reference either: the
+			// provider owns the resource, not an image
+			name:     "a pure resource provider has no image reference",
+			service:  types.ServiceConfig{Provider: provider},
+			expected: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, HasNoImageReference(tt.service), tt.expected)
+		})
+	}
+}
+
+// TestBuildOptionsApply_InvalidService pins the contract of the "invalid
+// service" check: a service with neither image nor build is rejected, unless
+// it is backed by a provider — a pure resource provider is legal, the
+// provider owns the resource instead of an image.
+func TestBuildOptionsApply_InvalidService(t *testing.T) {
+	t.Run("a service with neither image nor build is rejected", func(t *testing.T) {
+		project := &types.Project{
+			Name: "p",
+			Services: types.Services{
+				"web": {Name: "web"},
+			},
+		}
+		err := BuildOptions{}.Apply(project)
+		assert.ErrorContains(t, err, `invalid service "web"`)
+	})
+
+	t.Run("a pure resource provider is accepted", func(t *testing.T) {
+		project := &types.Project{
+			Name: "p",
+			Services: types.Services{
+				"db": {Name: "db", Provider: &types.ServiceProviderConfig{Type: "awesomecloud"}},
+			},
+		}
+		assert.NilError(t, BuildOptions{}.Apply(project))
+	})
+}

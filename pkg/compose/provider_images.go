@@ -69,7 +69,7 @@ func (s *composeService) ensureProviderImages(ctx context.Context, project *type
 		if service.Provider == nil {
 			continue
 		}
-		if service.Image == "" && service.Build == nil {
+		if api.IsPureResourceProvider(service) {
 			continue // pure resource provider: nothing to distribute
 		}
 		image := api.GetImageNameOrDefault(service, project.Name)

@@ -138,6 +138,46 @@ func TestGetLocalImagesDigests_PreStartHook(t *testing.T) {
 	assert.Equal(t, images["alpine:3.19"].ID, "sha256:hook")
 }
 
+// TestEnsureImagesExists_InvalidService pins the "invalid service" contract
+// of the image phase: a service declaring neither image: nor build: is
+// rejected, unless it is backed by a provider — a pure resource provider is
+// legal (the provider owns the resource, not an image), so it must not be
+// rejected here.
+func TestEnsureImagesExists_InvalidService(t *testing.T) {
+	t.Run("a service with neither image nor build is rejected", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		_, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+		project := &types.Project{
+			Name: "p",
+			Services: types.Services{
+				"web": {Name: "web"},
+			},
+		}
+		err := tested.ensureImagesExists(t.Context(), project, nil, true, false)
+		assert.ErrorContains(t, err, `invalid service "web"`)
+	})
+
+	t.Run("a pure resource provider is accepted", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		apiClient, tested := newTestComposeService(t, mockCtrl, "1.48")
+		// the provider service contributes no image of its own, but the
+		// fabricated default name is still inspected like any other service
+		apiClient.EXPECT().ImageInspect(anyCancellableContext(), "p-db", gomock.Any()).
+			Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:db"}}, nil).AnyTimes()
+
+		project := &types.Project{
+			Name: "p",
+			Services: types.Services{
+				"db": {Name: "db", Provider: &types.ServiceProviderConfig{Type: "awesomecloud"}},
+			},
+		}
+		assert.NilError(t, tested.ensureImagesExists(t.Context(), project, nil, true, false))
+	})
+}
+
 func TestResolveImageVolumes(t *testing.T) {
 	images := map[string]api.ImageSummary{
 		"content:1": {ID: "sha256:content"},

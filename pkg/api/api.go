@@ -308,7 +308,7 @@ type BuildOptions struct {
 func (o BuildOptions) Apply(project *types.Project) error {
 	platform := project.Environment["DOCKER_DEFAULT_PLATFORM"]
 	for name, service := range project.Services {
-		if service.Provider == nil && service.Image == "" && service.Build == nil {
+		if service.Provider == nil && HasNoImageReference(service) {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
 		}
 
@@ -902,6 +902,23 @@ func GetImageNameOrDefault(service types.ServiceConfig, projectName string) stri
 		imageName = projectName + Separator + service.Name
 	}
 	return imageName
+}
+
+// IsPureResourceProvider reports whether a service is a "pure resource"
+// provider: it declares a provider, but neither an image nor a build section.
+// Such a service has no image reference of its own — the name
+// GetImageNameOrDefault fabricates for it is never built nor pulled — so the
+// provider owns the resource instead of an image.
+func IsPureResourceProvider(service types.ServiceConfig) bool {
+	return service.Provider != nil && service.Image == "" && service.Build == nil
+}
+
+// HasNoImageReference reports whether a service declares neither an image nor
+// a build section, and therefore has no image reference of its own. For a
+// service with a provider this is the "pure resource provider" case (see
+// IsPureResourceProvider); without one it is an invalid service.
+func HasNoImageReference(service types.ServiceConfig) bool {
+	return service.Image == "" && service.Build == nil
 }
 
 // GetDependentImages returns the additional images a service depends on beyond

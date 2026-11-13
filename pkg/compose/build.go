@@ -108,7 +108,7 @@ func (s *composeService) build(ctx context.Context, project *types.Project, opti
 
 func (s *composeService) ensureImagesExists(ctx context.Context, project *types.Project, buildOpts *api.BuildOptions, quietPull bool, skipProviders bool) error {
 	for name, service := range project.Services {
-		if service.Provider == nil && service.Image == "" && service.Build == nil {
+		if service.Provider == nil && api.HasNoImageReference(service) {
 			return fmt.Errorf("invalid service %q. Must specify either image or build", name)
 		}
 	}
