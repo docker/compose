@@ -159,18 +159,26 @@ func (g *ociRemoteLoader) pullComposeArtifact(ctx context.Context, path string) 
 		return "", err
 	}
 
+	cache, err := cacheDir()
+	if err != nil {
+		return "", fmt.Errorf("initializing remote resource cache: %w", err)
+	}
+	cache = filepath.Join(cache, cacheOCIDir)
+
+	// if the ref has a digest eagerly look in the local cache.
+	// (still works if the registry is down)
+	if ref, ok := ref.(reference.Digested); ok {
+		if cacheEntryMatches(cache, ref.Digest()) {
+			return cacheEntryDir(cache, ref.Digest()), nil
+		}
+	}
+
 	resolver := oci.NewResolver(g.authProvider(), g.httpTransport(ctx), g.insecureRegistries...)
 
 	descriptor, content, err := oci.Get(ctx, resolver, ref)
 	if err != nil {
 		return "", fmt.Errorf("failed to pull OCI resource %q: %w", ref, err)
 	}
-
-	cache, err := cacheDir()
-	if err != nil {
-		return "", fmt.Errorf("initializing remote resource cache: %w", err)
-	}
-	cache = filepath.Join(cache, cacheOCIDir)
 
 	local := cacheEntryDir(cache, descriptor.Digest)
 	if cacheEntryMatches(cache, descriptor.Digest) {

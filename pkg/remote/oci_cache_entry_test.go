@@ -70,6 +70,12 @@ func newCacheTestRegistry(t *testing.T) *cacheTestRegistry {
 
 // serve starts the registry and returns its host, which the loader of the test must be told is insecure.
 func (r *cacheTestRegistry) serve(t *testing.T) string {
+	host, _ := r.serveWithServer(t)
+	return host
+}
+
+// serveWithServer starts the registry and returns its host and the server
+func (r *cacheTestRegistry) serveWithServer(t *testing.T) (string, *httptest.Server) {
 	t.Helper()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		switch {
@@ -92,7 +98,7 @@ func (r *cacheTestRegistry) serve(t *testing.T) string {
 		}
 	}))
 	t.Cleanup(server.Close)
-	return server.Listener.Addr().String()
+	return server.Listener.Addr().String(), server
 }
 
 func (r *cacheTestRegistry) ref(host string) string {
@@ -511,4 +517,23 @@ func TestOCILoaderRefusesAnIndexManifestNotHavingItsDigest(t *testing.T) {
 	entries, err := os.ReadDir(cache)
 	assert.Assert(t, err == nil || os.IsNotExist(err))
 	assert.Equal(t, len(entries), 0, "nothing is cached")
+}
+
+// Ensure that we can load a sha-pinned oci artifact from the cache only.
+//
+// This is crucial for operational safety: If the registry is down, this still
+// allows to do basic operations.
+func TestOCILoaderNoRegistryIfCached(t *testing.T) {
+	registry := newCacheTestRegistry(t)
+	host, server := registry.serveWithServer(t)
+	setCacheRoot(t)
+
+	_, err := newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.NilError(t, err)
+
+	server.Close()
+
+	// Note: recreate a loader: we want to test on-disk cache, not in-memory cache.
+	_, err = newCacheTestLoader(host).Load(t.Context(), registry.ref(host))
+	assert.NilError(t, err)
 }
