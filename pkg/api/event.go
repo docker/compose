@@ -124,6 +124,7 @@ type EventProcessor interface {
 	Start(ctx context.Context, operation string)
 	// On notify about (sub)task and progress processing operation
 	On(events ...Resource)
-	// Done is triggered as a Compose operation completed
+	// Done is triggered as a Compose operation completed.
+	// success is true when the operation completed without error.
 	Done(operation string, success bool)
 }
