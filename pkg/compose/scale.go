@@ -44,12 +44,14 @@ func (s *composeService) Scale(ctx context.Context, project *types.Project, opti
 // which is what the convergence performed by create/start acts upon.
 func applyReplicas(project *types.Project, replicas map[string]int) error {
 	for name, scale := range replicas {
+		if scale < 0 {
+			return fmt.Errorf("invalid replica count %d for service %q: must be a non-negative integer", scale, name)
+		}
+	}
+	for name, scale := range replicas {
 		service, err := project.GetService(name)
 		if err != nil {
 			return err
-		}
-		if scale < 0 {
-			return fmt.Errorf("invalid replica count %d for service %q: must be a non-negative integer", scale, name)
 		}
 		service.SetScale(scale)
 		project.Services[name] = service
