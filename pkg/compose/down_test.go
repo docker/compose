@@ -1544,6 +1544,26 @@ func TestStopContainerSkipsPreStopForRelay(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A dry-run must not execute hooks (no side effects) nor fail because the
+// dry-run client cannot attach to an exec. No ExecCreate expectation is set:
+// per newStartTestService, gomock fails the test if the hook still runs.
+func TestStopContainerSkipsPreStopInDryRun(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	svc.dryRun = true
+
+	service := types.ServiceConfig{
+		Name:    "db",
+		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+	}
+	ctr := serviceContainer("db")
+
+	apiClient.EXPECT().ContainerStop(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+
+	err := svc.stopContainer(t.Context(), &service, ctr, nil, nil)
+	assert.NilError(t, err)
+}
+
 // runningOneOff builds a RUNNING `compose run` container of the given service.
 func runningOneOff(service, id string) container.Summary {
 	c := testContainer(service, id, true)

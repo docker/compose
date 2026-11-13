@@ -41,6 +41,12 @@ const (
 )
 
 func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
+	// A dry-run must have no side effects, and the dry-run client cannot
+	// attach to an exec: skip the hook rather than fail on it.
+	if s.dryRun {
+		return nil
+	}
+
 	// Keep stdout and stderr in separate tails so the error message can prefer
 	// stderr (which usually holds the real error) over stdout progress noise.
 	tailOut := newOutputTail(hookOutputTailLines, hookOutputTailBytes)

@@ -855,6 +855,25 @@ func TestExecRunPostStart_RunsHookAndStreamsToListener(t *testing.T) {
 	assert.DeepEqual(t, lines, []string{"post-start ok"})
 }
 
+// TestExecRunPostStart_SkipsHookInDryRun verifies that a dry-run neither
+// executes post_start hooks (no side effects) nor fails because the dry-run
+// client cannot attach to an exec. No ExecCreate expectation is set: gomock
+// fails the test if the hook still runs.
+func TestExecRunPostStart_SkipsHookInDryRun(t *testing.T) {
+	svc, _, _ := newStartPhaseTestService(t)
+	svc.dryRun = true
+
+	service := types.ServiceConfig{
+		Name:      "web",
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"/notify.sh"}}},
+	}
+	ctr := container.Summary{ID: "c1", Names: []string{"/test-web-1"}}
+
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
+	err := exec.execRunPostStart(t.Context(), Operation{Service: &service, Container: &ctr})
+	assert.NilError(t, err)
+}
+
 // TestExecutePlanStartInjectsSecretsAndConfigsBeforeContainerStart pins that
 // a start node copies the service's secrets and configs into the container
 // before starting it, in that order.

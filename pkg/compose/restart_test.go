@@ -173,6 +173,27 @@ func TestRestartContainerSkipsHooksForRelay(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A dry-run must not execute hooks (no side effects) nor fail because the
+// dry-run client cannot attach to an exec. No ExecCreate expectation is set:
+// per newStartTestService, gomock fails the test if either hook still runs.
+func TestRestartContainerSkipsHooksInDryRun(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	svc.dryRun = true
+
+	service := types.ServiceConfig{
+		Name:      "web",
+		PreStop:   []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"warmup"}}},
+	}
+	ctr := serviceContainer("web")
+
+	apiClient.EXPECT().ContainerRestart(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ContainerRestartResult{}, nil)
+
+	err := svc.restartContainer(t.Context(), service, ctr, api.RestartOptions{})
+	assert.NilError(t, err)
+}
+
 // TestRestart_ConcurrencyIsBoundedAcrossServices guards against a regression
 // (PR #14177 review) where each service's per-container fan-out got its own
 // maxConcurrency budget: with several independent services ready at once,
