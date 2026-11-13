@@ -37,9 +37,23 @@ func TestApplyReplicas(t *testing.T) {
 	assert.Equal(t, web.GetScale(), 3)
 	assert.Equal(t, db.GetScale(), 1, "untargeted service keeps its default scale")
 
+	err = applyReplicas(project, map[string]int{"web": 0})
+	assert.NilError(t, err)
+	web = project.Services["web"]
+	assert.Equal(t, web.GetScale(), 0)
+
 	err = applyReplicas(project, map[string]int{"unknown": 1})
 	assert.ErrorContains(t, err, "no such service: unknown")
 
 	err = applyReplicas(project, map[string]int{"web": -1})
 	assert.ErrorContains(t, err, "must be a non-negative integer")
+
+	err = applyReplicas(project, map[string]int{"unknown": -1})
+	assert.ErrorContains(t, err, "must be a non-negative integer")
+
+	// Ensure atomic behavior: no mutations occur if validation fails
+	err = applyReplicas(project, map[string]int{"web": 5, "unknown": -1})
+	assert.ErrorContains(t, err, "must be a non-negative integer")
+	web = project.Services["web"]
+	assert.Equal(t, web.GetScale(), 0)
 }

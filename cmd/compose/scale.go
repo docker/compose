@@ -100,9 +100,6 @@ func setServiceScale(project *types.Project, name string, replicas int) error {
 	if err != nil {
 		return err
 	}
-	if replicas < 0 {
-		return fmt.Errorf("invalid replica count %d for service %q: must be a non-negative integer", replicas, name)
-	}
 	service.SetScale(replicas)
 	project.Services[name] = service
 	return nil

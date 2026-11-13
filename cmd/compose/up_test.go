@@ -84,11 +84,6 @@ func TestApplyScaleOpt(t *testing.T) {
 	assert.Error(t, err, `invalid --scale option "foo=-1": replica count must be a non-negative integer`)
 }
 
-func TestParseServicesReplicasArgs(t *testing.T) {
-	_, err := parseServicesReplicasArgs([]string{"foo=-1"})
-	assert.ErrorContains(t, err, "replica count must be a non-negative integer")
-}
-
 func TestUpOptions_OnExit(t *testing.T) {
 	tests := []struct {
 		name string
