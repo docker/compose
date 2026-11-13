@@ -213,3 +213,30 @@ func TestWarnIgnoredJobs(t *testing.T) {
 	assert.Assert(t, strings.Contains(msg, "migrate"), msg)
 	assert.Assert(t, !strings.Contains(msg, "backup"), msg)
 }
+
+// --wait alone keeps the session attached to stream the logs until the services
+// are running|healthy; only an explicit --detach silences it.
+func TestValidateFlagsWait(t *testing.T) {
+	tests := []struct {
+		name    string
+		up      upOptions
+		wantErr string
+	}{
+		{name: "wait alone stays attached", up: upOptions{wait: true}},
+		{name: "wait with watch", up: upOptions{wait: true, watch: true}, wantErr: "--wait cannot be combined with"},
+		{name: "wait with abort on container failure", up: upOptions{wait: true, cascadeFail: true}, wantErr: "--wait cannot be combined with"},
+		{name: "wait with abort on container exit", up: upOptions{wait: true, cascadeStop: true}, wantErr: "--wait cannot be combined with"},
+		{name: "wait with attach", up: upOptions{wait: true, attach: []string{"web"}}, wantErr: "--wait cannot be combined with"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateFlags(&tt.up, &createOptions{})
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			assert.NilError(t, err)
+			assert.Assert(t, !tt.up.Detach, "--wait must not imply --detach")
+		})
+	}
+}

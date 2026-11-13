@@ -33,6 +33,45 @@ func TestUpWait(t *testing.T) {
 		ServiceState("oneshot", "exited"))
 }
 
+// https://github.com/docker/compose/issues/9122: up --wait ran fully detached,
+// leaving CI with no way to see why a service was slow or never got healthy.
+func TestUpWaitStreamsLogs(t *testing.T) {
+	NewScenario(t, "up --wait must stream the services' logs while waiting, then return leaving them running").
+		Step("up --wait relays the service output and returns once it is healthy",
+			ComposeCmd("up", "--wait").Within(60*time.Second),
+			StdoutContains("booting"),
+			StdoutContains("ready-to-serve"),
+			ServiceHealthy("app"),
+			ServiceState("app", "running"))
+}
+
+// Pins that the --wait readiness check runs on the caller's context: on the
+// session's own it fails with "context canceled" once the followed service exits.
+func TestUpWaitNoAttachOneShot(t *testing.T) {
+	NewScenario(t, "up --wait must still succeed when the only service whose logs are followed exits during the wait").
+		Step("up --wait returns once the long-running service is up, the followed one-shot having exited",
+			ComposeCmd("up", "--wait", "--no-attach", "longrunning").Within(60*time.Second),
+			ServiceState("longrunning", "running"),
+			ServiceState("oneshot", "exited"))
+}
+
+func TestUpWaitDetachedStaysQuiet(t *testing.T) {
+	NewScenario(t, "up --detach --wait must not stream the services' logs, as an explicit --detach asks for").
+		Step("up -d --wait returns once the service is healthy without relaying its output",
+			ComposeCmd("up", "-d", "--wait").Within(60*time.Second),
+			OutputNotContains("ready-to-serve"),
+			ServiceHealthy("app"))
+}
+
+func TestUpWaitStreamsLogsOnUnhealthy(t *testing.T) {
+	NewScenario(t, "up --wait must stream the logs of a service that never gets healthy, and still fail").
+		Step("up --wait fails with the service output in the log",
+			ComposeCmd("up", "--wait").MayFail().Within(60*time.Second),
+			ExitCode(1),
+			StdoutContains("failing-to-boot"),
+			ServiceState("app", "running"))
+}
+
 func TestUpWaitTimeout(t *testing.T) {
 	s := NewScenario(t, "up --wait --wait-timeout must fail once the timeout expires instead of silently succeeding")
 	s.Step("up --wait fails after the timeout with the service still starting",
