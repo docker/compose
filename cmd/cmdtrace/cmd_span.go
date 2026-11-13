@@ -60,6 +60,7 @@ func Setup(cmd *cobra.Command, dockerCli command.Cli, args []string) error {
 	cmdSpan.SetAttributes(
 		attribute.StringSlice("cli.flags", getFlags(cmd.Flags())),
 		attribute.Bool("cli.isatty", dockerCli.In().IsTerminal()),
+		attribute.String("docker.context", dockerCli.CurrentContext()),
 	)
 
 	cmd.SetContext(ctx)
