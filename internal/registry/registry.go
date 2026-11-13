@@ -17,10 +17,15 @@
 package registry
 
 import (
+	"context"
+	"fmt"
+
 	"github.com/distribution/reference"
 	clitypes "github.com/docker/cli/cli/config/types"
 	"github.com/moby/moby/api/pkg/authconfig"
 	registrytypes "github.com/moby/moby/api/types/registry"
+	"github.com/moby/moby/client"
+	"github.com/opencontainers/go-digest"
 )
 
 const (
@@ -94,4 +99,24 @@ func EncodedAuth(ref reference.Named, cfg AuthProvider) (string, error) {
 		IdentityToken: auth.IdentityToken,
 		RegistryToken: auth.RegistryToken,
 	})
+}
+
+// ImageDigestResolver returns a func resolving an image reference to the
+// descriptor digest its registry holds for it, with the credentials of auth.
+// The lookup is made through DistributionInspect with ctx.
+func ImageDigestResolver(ctx context.Context, auth AuthProvider, c client.APIClient) func(named reference.Named) (digest.Digest, error) {
+	return func(named reference.Named) (digest.Digest, error) {
+		encodedAuth, err := EncodedAuth(named, auth)
+		if err != nil {
+			return "", err
+		}
+		inspect, err := c.DistributionInspect(ctx, named.String(), client.DistributionInspectOptions{
+			EncodedRegistryAuth: encodedAuth,
+		})
+		if err != nil {
+			return "",
+				fmt.Errorf("failed to resolve digest for %s: %w", named.String(), err)
+		}
+		return inspect.Descriptor.Digest, nil
+	}
 }

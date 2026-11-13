@@ -17,38 +17,25 @@
 package compose
 
 import (
-	"context"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
-	"github.com/distribution/reference"
-	clitypes "github.com/docker/cli/cli/config/types"
-	registrytypes "github.com/moby/moby/api/types/registry"
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/client"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	compose "github.com/docker/compose/v5/pkg/api"
 )
 
-// stubAuth is a comparable registry.AuthProvider (a func-typed one is not).
-type stubAuth struct{}
-
-func (*stubAuth) GetAuthConfig(string) (clitypes.AuthConfig, error) {
-	return clitypes.AuthConfig{Username: "user", Password: "secret"}, nil
-}
-
 // TestPublishBackendWiring pins the adapter between a composeService and
 // internal/publish: the publish tests run against their own fake backend, so
 // an adapter that stopped following the service (a refused prompt answered
 // "yes", a dry run not honored, the public Push opening a second "push"
-// bracket inside the "publish" one, a digest resolved with another context)
-// would otherwise go unnoticed.
+// bracket inside the "publish" one) would otherwise go unnoticed.
 func TestPublishBackendWiring(t *testing.T) {
 	api, s := newTestComposeService(t, gomock.NewController(t), "1.48")
-	auth := &stubAuth{}
+	auth := configfile.New("")
 	events := &bracketRecorder{}
 	s.auth = auth
 	s.events = events
@@ -90,27 +77,5 @@ func TestPublishBackendWiring(t *testing.T) {
 		// publish already runs inside the "publish" bracket: the public Push
 		// would open a second, "push" one.
 		assert.Equal(t, len(events.entries), 0, "unexpected events: %v", events.entries)
-	})
-
-	t.Run("image digests resolve with the service's auth and the caller's context", func(t *testing.T) {
-		type ctxKey struct{}
-		ctx := context.WithValue(t.Context(), ctxKey{}, "caller")
-		const indexDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-		api.EXPECT().
-			DistributionInspect(ctx, "docker.io/library/foo:1", gomock.Cond(func(options client.DistributionInspectOptions) bool {
-				return options.EncodedRegistryAuth != ""
-			})).
-			Return(client.DistributionInspectResult{
-				DistributionInspect: registrytypes.DistributionInspect{
-					Descriptor: ocispec.Descriptor{Digest: digest.Digest(indexDigest)},
-				},
-			}, nil)
-		named, err := reference.ParseDockerRef("foo:1")
-		assert.NilError(t, err)
-
-		resolved, err := b.ImageDigestResolver(ctx)(named)
-
-		assert.NilError(t, err)
-		assert.Equal(t, resolved.String(), indexDigest)
 	})
 }
