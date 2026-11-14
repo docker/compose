@@ -64,6 +64,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 		Short: "Creates containers for a service",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.pullChanged = cmd.Flags().Changed("pull")
+			opts.removeOrphans = removeOrphansFromEnv(cmd.Flags(), opts.removeOrphans)
 			if opts.Build && opts.noBuild {
 				return errors.New("--build and --no-build are incompatible")
 			}
@@ -115,6 +116,11 @@ func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *Backe
 	if err := rejectScheduledJobs(project); err != nil {
 		return err
 	}
+	ignoreOrphans, err := resolveIgnoreOrphans(project, createOpts.removeOrphans)
+	if err != nil {
+		return err
+	}
+	createOpts.ignoreOrphans = ignoreOrphans
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}

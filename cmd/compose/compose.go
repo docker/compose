@@ -72,6 +72,36 @@ const (
 	ComposeProgress = "COMPOSE_PROGRESS"
 )
 
+// removeOrphansFromEnv resolves the effective --remove-orphans value for a
+// command: an explicit flag always wins; otherwise COMPOSE_REMOVE_ORPHANS is
+// read from the process environment. Meant to be called from a command's
+// PreRunE — after the root PersistentPreRunE completed the process
+// environment with the COMPOSE_* keys of the project's local .env (see
+// setEnvWithDotEnv) — so every command carrying the flag resolves the
+// variable identically, whether it is exported in the shell or declared in
+// the local .env.
+func removeOrphansFromEnv(flags *pflag.FlagSet, current bool) bool {
+	if flags.Changed("remove-orphans") {
+		return current
+	}
+	return utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
+}
+
+// resolveIgnoreOrphans reads COMPOSE_IGNORE_ORPHANS and refuses its
+// combination with --remove-orphans. Deliberate source asymmetry with
+// removeOrphansFromEnv: the destructive COMPOSE_REMOVE_ORPHANS resolves
+// through the process environment, which setEnvWithDotEnv completes from the
+// local .env only — a remote model cannot enable container removal. The
+// benign COMPOSE_IGNORE_ORPHANS reads project.Environment, remote configs
+// included: the worst a remote model can do there is suppress a warning.
+func resolveIgnoreOrphans(project *types.Project, removeOrphans bool) (bool, error) {
+	ignoreOrphans := utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
+	if ignoreOrphans && removeOrphans {
+		return false, fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+	}
+	return ignoreOrphans, nil
+}
+
 // rawEnv load a dot env file using docker/cli key=value parser, without attempt to interpolate or evaluate values
 func rawEnv(r io.Reader, filename string, vars map[string]string, lookup func(key string) (string, bool)) error {
 	lines, err := kvfile.ParseFromReader(r, lookup)
@@ -750,16 +780,22 @@ func selectEventProcessor(dockerCli command.Cli, progress, ansi string, detached
 	}
 }
 
+// setEnvWithDotEnv completes the process environment with the COMPOSE_*
+// keys declared in the project's local .env (and explicit --env-file files),
+// so they act as per-project defaults for the matching CLI flags. Keys
+// already present in the process environment win, and an explicit flag wins
+// over both — see removeOrphansFromEnv.
+//
+// Remote configs (OCI, Git) passed with -f are skipped: their paths can't be
+// resolved here, since the remote loaders aren't registered in this
+// NewProjectOptions. That also suits the intent: COMPOSE_* variables are the
+// local user's choice to avoid repeating a flag on every command, and a
+// remote model must not steer the behavior of the CLI consuming it.
 func setEnvWithDotEnv(opts ProjectOptions, dockerCli command.Cli) error {
-	// Check if we're using a remote config (OCI or Git)
-	// If so, skip env loading as remote loaders haven't been initialized yet
-	// and trying to process the path would fail
 	remoteLoaders := opts.remoteLoaders(dockerCli)
 	for _, path := range opts.ConfigPaths {
 		for _, loader := range remoteLoaders {
 			if loader.Accept(path) {
-				// Remote config - skip env loading for now
-				// It will be loaded later when the project is fully initialized
 				return nil
 			}
 		}

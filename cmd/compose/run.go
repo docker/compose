@@ -39,7 +39,6 @@ import (
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
-	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type runOptions struct {
@@ -200,6 +199,7 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				display.Mode = display.ModeQuiet
 				backendOptions.Add(compose.WithEventProcessor(display.Quiet()))
 			}
+			options.removeOrphans = removeOrphansFromEnv(cmd.Flags(), options.removeOrphans)
 			createOpts.pullChanged = cmd.Flags().Changed("pull")
 			return nil
 		}),
@@ -218,7 +218,11 @@ func runCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backen
 				buildOpts.Progress = string(xprogress.QuietMode)
 			}
 
-			options.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
+			ignoreOrphans, err := resolveIgnoreOrphans(project, options.removeOrphans)
+			if err != nil {
+				return err
+			}
+			options.ignoreOrphans = ignoreOrphans
 			return runRun(ctx, backend, project, options, createOpts, buildOpts, dockerCli)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
