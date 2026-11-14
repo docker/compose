@@ -772,12 +772,29 @@ func (s *Service) checkForBindMount(project *types.Project) map[string][]types.S
 		}
 	}
 	for serviceName, config := range project.Services {
-		record(serviceName, config.Volumes)
+		record(serviceName, append(slices.Clone(config.Volumes), bindMountsAsVolumes(config.Mounts)...))
 	}
 	for name, job := range project.Jobs {
-		record(name, job.Volumes)
+		record(name, append(slices.Clone(job.Volumes), bindMountsAsVolumes(job.Mounts)...))
 	}
 	return allFindings
+}
+
+// bindMountsAsVolumes returns the bind mounts of `mounts` as the volumes they are the equivalent of, which is
+// all the warning about the host paths of a published model needs.
+func bindMountsAsVolumes(mounts []types.ServiceMountConfig) []types.ServiceVolumeConfig {
+	var volumes []types.ServiceVolumeConfig
+	for _, m := range mounts {
+		if m.Type == types.VolumeTypeBind {
+			volumes = append(volumes, types.ServiceVolumeConfig{
+				Type:     types.VolumeTypeBind,
+				Source:   m.Source,
+				Target:   m.Target,
+				ReadOnly: m.ReadOnly,
+			})
+		}
+	}
+	return volumes
 }
 
 func (s *Service) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {

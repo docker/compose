@@ -25,6 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	mmount "github.com/moby/moby/api/types/mount"
 	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
@@ -2240,5 +2241,56 @@ func runningContainer(t *testing.T, svc types.ServiceConfig, id string) Observed
 			ID: id, State: container.StateRunning,
 			Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
 		},
+	}
+}
+
+func TestHasVolumeMismatch_Mounts(t *testing.T) {
+	r := &reconciler{resolvedVolumes: map[string]ObservedVolume{"data": {Name: "myproject_data"}}}
+	service := types.ServiceConfig{ContainerSpec: types.ContainerSpec{
+		Mounts: []types.ServiceMountConfig{{Type: types.VolumeTypeVolume, Source: "data", Target: "/data"}},
+	}}
+	withVolume := func(name string) ObservedContainer {
+		return ObservedContainer{Summary: container.Summary{Mounts: []container.MountPoint{{Type: mmount.TypeVolume, Name: name}}}}
+	}
+
+	assert.Assert(t, !r.hasVolumeMismatch(service, withVolume("myproject_data")))
+	assert.Assert(t, r.hasVolumeMismatch(service, withVolume("replaced")))
+}
+
+// TestMountsVolume verifies only a named volume mounted by `volumes` or `mounts` makes a service a consumer of
+// the compose volume of that name: a bind whose path happens to be the volume key is not.
+func TestMountsVolume(t *testing.T) {
+	tests := []struct {
+		name    string
+		service types.ServiceConfig
+		want    bool
+	}{
+		{
+			name:    "volumes entry of type volume",
+			service: types.ServiceConfig{ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "data", Target: "/a"}}}},
+			want:    true,
+		},
+		{
+			name:    "mounts entry of type volume",
+			service: types.ServiceConfig{ContainerSpec: types.ContainerSpec{Mounts: []types.ServiceMountConfig{{Type: types.VolumeTypeVolume, Source: "data", Target: "/a"}}}},
+			want:    true,
+		},
+		{
+			name:    "volumes entry of type bind with the key as source",
+			service: types.ServiceConfig{ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeBind, Source: "data", Target: "/a"}}}},
+		},
+		{
+			name:    "mounts entry of type bind with the key as source",
+			service: types.ServiceConfig{ContainerSpec: types.ContainerSpec{Mounts: []types.ServiceMountConfig{{Type: types.VolumeTypeBind, Source: "data", Target: "/a"}}}},
+		},
+		{
+			name:    "volumes entry of type image with the key as source",
+			service: types.ServiceConfig{ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeImage, Source: "data", Target: "/a"}}}},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, mountsVolume(tt.service, "data"), tt.want)
+		})
 	}
 }

@@ -105,7 +105,7 @@ func runConvert(ctx context.Context, dockerCli command.Cli, p *ProjectOptions, o
 		return err
 	}
 
-	project, _, err := p.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes)
+	project, _, err := p.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, keepVolumes)
 	if err != nil {
 		return err
 	}

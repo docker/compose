@@ -577,11 +577,11 @@ func TestEnsureVolumesDown_KeepsVolumesOfOtherServices(t *testing.T) {
 	project := &types.Project{
 		Name: "prj",
 		Services: types.Services{
-			"web": {Name: "web", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "cache"}, {Source: "shared"}}}},
-			"db":  {Name: "db", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data"}}}},
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "cache"}, {Type: types.VolumeTypeVolume, Source: "shared"}}}},
+			"db":  {Name: "db", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "data"}}}},
 		},
 		DisabledServices: types.Services{
-			"worker": {Name: "worker", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "shared"}}}},
+			"worker": {Name: "worker", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeVolume, Source: "shared"}}}},
 		},
 		Volumes: types.Volumes{
 			"cache":  {Name: "prj_cache"},

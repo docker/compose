@@ -72,6 +72,11 @@ func TestResolveImageDigests(t *testing.T) {
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
 					"./data:/short",
 				},
+				// `mounts` entries are pinned the same way as `volumes` ones
+				"mounts": []any{
+					map[string]any{"type": "image", "source": "someimage:latest", "target": "/mounted"},
+					map[string]any{"type": "bind", "source": "/host", "target": "/bind-mounted"},
+				},
 			},
 			"builder": map[string]any{
 				"image": "docker.io/library/pinned@" + testDigest,
@@ -119,6 +124,9 @@ func TestResolveImageDigests(t *testing.T) {
 	assert.Equal(t, volumes[2].(map[string]any)["source"], "docker.io/library/builder:latest@"+builderDigest)
 	assert.Equal(t, volumes[3].(map[string]any)["source"], "/host")
 	assert.Equal(t, volumes[4], "./data:/short")
+	mounts := service["mounts"].([]any)
+	assert.Equal(t, mounts[0].(map[string]any)["source"], "docker.io/library/someimage:latest@"+volumeDigest)
+	assert.Equal(t, mounts[1].(map[string]any)["source"], "/host")
 	assert.Equal(t, services["builder"].(map[string]any)["image"], "docker.io/library/pinned@"+testDigest)
 	dataVolumes := services["data"].(map[string]any)["volumes"].([]any)
 	assert.Equal(t, dataVolumes[0].(map[string]any)["source"], "docker.io/library/someimage:latest@"+volumeDigest)
@@ -283,11 +291,18 @@ func TestLockModel(t *testing.T) {
 					map[string]any{"type": "image", "source": "docker.io/library/someimage@" + testDigest, "target": "/data"},
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
 				},
+				"mounts": []any{
+					map[string]any{"type": "image", "source": "docker.io/library/mounted@" + testDigest, "target": "/mounted"},
+					map[string]any{"type": "bind", "source": "/host", "target": "/bind-mounted"},
+				},
 			},
 			"b": map[string]any{
 				"image": "docker.io/library/alpine@" + testDigest,
 				"volumes": []any{
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
+				},
+				"mounts": []any{
+					map[string]any{"type": "bind", "source": "/host", "target": "/bind-mounted"},
 				},
 			},
 		},
@@ -303,6 +318,9 @@ func TestLockModel(t *testing.T) {
 				// volumes keeps its []any raw-model type after filtering
 				"volumes": []any{
 					map[string]any{"type": "image", "source": "docker.io/library/someimage@" + testDigest, "target": "/data"},
+				},
+				"mounts": []any{
+					map[string]any{"type": "image", "source": "docker.io/library/mounted@" + testDigest, "target": "/mounted"},
 				},
 			},
 			"b": map[string]any{
