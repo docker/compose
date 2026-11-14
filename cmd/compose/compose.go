@@ -626,7 +626,8 @@ func runParentPreRun(cmd *cobra.Command, args []string) error {
 }
 
 // resolveAnsiMode reconciles --ansi with the deprecated --no-ansi flag and
-// the COMPOSE_ANSI environment variable (flag wins over environment).
+// the COMPOSE_ANSI environment variable (flag wins over environment). cmd is
+// the executed command, possibly a sub-command of compose.
 func resolveAnsiMode(cmd *cobra.Command, ansi string, noAnsi bool) (string, error) {
 	if noAnsi {
 		if ansi != "auto" {
@@ -635,10 +636,28 @@ func resolveAnsiMode(cmd *cobra.Command, ansi string, noAnsi bool) (string, erro
 		ansi = "never"
 		fmt.Fprint(os.Stderr, "option '--no-ansi' is DEPRECATED ! Please use '--ansi' instead.\n")
 	}
-	if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !cmd.Flags().Changed("ansi") {
+	composeCmd, err := findComposeCommand(cmd)
+	if err != nil {
+		return "", err
+	}
+	if v, ok := os.LookupEnv("COMPOSE_ANSI"); ok && !composeCmd.Flags().Changed("ansi") {
 		ansi = v
 	}
 	return ansi, nil
+}
+
+// findComposeCommand walks up from cmd to the compose command, which owns the
+// global flags (--ansi, --parallel, ...): they are registered there only, so
+// whether one was set explicitly can't be read from the executed sub-command.
+func findComposeCommand(cmd *cobra.Command) (*cobra.Command, error) {
+	composeCmd := cmd
+	for composeCmd.Name() != PluginName {
+		if !composeCmd.HasParent() {
+			return nil, fmt.Errorf("error parsing command line, expected %q", PluginName)
+		}
+		composeCmd = composeCmd.Parent()
+	}
+	return composeCmd, nil
 }
 
 // applyAnsiMode configures ANSI output, honoring the NO_COLOR convention
@@ -680,12 +699,9 @@ func normalizeProjectOptions(opts *ProjectOptions) error {
 // resolveMaxConcurrency returns the parallelism limit: COMPOSE_PARALLEL_LIMIT
 // applies unless --parallel was set explicitly on the compose command.
 func resolveMaxConcurrency(cmd *cobra.Command, parallel int) (int, error) {
-	composeCmd := cmd
-	for composeCmd.Name() != PluginName {
-		if !composeCmd.HasParent() {
-			return 0, fmt.Errorf("error parsing command line, expected %q", PluginName)
-		}
-		composeCmd = composeCmd.Parent()
+	composeCmd, err := findComposeCommand(cmd)
+	if err != nil {
+		return 0, err
 	}
 
 	if v, ok := os.LookupEnv(ComposeParallelLimit); ok && !composeCmd.Flags().Changed("parallel") {
