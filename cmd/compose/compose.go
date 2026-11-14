@@ -46,6 +46,7 @@ import (
 
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/cmd/formatter"
+	"github.com/docker/compose/v5/cmd/prompt"
 	"github.com/docker/compose/v5/internal/tracing"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
@@ -118,7 +119,10 @@ func AdaptCmd(fn CobraCommand) func(cmd *cobra.Command, args []string) error {
 		}()
 
 		err := fn(ctx, cmd, args)
-		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) {
+		// Ctrl+C at an interactive prompt never raises SIGINT (the prompt
+		// holds the terminal in raw mode): it surfaces as prompt.ErrInterrupt
+		// and deserves the same 130 status a real SIGINT gets.
+		if api.IsErrCanceled(err) || errors.Is(ctx.Err(), context.Canceled) || errors.Is(err, prompt.ErrInterrupt) {
 			err = dockercli.StatusError{
 				StatusCode: 130,
 			}
