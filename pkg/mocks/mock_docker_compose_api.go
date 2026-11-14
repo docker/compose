@@ -140,7 +140,7 @@ func (mr *MockComposeMockRecorder) Events(ctx, projectName, options any) *gomock
 }
 
 // Exec mocks base method.
-func (m *MockCompose) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+func (m *MockCompose) Exec(ctx context.Context, projectName string, options api.ExecOptionsProvider) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Exec", ctx, projectName, options)
 	ret0, _ := ret[0].(int)
@@ -1022,7 +1022,7 @@ func (mr *MockRunnerMockRecorder) Copy(ctx, projectName, options any) *gomock.Ca
 }
 
 // Exec mocks base method.
-func (m *MockRunner) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+func (m *MockRunner) Exec(ctx context.Context, projectName string, options api.ExecOptionsProvider) (int, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Exec", ctx, projectName, options)
 	ret0, _ := ret[0].(int)
@@ -1153,6 +1153,43 @@ func (m *MockProjectLoader) LoadProject(ctx context.Context, options api.Project
 func (mr *MockProjectLoaderMockRecorder) LoadProject(ctx, options any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "LoadProject", reflect.TypeOf((*MockProjectLoader)(nil).LoadProject), ctx, options)
+}
+
+// MockExecOptionsProvider is a mock of ExecOptionsProvider interface.
+type MockExecOptionsProvider struct {
+	ctrl     *gomock.Controller
+	recorder *MockExecOptionsProviderMockRecorder
+}
+
+// MockExecOptionsProviderMockRecorder is the mock recorder for MockExecOptionsProvider.
+type MockExecOptionsProviderMockRecorder struct {
+	mock *MockExecOptionsProvider
+}
+
+// NewMockExecOptionsProvider creates a new mock instance.
+func NewMockExecOptionsProvider(ctrl *gomock.Controller) *MockExecOptionsProvider {
+	mock := &MockExecOptionsProvider{ctrl: ctrl}
+	mock.recorder = &MockExecOptionsProviderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockExecOptionsProvider) EXPECT() *MockExecOptionsProviderMockRecorder {
+	return m.recorder
+}
+
+// ToExecOptions mocks base method.
+func (m *MockExecOptionsProvider) ToExecOptions() api.ExecOptions {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ToExecOptions")
+	ret0, _ := ret[0].(api.ExecOptions)
+	return ret0
+}
+
+// ToExecOptions indicates an expected call of ToExecOptions.
+func (mr *MockExecOptionsProviderMockRecorder) ToExecOptions() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ToExecOptions", reflect.TypeOf((*MockExecOptionsProvider)(nil).ToExecOptions))
 }
 
 // MockLogConsumer is a mock of LogConsumer interface.
