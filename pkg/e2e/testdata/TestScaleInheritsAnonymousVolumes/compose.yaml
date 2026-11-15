@@ -1,0 +1,15 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on:
+      - dep
+  dep:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - /data
+    environment:
+      TAG: ${TAG:-initial}
