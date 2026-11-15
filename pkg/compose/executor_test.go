@@ -239,10 +239,11 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 			Number:     1,
 		}, "")
 		stop := plan.AddNode(planning.Operation{
-			Type:       planning.OpStopContainer,
-			ResourceID: "service:web:1",
-			Cause:      fmt.Sprintf("replaced by #%d", create.ID),
-			Container:  &old,
+			Type:        planning.OpStopContainer,
+			ResourceID:  "service:web:1",
+			Cause:       fmt.Sprintf("replaced by #%d", create.ID),
+			Container:   &old,
+			SkipPreStop: true,
 		}, "", create)
 		remove := plan.AddNode(planning.Operation{
 			Type:       planning.OpRemoveContainer,
@@ -335,13 +336,13 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 		})
 	}
 
-	t.Run("a recreate runs the hook of the replaced container", func(t *testing.T) {
+	// The replacement already exists when the old container is stopped: a
+	// failing hook there would leave it behind under its temporary name.
+	t.Run("a recreate does not run the hook of the replaced container", func(t *testing.T) {
 		svc, apiClient := newTestService(t)
 		created := expectReplacementCreated(apiClient)
-		hook := expectHook(apiClient, 0)
-		hook.After(created)
 		apiClient.EXPECT().ContainerStop(gomock.Any(), "c1", gomock.Any()).
-			Return(client.ContainerStopResult{}, nil).After(hook)
+			Return(client.ContainerStopResult{}, nil).After(created)
 		apiClient.EXPECT().ContainerRemove(gomock.Any(), "c1", gomock.Any()).
 			Return(client.ContainerRemoveResult{}, nil)
 		apiClient.EXPECT().ContainerRename(gomock.Any(), "new-id", client.ContainerRenameOptions{NewName: "test-web-1"}).
@@ -349,15 +350,6 @@ func TestExecutePlanStopContainerRunsPreStop(t *testing.T) {
 
 		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), recreatePlan(webContainer(nil)))
 		assert.NilError(t, err)
-	})
-
-	t.Run("a failing hook leaves the replaced container running and its replacement created", func(t *testing.T) {
-		svc, apiClient := newTestService(t)
-		expectReplacementCreated(apiClient)
-		expectHook(apiClient, 1)
-
-		err := svc.executePlan(t.Context(), project, emptyObservedState("test"), recreatePlan(webContainer(nil)))
-		assert.ErrorContains(t, err, "web hook exited with status 1")
 	})
 }
 

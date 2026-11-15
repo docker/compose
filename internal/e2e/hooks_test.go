@@ -57,9 +57,11 @@ func TestPreStopHookSuccess(t *testing.T) {
 }
 
 // Regression test for https://github.com/docker/compose/issues/14476: up stopped
-// containers without running their pre_stop hooks.
+// containers without running their pre_stop hooks. The container a recreate
+// replaces is the exception, as before the plan engine: its replacement already
+// exists, and a failing hook would leave it behind.
 func TestPreStopHookWhenUpStopsAContainer(t *testing.T) {
-	s := NewScenario(t, "up must run the pre_stop hooks of every container it stops")
+	s := NewScenario(t, "up must run the pre_stop hooks of every container it stops, except the one a recreate replaces")
 	s.Step("up starts the services with two replicas of scaled",
 		ComposeCmd("up", "-d", "--scale", "scaled=2"),
 		ServiceScale("scaled", 2)).
@@ -78,9 +80,8 @@ func TestPreStopHookWhenUpStopsAContainer(t *testing.T) {
 		Step("a config change recreates the service",
 			ComposeCmd("up", "-d").WithEnv("DB_V=2", "RECREATED_V=2"),
 			Recreated("recreated")).
-		Step("the replaced container ran its hook",
-			probeVolume(s, "cat", "/mnt/recreated"),
-			OutputContains("pre_stop"))
+		Step("the replaced container did not run its hook",
+			probeVolume(s, "test", "!", "-e", "/mnt/recreated"))
 }
 
 func TestPreStopHookInError(t *testing.T) {
