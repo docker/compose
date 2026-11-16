@@ -512,7 +512,7 @@ func TestEnsureVolumesDown_SkipsVolumeNotOwnedByProject(t *testing.T) {
 	apiClient.EXPECT().VolumeRemove(gomock.Any(), "own-data", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
 	// no VolumeRemove expectation for shared-data and unlabeled-data — a call for either fails the test
 
-	for _, op := range svc.ensureVolumesDown(t.Context(), project, nil) {
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, nil, nil) {
 		assert.NilError(t, op())
 	}
 
@@ -557,9 +557,46 @@ func TestEnsureVolumesDown_KeepsVolumeWhenInspectFails(t *testing.T) {
 		Return(client.VolumeInspectResult{}, errors.New("engine unavailable"))
 	// no VolumeRemove expectation — a call for prj-data fails the test
 
-	ops := svc.ensureVolumesDown(t.Context(), project, nil)
+	ops := svc.ensureVolumesDown(t.Context(), project, nil, nil)
 	assert.Equal(t, len(ops), 1)
 	assert.Error(t, ops[0](), "failed to inspect volume prj-data: engine unavailable")
+}
+
+// TestEnsureVolumesDown_KeepsVolumesOfOtherServices guards #14448: down -v
+// with services must not remove a volume a service it leaves in place still
+// uses, whether a dependency of the selection or a service outside of it.
+func TestEnsureVolumesDown_KeepsVolumesOfOtherServices(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	apiClient, cli := prepareMocks(mockCtrl)
+	svcIface, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{
+		Name: "prj",
+		Services: types.Services{
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "cache"}, {Source: "shared"}}}},
+			"db":  {Name: "db", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data"}}}},
+		},
+		DisabledServices: types.Services{
+			"worker": {Name: "worker", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "shared"}}}},
+		},
+		Volumes: types.Volumes{
+			"cache":  {Name: "prj_cache"},
+			"data":   {Name: "prj_data"},
+			"shared": {Name: "prj_shared"},
+		},
+	}
+	apiClient.EXPECT().VolumeInspect(gomock.Any(), "prj_cache", gomock.Any()).
+		Return(client.VolumeInspectResult{Volume: volume.Volume{Name: "prj_cache", Labels: map[string]string{compose.ProjectLabel: "prj"}}}, nil)
+	apiClient.EXPECT().VolumeRemove(gomock.Any(), "prj_cache", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
+	// no expectation for prj_data and prj_shared — a call for either fails the test
+
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, []string{"web"}, nil) {
+		assert.NilError(t, op())
+	}
 }
 
 func TestDownRemoveImages(t *testing.T) {

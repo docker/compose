@@ -14,9 +14,10 @@
    limitations under the License.
 */
 
-package compose
+package publish
 
 import (
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
@@ -31,16 +32,57 @@ import (
 	"github.com/distribution/reference"
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/google/go-cmp/cmp"
-	"github.com/moby/moby/api/types/registry"
+	registrytypes "github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
+	"github.com/opencontainers/go-digest"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal"
 	"github.com/docker/compose/v5/internal/progress"
+	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/mocks"
 )
+
+// fakeBackend is the engine of the publish tests: it answers the prompts with
+// the given function, resolves digests through its API client the way the
+// engine does, and ignores the events.
+type fakeBackend struct {
+	apiClient client.APIClient
+	prompt    func(message string, defaultValue bool) (bool, error)
+	auth      registry.AuthProvider
+}
+
+func (f *fakeBackend) APIClient() client.APIClient         { return f.apiClient }
+func (f *fakeBackend) AuthProvider() registry.AuthProvider { return f.auth }
+func (f *fakeBackend) Events() api.EventProcessor          { return progress.Noop{} }
+func (f *fakeBackend) DryRun() bool                        { return false }
+
+func (f *fakeBackend) Prompt(message string, defaultValue bool) (bool, error) {
+	return f.prompt(message, defaultValue)
+}
+
+func (f *fakeBackend) ImageDigestResolver(ctx context.Context) func(named reference.Named) (digest.Digest, error) {
+	return func(named reference.Named) (digest.Digest, error) {
+		auth, err := registry.EncodedAuth(named, f.auth)
+		if err != nil {
+			return "", err
+		}
+		inspect, err := f.apiClient.DistributionInspect(ctx, named.String(), client.DistributionInspectOptions{
+			EncodedRegistryAuth: auth,
+		})
+		if err != nil {
+			return "", fmt.Errorf("failed to resolve digest for %s: %w", named.String(), err)
+		}
+		return inspect.Descriptor.Digest, nil
+	}
+}
+
+func (f *fakeBackend) Push(context.Context, *types.Project, api.PushOptions) error {
+	return nil
+}
 
 func Test_createLayers(t *testing.T) {
 	project, err := loader.LoadWithContext(t.Context(), types.ConfigDetails{
@@ -55,7 +97,7 @@ func Test_createLayers(t *testing.T) {
 	assert.NilError(t, err)
 	project.ComposeFiles = []string{"testdata/publish/compose.yaml"}
 
-	service := &composeService{}
+	service := &Service{}
 	layers, err := service.createLayers(t.Context(), project, api.PublishOptions{
 		WithEnvironment: true,
 	})
@@ -136,9 +178,7 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	declined := func(message string, defaultValue bool) (bool, error) {
 		return false, nil
 	}
-	svc := &composeService{
-		prompt: declined,
-	}
+	svc := &Service{backend: &fakeBackend{prompt: declined}}
 
 	accept, err := svc.preChecks(t.Context(), project, api.PublishOptions{})
 	assert.NilError(t, err)
@@ -227,7 +267,7 @@ func Test_checkForSensitiveData_optional_env_file_missing(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	findings, err := svc.checkForSensitiveData(t.Context(), project)
 	assert.NilError(t, err, "optional missing env file should not cause error during scan")
 	assert.Equal(t, len(findings), 0)
@@ -251,7 +291,7 @@ func Test_checkForSensitiveData_optional_env_file_present(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	findings, err := svc.checkForSensitiveData(t.Context(), project)
 	assert.NilError(t, err)
 	assert.Assert(t, len(findings) > 0, "present optional env file should still be scanned for secrets")
@@ -272,7 +312,7 @@ func Test_checkForSensitiveData_required_env_file_missing(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	_, err := svc.checkForSensitiveData(t.Context(), project)
 	assert.ErrorContains(t, err, "not found", "required missing env file should fail")
 }
@@ -630,7 +670,7 @@ services:
 	})
 
 	prompt := &fakePrompt{}
-	svc := &composeService{prompt: prompt.handler}
+	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
 	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
 	assert.NilError(t, err)
@@ -649,7 +689,7 @@ services:
 	})
 
 	prompt := &fakePrompt{answers: []bool{true}}
-	svc := &composeService{prompt: prompt.handler}
+	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
 	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
 	assert.NilError(t, err)
@@ -670,7 +710,7 @@ services:
 	})
 
 	prompt := &fakePrompt{answers: []bool{false}}
-	svc := &composeService{prompt: prompt.handler}
+	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
 	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
@@ -700,7 +740,7 @@ configs:
 	})
 
 	prompt := &fakePrompt{answers: []bool{true}}
-	svc := &composeService{prompt: prompt.handler}
+	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
 	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{WithEnvironment: true})
 	assert.NilError(t, err)
@@ -724,7 +764,7 @@ configs:
 	})
 
 	prompt := &fakePrompt{answers: []bool{true, true}}
-	svc := &composeService{prompt: prompt.handler}
+	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
 	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
 	assert.NilError(t, err)
@@ -752,12 +792,9 @@ func Test_publish_decline_returns_ErrCanceled(t *testing.T) {
 	declined := func(message string, defaultValue bool) (bool, error) {
 		return false, nil
 	}
-	svc := &composeService{
-		prompt: declined,
-		events: progress.Noop{},
-	}
+	svc := &Service{backend: &fakeBackend{prompt: declined}}
 
-	err := svc.publish(t.Context(), project, "docker.io/myorg/myapp:latest", api.PublishOptions{})
+	err := svc.Publish(t.Context(), project, "docker.io/myorg/myapp:latest", api.PublishOptions{})
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
 		"expected api.ErrCanceled when user declines, got: %v", err)
 }
@@ -766,9 +803,8 @@ func Test_generateImageDigestsOverride_resolvesDependentImages(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	apiClient, cli := prepareMocks(mockCtrl)
-	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
-	tested := &composeService{dockerCli: cli}
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	tested := &Service{backend: &fakeBackend{apiClient: apiClient, auth: configfile.New("")}}
 
 	// distinct digests per resolved reference, so attaching a digest to the wrong image would fail
 	const (
@@ -798,15 +834,15 @@ func Test_generateImageDigestsOverride_resolvesDependentImages(t *testing.T) {
 	// per dependent image
 	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/nginx:latest", gomock.Any()).
 		Return(client.DistributionInspectResult{
-			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: serviceDigest}},
+			DistributionInspect: registrytypes.DistributionInspect{Descriptor: v1.Descriptor{Digest: serviceDigest}},
 		}, nil)
 	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/hookimage:latest", gomock.Any()).
 		Return(client.DistributionInspectResult{
-			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: hookDigest}},
+			DistributionInspect: registrytypes.DistributionInspect{Descriptor: v1.Descriptor{Digest: hookDigest}},
 		}, nil)
 	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/someimage:latest", gomock.Any()).
 		Return(client.DistributionInspectResult{
-			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: volumeDigest}},
+			DistributionInspect: registrytypes.DistributionInspect{Descriptor: v1.Descriptor{Digest: volumeDigest}},
 		}, nil)
 
 	override, err := tested.generateImageDigestsOverride(t.Context(), project)
@@ -822,9 +858,8 @@ func Test_generateImageDigestsOverride_resolvesJobImages(t *testing.T) {
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 
-	apiClient, cli := prepareMocks(mockCtrl)
-	cli.EXPECT().ConfigFile().Return(configfile.New("")).AnyTimes()
-	tested := &composeService{dockerCli: cli}
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	tested := &Service{backend: &fakeBackend{apiClient: apiClient, auth: configfile.New("")}}
 
 	const jobDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 	project := &types.Project{
@@ -839,7 +874,7 @@ func Test_generateImageDigestsOverride_resolvesJobImages(t *testing.T) {
 
 	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate:latest", gomock.Any()).
 		Return(client.DistributionInspectResult{
-			DistributionInspect: registry.DistributionInspect{Descriptor: v1.Descriptor{Digest: jobDigest}},
+			DistributionInspect: registrytypes.DistributionInspect{Descriptor: v1.Descriptor{Digest: jobDigest}},
 		}, nil)
 
 	override, err := tested.generateImageDigestsOverride(t.Context(), project)
@@ -859,7 +894,7 @@ func Test_checkOnlyBuildSection_rejectsJobWithoutImage(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	ok, err := svc.checkOnlyBuildSection(project)
 	assert.Assert(t, !ok)
 	assert.ErrorContains(t, err, `"migrate"`)
@@ -876,7 +911,7 @@ func Test_checkOnlyBuildSection_acceptsJobWithImage(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	ok, err := svc.checkOnlyBuildSection(project)
 	assert.NilError(t, err)
 	assert.Assert(t, ok)
@@ -900,7 +935,7 @@ func Test_checkForBindMount_flagsJobBindMount(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	findings := svc.checkForBindMount(project)
 	assert.Equal(t, len(findings["migrate"]), 1)
 	assert.Equal(t, findings["migrate"][0].Source, "/host/data")
@@ -924,7 +959,7 @@ func Test_checkForSensitiveData_jobEnvFile(t *testing.T) {
 		},
 	}
 
-	svc := &composeService{}
+	svc := &Service{}
 	findings, err := svc.checkForSensitiveData(t.Context(), project)
 	assert.NilError(t, err)
 	assert.Assert(t, len(findings) > 0, "job env file should be scanned for secrets like a service's")

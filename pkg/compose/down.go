@@ -20,6 +20,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -128,7 +130,14 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	// for why a per-service limiter alone isn't enough.
 	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
+	var (
+		tornDownMu sync.Mutex
+		tornDown   []string
+	)
 	err = depgraph.InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+		tornDownMu.Lock()
+		tornDown = append(tornDown, service)
+		tornDownMu.Unlock()
 		return s.downService(ctx, project, containers, options, service, limiter)
 	}, depgraph.WithRootNodesAndDown(options.Services))
 	if err != nil {
@@ -155,7 +164,11 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Volumes {
-		ops = append(ops, s.ensureVolumesDown(ctx, project, limiter)...)
+		var scope []string
+		if len(options.Services) > 0 {
+			scope = tornDown
+		}
+		ops = append(ops, s.ensureVolumesDown(ctx, project, scope, limiter)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -176,10 +189,15 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, limiter *semaphore.Weighted) []downOp {
+// With services given, a volume another service uses is kept: the engine
+// refuses to remove it only while a container holds it.
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, services []string, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
-	for _, vol := range project.Volumes {
+	for key, vol := range project.Volumes {
 		if vol.External {
+			continue
+		}
+		if len(services) > 0 && usedByOtherServices(project, key, services) {
 			continue
 		}
 		volumeName := vol.Name
@@ -189,6 +207,19 @@ func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.P
 	}
 
 	return ops
+}
+
+// usedByOtherServices tells whether a service outside the given ones uses the volume.
+func usedByOtherServices(project *types.Project, volumeKey string, services []string) bool {
+	all := make(types.Services, len(project.Services)+len(project.DisabledServices))
+	maps.Copy(all, project.DisabledServices)
+	maps.Copy(all, project.Services)
+	for _, consumer := range volumeConsumers(all, volumeKey) {
+		if !slices.Contains(services, consumer) {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *composeService) ensureImagesDown(ctx context.Context, project *types.Project, options api.DownOptions, limiter *semaphore.Weighted) []downOp {

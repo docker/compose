@@ -3,7 +3,7 @@ module github.com/docker/compose/v5
 go 1.26.10
 
 require (
-	github.com/DefangLabs/secret-detector v0.0.0-20260916192156-3e28d7ed64df
+	github.com/DefangLabs/secret-detector v1.1.0
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
@@ -29,8 +29,8 @@ require (
 	github.com/mitchellh/go-ps v1.0.0
 	github.com/moby/buildkit v0.33.1
 	github.com/moby/go-archive v0.3.3
-	github.com/moby/moby/api v1.56.1
-	github.com/moby/moby/client v0.6.2
+	github.com/moby/moby/api v1.57.0
+	github.com/moby/moby/client v0.6.3
 	github.com/moby/patternmatcher v0.6.1
 	github.com/moby/sys/atomicwriter v0.1.0
 	github.com/morikuni/aec v1.1.0
@@ -53,8 +53,8 @@ require (
 	go.uber.org/goleak v1.3.0
 	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v4 v4.0.0
-	golang.org/x/sync v0.24.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/sync v0.25.0
+	golang.org/x/sys v0.50.0
 	google.golang.org/grpc v1.85.0
 	gotest.tools/v3 v3.5.2
 	tags.cncf.io/container-device-interface v1.1.1
@@ -90,7 +90,6 @@ require (
 	github.com/in-toto/attestation v1.2.0 // indirect
 	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect

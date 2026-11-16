@@ -125,6 +125,7 @@ func TestComposeRunInheritsAnonymousVolumes(t *testing.T) {
 		Step("data lands in the dependency's anonymous volume",
 			ComposeCmd("exec", "dep", "sh", "-c", "echo kept > /data/marker")).
 		Step("a diverged dependency recreated by run still sees that data",
+			// silences the orphan warning about the one-off left by the first run
 			ComposeCmd("run", "task").WithEnv("TAG=two", "COMPOSE_IGNORE_ORPHANS=True"),
 			Recreated("dep"),
 			ExecOutputContains("dep", "cat /data/marker", "kept"))

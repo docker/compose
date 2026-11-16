@@ -80,6 +80,9 @@ func TestApplyScaleOpt(t *testing.T) {
 	assert.Equal(t, *bar.Scale, 3)
 	assert.Equal(t, *bar.Deploy.Replicas, 3)
 
+	err = applyScaleOpts(&p, []string{"=2"})
+	assert.Error(t, err, `invalid --scale option "=2". Should be SERVICE=NUM`)
+
 	err = applyScaleOpts(&p, []string{"foo=-1"})
 	assert.Error(t, err, `invalid --scale option "foo=-1": replica count must be a non-negative integer`)
 }

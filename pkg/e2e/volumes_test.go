@@ -247,3 +247,24 @@ func TestDownVolumesKeepsVolumesNotOwned(t *testing.T) {
 			VolumeExists(shared),
 			VolumeExists(unmanaged))
 }
+
+func TestDownVolumesOfSelectedServices(t *testing.T) {
+	// Regression test for https://github.com/docker/compose/issues/14448:
+	// `down -v web` removed the volumes of web's dependencies too, which only
+	// the engine's "in use" check protected, so they were lost once the
+	// dependency's container was gone.
+	s := NewScenario(t, "down -v with services must only remove the volumes of the services it tears down")
+	s.Step("up creates the volumes of every service",
+		ComposeCmd("up", "-d"),
+		VolumeExists(s.Project()+"_cache"),
+		VolumeExists(s.Project()+"_data"),
+		VolumeExists(s.Project()+"_shared")).
+		Step("down removes the containers and keeps the volumes",
+			ComposeCmd("down", "-t", "0"),
+			VolumeExists(s.Project()+"_data")).
+		Step("down -v web removes web's own volume and keeps those other services still use",
+			ComposeCmd("down", "-v", "-t", "0", "web"),
+			VolumeAbsent(s.Project()+"_cache"),
+			VolumeExists(s.Project()+"_data"),
+			VolumeExists(s.Project()+"_shared"))
+}
