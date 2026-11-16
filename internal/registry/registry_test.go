@@ -22,6 +22,7 @@ import (
 
 	"github.com/distribution/reference"
 	clitypes "github.com/docker/cli/cli/config/types"
+	"github.com/moby/moby/api/pkg/authconfig"
 	registrytypes "github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
 	"github.com/opencontainers/go-digest"
@@ -50,7 +51,8 @@ func TestImageDigestResolverUsesDistributionDigest(t *testing.T) {
 	const indexDigest = "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	mockAPI.EXPECT().
 		DistributionInspect(ctx, "docker.io/library/foo:1", gomock.Cond(func(options client.DistributionInspectOptions) bool {
-			return options.EncodedRegistryAuth != ""
+			decoded, err := authconfig.Decode(options.EncodedRegistryAuth)
+			return err == nil && decoded.Username == "user" && decoded.Password == "secret"
 		})).
 		Return(client.DistributionInspectResult{
 			DistributionInspect: registrytypes.DistributionInspect{

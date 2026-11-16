@@ -367,15 +367,8 @@ func (s *composeService) pullServiceImage(ctx context.Context, service types.Ser
 
 // ImageDigestResolver creates a func able to resolve image digest from a
 // docker ref, for pinning image references in a reproducible compose model
-// (`compose publish` / `config --resolve-image-digests`).
-//
-// It deliberately returns the registry descriptor digest — the multi-platform
-// index digest for multi-arch images — via DistributionInspect: a published
-// compose file must stay deployable on any platform. This is NOT the same
-// digest kind as localContentDigest, which selects the platform-specific
-// runnable manifest to compare a running container with a fresh build/pull;
-// never funnel this resolution through the local content-digest producer, and
-// never pin a published reference with a per-platform digest.
+// (`config --resolve-image-digests`). It delegates to
+// registry.ImageDigestResolver, which documents which digest kind it returns.
 //
 // Docker Hub credentials come from the Docker Desktop session first.
 func ImageDigestResolver(ctx context.Context, file *configfile.ConfigFile, apiClient client.APIClient) func(named reference.Named) (digest.Digest, error) {

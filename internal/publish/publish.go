@@ -359,7 +359,8 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 }
 
 func (s *Service) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
-	project, err := project.WithImagesResolved(registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.APIClient()))
+	resolver := registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.APIClient())
+	project, err := project.WithImagesResolved(resolver)
 	if err != nil {
 		return nil, err
 	}
@@ -374,7 +375,7 @@ func (s *Service) generateImageDigestsOverride(ctx context.Context, project *typ
 				ContainerSpec: types.ContainerSpec{Image: job.Image},
 			}
 		}
-		jobsAsServices, err = jobsAsServices.WithImagesResolved(registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.APIClient()))
+		jobsAsServices, err = jobsAsServices.WithImagesResolved(resolver)
 		if err != nil {
 			return nil, err
 		}
