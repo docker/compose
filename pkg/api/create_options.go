@@ -23,9 +23,10 @@ import (
 	"strings"
 )
 
-// InvalidOptionError reports an option set to a value it does not accept. It is
-// returned, before any side effect, by CreateOptions.Validate and therefore by
-// Compose.Create and Compose.Up.
+// InvalidOptionError reports an option set to a value it does not accept, or a
+// required option left unset. It is returned, before any side effect, by the
+// Validate method of the options of an operation (CreateOptions.Validate,
+// EventsOptions.Validate…), and therefore by the operation itself.
 //
 // It matches ErrInvalidOption with errors.Is, and callers needing the details
 // can retrieve it with errors.As.
@@ -35,11 +36,18 @@ type InvalidOptionError struct {
 	Option string
 	// Value is the value that was set.
 	Value string
-	// Allowed lists the values the option accepts.
+	// Allowed lists the values the option accepts, when it is a closed set.
 	Allowed []string
+	// Reason explains what is wrong when there is no value to blame, for
+	// instance a required option left unset. It replaces Value and Allowed in
+	// the message.
+	Reason string
 }
 
 func (e *InvalidOptionError) Error() string {
+	if e.Reason != "" {
+		return fmt.Sprintf("%s (%s): %s", ErrInvalidOption, e.Option, e.Reason)
+	}
 	return fmt.Sprintf("%s (%s): %q is not one of %s", ErrInvalidOption, e.Option, e.Value, strings.Join(e.Allowed, ", "))
 }
 

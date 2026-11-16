@@ -63,7 +63,7 @@ var (
 	// replica of it, that has no running container. See ServiceNotRunningError.
 	ErrNotRunning = errors.New("not running")
 	// ErrInvalidOption is returned when an option is set to a value it does
-	// not accept. See InvalidOptionError.
+	// not accept, or a required option is left unset. See InvalidOptionError.
 	ErrInvalidOption = errors.New("invalid option")
 
 	// ErrJobsNotSupported is returned when a job operation requires an engine with usable jobs support (the jobs API and its extension enabled)
