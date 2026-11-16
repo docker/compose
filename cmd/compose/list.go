@@ -96,7 +96,7 @@ func runList(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 	if err != nil {
 		return err
 	}
-	stackList, err := backend.List(ctx, api.ListOptions{All: lsOpts.All})
+	stackList, err := backend.List(ctx, api.ListOptions{IncludeStopped: lsOpts.All})
 	if err != nil {
 		return err
 	}
