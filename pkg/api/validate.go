@@ -28,7 +28,7 @@ import (
 // matching ErrIncompatibleOptions, and Logs calls it before doing anything.
 func (o LogOptions) Validate() error {
 	if o.Index > 0 && len(o.Services) != 1 {
-		return incompatible(fmt.Sprintf("Index selects a replica of one service, but %d services are selected", len(o.Services)),
+		return incompatible("Index selects a replica of one service, but "+servicesSelected(len(o.Services)),
 			"Index", "Services")
 	}
 	return nil
@@ -61,7 +61,14 @@ func (o PublishOptions) Validate() error {
 // calls it before touching a single resource.
 func (o DownOptions) Validate() error {
 	if !o.Images.Valid() {
-		return &InvalidOptionError{Option: "Images", Value: string(o.Images), Allowed: []string{string(ImagePruneLocal), string(ImagePruneAll)}}
+		return &InvalidOptionError{Option: "Images", Value: string(o.Images), Allowed: []string{string(ImagePruneNone), string(ImagePruneLocal), string(ImagePruneAll)}}
 	}
 	return nil
+}
+
+func servicesSelected(n int) string {
+	if n == 0 {
+		return "no service is selected"
+	}
+	return fmt.Sprintf("%d services are selected", n)
 }
