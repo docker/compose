@@ -125,6 +125,7 @@ type EventProcessor interface {
 	// On notify about (sub)task and progress processing operation
 	On(events ...Resource)
 	// Done is triggered as a Compose operation completed.
-	// success is true when the operation completed without error.
+	// success is true when the operation completed without error; it is false
+	// when the operation failed, including when it was cancelled (e.g. Ctrl-C).
 	Done(operation string, success bool)
 }
