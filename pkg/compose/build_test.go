@@ -161,6 +161,18 @@ func TestResolveImageVolumes(t *testing.T) {
 		assert.Equal(t, service.CustomLabels[api.ImageVolumeDigestLabel], "/data=sha256:content")
 	})
 
+	t.Run("source of a mount is an image name", func(t *testing.T) {
+		service := types.ServiceConfig{
+			Name: "web", ContainerSpec: types.ContainerSpec{
+				CustomLabels: types.Labels{},
+				Mounts:       []types.ServiceMountConfig{{Type: types.VolumeTypeImage, Source: "source", Target: "/data"}},
+			},
+		}
+		resolveImageVolumes(&service, images, "p")
+		assert.Equal(t, service.Mounts[0].Source, "p-source")
+		assert.Equal(t, service.CustomLabels[api.ImageVolumeDigestLabel], "/data=sha256:built")
+	})
+
 	t.Run("source is another service resolves to its image name", func(t *testing.T) {
 		service := types.ServiceConfig{
 			Name: "web", ContainerSpec: types.ContainerSpec{

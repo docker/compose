@@ -83,7 +83,7 @@ func runPublish(ctx context.Context, dockerCli command.Cli, backendOptions *Back
 		return err
 	}
 
-	project, metrics, err := opts.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes)
+	project, metrics, err := opts.ToProject(ctx, dockerCli, backend, nil, warnUnsupportedAttributes, keepVolumes)
 	if err != nil {
 		return err
 	}

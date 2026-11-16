@@ -22,6 +22,7 @@ import (
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/docker/cli/cli/command"
 	"github.com/moby/moby/client"
 	"gotest.tools/v3/assert"
@@ -318,3 +319,37 @@ type noBackend struct{}
 
 func (noBackend) APIClient() client.APIClient { return nil }
 func (noBackend) CLI() command.Cli            { return nil }
+
+// the volumes the short syntax can't say are moved to `mounts`, so that the engine has no choice to make between
+// the Bind and the Mount API; a caller that renders the model can keep them as they are.
+func TestLoadProject_ConvertsVolumesToMounts(t *testing.T) {
+	composeFile := filepath.Join(t.TempDir(), "compose.yaml")
+	assert.NilError(t, os.WriteFile(composeFile, []byte(`
+name: test-project
+services:
+  app:
+    image: nginx:latest
+    volumes:
+      - /var/data:/data:ro
+      - type: tmpfs
+        target: /scratch
+`), 0o644))
+
+	service := New(noBackend{})
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{ConfigPaths: []string{composeFile}})
+	assert.NilError(t, err)
+	app := project.Services["app"]
+	assert.Assert(t, is.Len(app.Volumes, 1))
+	assert.Equal(t, app.Volumes[0].Target, "/data")
+	assert.Assert(t, is.Len(app.Mounts, 1))
+	assert.Equal(t, app.Mounts[0].Type, "tmpfs")
+	assert.Equal(t, app.Mounts[0].Target, "/scratch")
+
+	keep := cli.WithLoadOptions(func(o *loader.Options) { o.ConvertVolumesToMounts = false })
+	project, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{ConfigPaths: []string{composeFile}, ProjectOptionsFns: []cli.ProjectOptionsFn{keep}})
+	assert.NilError(t, err)
+	app = project.Services["app"]
+	assert.Assert(t, is.Len(app.Volumes, 2))
+	assert.Assert(t, is.Len(app.Mounts, 0))
+}

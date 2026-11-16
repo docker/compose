@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net"
 	"net/netip"
 	"os"
@@ -45,6 +46,7 @@ import (
 	"github.com/docker/compose/v5/internal/confighash"
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 type createOptions struct {
@@ -1011,74 +1013,150 @@ func getDependentServiceFromMode(mode string) string {
 	return ""
 }
 
+// buildContainerVolumes returns what the container mounts: the `volumes` of the service as `Binds` strings, and its
+// `mounts` as mounts of the Mount API, as they are. There is no choice to make between the two: the project is loaded
+// with the volumes that the short syntax can't say moved to `mounts`.
 func (s *composeService) buildContainerVolumes(
 	ctx context.Context,
 	p types.Project,
 	service types.ServiceConfig,
 	inherit *container.Summary,
 ) ([]string, []mount.Mount, error) {
-	var mounts []mount.Mount
-	var binds []string
-
-	mountOptions, err := s.buildContainerMountOptions(ctx, p, service, inherit)
+	inherited, service, err := s.inheritedMounts(ctx, p, service, inherit)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	for _, m := range mountOptions {
-		switch m.Type {
-		case mount.TypeBind:
-			// `Mount` is preferred but does not offer option to created host path if missing
-			// so `Bind` API is used here with raw volume string
-			// see https://github.com/moby/moby/issues/43483
-			if bind, ok := bindStringForMount(service, m); ok {
-				binds = append(binds, bind)
-				continue
-			}
-		case mount.TypeVolume:
-			if bind, ok := volumeBindString(p, service, m); ok {
-				binds = append(binds, bind)
-				continue
-			}
-		case mount.TypeImage:
-			err := s.checkImageMountSupported(ctx)
+	// only one entry per target: the last one declared prevails, and `mounts` come after `volumes`
+	mountTargets := utils.Set[string]{}
+	for _, m := range service.Mounts {
+		mountTargets.Add(m.Target)
+	}
+	volumes := slices.DeleteFunc(lastByTarget(service.Volumes, func(v types.ServiceVolumeConfig) string { return v.Target }),
+		func(v types.ServiceVolumeConfig) bool { return mountTargets.Has(v.Target) })
+	serviceMounts := lastByTarget(service.Mounts, func(m types.ServiceMountConfig) string { return m.Target })
+
+	var binds []string
+	var mounts []mount.Mount
+	targets := utils.Set[string]{}
+	for _, volume := range volumes {
+		targets.Add(volume.Target)
+		if volume.Type == types.VolumeTypeVolume && volume.Source == "" {
+			// the Binds API has no string for an anonymous volume, `docker run -v /target` makes it a mount
+			anonymous, err := volume.ToMount()
 			if err != nil {
 				return nil, nil, err
 			}
+			serviceMount, err := buildServiceMount(p, anonymous)
+			if err != nil {
+				return nil, nil, err
+			}
+			mounts = append(mounts, serviceMount)
+			continue
 		}
-		mounts = append(mounts, m)
+		bind, err := volumeBindString(p, volume)
+		if err != nil {
+			return nil, nil, err
+		}
+		binds = append(binds, bind)
+	}
+	for _, m := range serviceMounts {
+		serviceMount, err := buildServiceMount(p, m)
+		if err != nil {
+			return nil, nil, err
+		}
+		if serviceMount.Type == mount.TypeImage {
+			if err := s.checkImageMountSupported(ctx); err != nil {
+				return nil, nil, err
+			}
+		}
+		mounts = append(mounts, serviceMount)
+		targets.Add(serviceMount.Target)
+	}
+
+	// what the service declares prevails over what is inherited, and over secrets and configs
+	secretMounts, err := buildContainerSecretMounts(p, service)
+	if err != nil {
+		return nil, nil, err
+	}
+	configMounts, err := buildContainerConfigMounts(p, service)
+	if err != nil {
+		return nil, nil, err
+	}
+	for _, group := range [][]mount.Mount{inherited, secretMounts, configMounts} {
+		for _, m := range group {
+			if targets.Has(m.Target) {
+				continue
+			}
+			mounts = append(mounts, m)
+			targets.Add(m.Target)
+		}
 	}
 	return binds, mounts, nil
 }
 
-// bindStringForMount returns the legacy Bind-API string for a bind mount
-// which doesn't require the Mount API
-func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, bool) {
-	v := findVolumeByTarget(service.Volumes, m.Target)
-	if v == nil {
-		return "", false
+// lastByTarget keeps the last entry declared for each target, in the order of those entries
+func lastByTarget[T any](entries []T, target func(T) string) []T {
+	last := map[string]int{}
+	for i, e := range entries {
+		last[target(e)] = i
 	}
-	if v.Type != types.VolumeTypeBind {
-		v.Source = m.Source
+	kept := make([]T, 0, len(last))
+	for i, e := range entries {
+		if last[target(e)] == i {
+			kept = append(kept, e)
+		}
 	}
-	if bindRequiresMountAPI(v.Bind) {
-		return "", false
-	}
-	return toBindString(m.Source, v), true
+	return kept
 }
 
-// volumeBindString returns the legacy Bind-API string for a volume mount
-// without advanced options, preferred to preserve backward compatibility
-func volumeBindString(p types.Project, service types.ServiceConfig, m mount.Mount) (string, bool) {
-	v := findVolumeByTarget(service.Volumes, m.Target)
-	vol := findVolumeByName(p.Volumes, m.Source)
-	if v == nil || vol == nil {
-		return "", false
+// volumeBindString returns the `Binds` string of a volume with a source. The volume has to be one the short syntax can
+// say, as the loader moves the others to `mounts`; the host path of a bind is created by the engine when it is missing.
+func volumeBindString(p types.Project, v types.ServiceVolumeConfig) (string, error) {
+	if !v.IsShortSyntaxExpressible() {
+		return "", fmt.Errorf("volume %s can't be sent as a bind string: it has to be a mount, was the project loaded without converting its volumes?", v.Target)
 	}
-	if volumeRequiresMountAPI(v.Volume) {
-		return "", false
+	source := v.Source
+	switch v.Type {
+	case types.VolumeTypeBind:
+		var err error
+		if source, err = absoluteBindSource(source); err != nil {
+			return "", err
+		}
+	case types.VolumeTypeVolume:
+		if pVolume, ok := p.Volumes[source]; ok && source != "" {
+			source = pVolume.Name
+		}
 	}
-	return toBindString(vol.Name, v), true
+
+	access := "rw"
+	if v.ReadOnly {
+		access = "ro"
+	}
+	options := []string{access}
+	if v.Bind != nil && v.Bind.SELinux != "" {
+		options = append(options, v.Bind.SELinux)
+	}
+	if v.Bind != nil && v.Bind.Propagation != "" {
+		options = append(options, v.Bind.Propagation)
+	}
+	if v.Volume != nil && v.Volume.NoCopy {
+		options = append(options, "nocopy")
+	}
+	return fmt.Sprintf("%s:%s:%s", source, v.Target, strings.Join(options, ",")), nil
+}
+
+// absoluteBindSource makes the source of a bind absolute. It has already been prefixed with the working
+// directory when needed, by the compose-go project loader, which also rejects a bind without source: a project
+// built by hand has to say it, rather than have the engine bind the working directory of the process.
+func absoluteBindSource(source string) (string, error) {
+	if source == "" {
+		return "", errors.New("bind mount has no source")
+	}
+	if filepath.IsAbs(source) || isUnixAbs(source) || isWindowsAbs(source) {
+		return source, nil
+	}
+	return filepath.Abs(source)
 }
 
 // checkImageMountSupported verifies the negotiated API version supports image
@@ -1095,165 +1173,100 @@ func (s *composeService) checkImageMountSupported(ctx context.Context) error {
 	return nil
 }
 
-func toBindString(name string, v *types.ServiceVolumeConfig) string {
-	access := "rw"
-	if v.ReadOnly {
-		access = "ro"
-	}
-	options := []string{access}
-	if v.Bind != nil && v.Bind.SELinux != "" {
-		options = append(options, v.Bind.SELinux)
-	}
-	if v.Bind != nil && v.Bind.Propagation != "" {
-		options = append(options, v.Bind.Propagation)
-	}
-	if v.Volume != nil && v.Volume.NoCopy {
-		options = append(options, "nocopy")
-	}
-	return fmt.Sprintf("%s:%s:%s", name, v.Target, strings.Join(options, ","))
-}
-
-func findVolumeByName(volumes types.Volumes, name string) *types.VolumeConfig {
-	for _, vol := range volumes {
-		if vol.Name == name {
-			return &vol
+// bindMountsAsVolumes returns the bind mounts of `mounts` as the volumes they are the equivalent of, for
+// what only looks at the host paths a service reads from.
+func bindMountsAsVolumes(mounts []types.ServiceMountConfig) []types.ServiceVolumeConfig {
+	var volumes []types.ServiceVolumeConfig
+	for _, m := range mounts {
+		if m.Type != types.VolumeTypeBind {
+			continue
 		}
-	}
-	return nil
-}
-
-func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *types.ServiceVolumeConfig {
-	for _, v := range volumes {
-		if v.Target == target {
-			return &v
+		volume := types.ServiceVolumeConfig{
+			Type:        types.VolumeTypeBind,
+			Source:      m.Source,
+			Target:      m.Target,
+			ReadOnly:    m.ReadOnly,
+			Consistency: m.Consistency,
+			Bind:        &types.ServiceVolumeBind{},
 		}
-	}
-	return nil
-}
-
-// bindRequiresMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
-// options which require use of Mount API
-func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
-	switch {
-	case bind == nil:
-		return false
-	case !bool(bind.CreateHostPath):
-		return true
-	case bind.Propagation != "":
-		return true
-	case bind.Recursive != "":
-		return true
-	default:
-		return false
-	}
-}
-
-// volumeRequiresMountAPI check if Volume declaration can be implemented by the plain old Bind API or uses any of the advanced
-// options which require use of Mount API
-func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
-	switch {
-	case vol == nil:
-		return false
-	case len(vol.Labels) > 0:
-		return true
-	case vol.Subpath != "":
-		return true
-	case vol.NoCopy:
-		return true
-	default:
-		return false
-	}
-}
-
-func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, inherit *container.Summary) ([]mount.Mount, error) {
-	mounts := map[string]mount.Mount{}
-	if inherit != nil {
-		for _, m := range inherit.Mounts {
-			if m.Type == "tmpfs" {
-				continue
+		if m.Bind != nil {
+			volume.Bind = &types.ServiceVolumeBind{
+				Propagation:    m.Bind.Propagation,
+				CreateHostPath: types.OptOut(m.Bind.CreateSrc),
+				Recursive:      m.Bind.Recursive,
 			}
-			src := m.Source
-			if m.Type == "volume" {
-				src = m.Name
-			}
-
-			img, err := s.apiClient().ImageInspect(ctx, api.GetImageNameOrDefault(service, p.Name))
-			if err != nil {
-				return nil, err
-			}
-
-			if img.Config != nil {
-				if _, ok := img.Config.Volumes[m.Destination]; ok {
-					// inherit previous container's anonymous volume
-					mounts[m.Destination] = mount.Mount{
-						Type:     m.Type,
-						Source:   src,
-						Target:   m.Destination,
-						ReadOnly: !m.RW,
-					}
-				}
-			}
-			volumes := []types.ServiceVolumeConfig{}
-			for _, v := range service.Volumes {
-				if v.Target != m.Destination || v.Source != "" {
-					volumes = append(volumes, v)
-					continue
-				}
-				// inherit previous container's anonymous volume
-				mounts[m.Destination] = mount.Mount{
-					Type:     m.Type,
-					Source:   src,
-					Target:   m.Destination,
-					ReadOnly: !m.RW,
-				}
-			}
-			service.Volumes = volumes
 		}
+		volumes = append(volumes, volume)
 	}
-
-	mounts, err := fillBindMounts(p, service, mounts)
-	if err != nil {
-		return nil, err
-	}
-
-	values := make([]mount.Mount, 0, len(mounts))
-	for _, v := range mounts {
-		values = append(values, v)
-	}
-	return values, nil
+	return volumes
 }
 
-func fillBindMounts(project types.Project, service types.ServiceConfig, mounts map[string]mount.Mount) (map[string]mount.Mount, error) {
-	for _, volume := range service.Volumes {
-		bindMount, err := buildMount(project, volume)
+// inheritedMounts returns the volumes of the previous container that the new one inherits, which are the anonymous
+// ones declared by the image and the ones the service declares as anonymous, and the service without the latter.
+func (s *composeService) inheritedMounts(ctx context.Context, p types.Project, service types.ServiceConfig, inherit *container.Summary) ([]mount.Mount, types.ServiceConfig, error) {
+	if inherit == nil {
+		return nil, service, nil
+	}
+	var imageVolumes map[string]struct{}
+	if slices.ContainsFunc(inherit.Mounts, func(m container.MountPoint) bool { return m.Type != "tmpfs" }) {
+		img, err := s.apiClient().ImageInspect(ctx, api.GetImageNameOrDefault(service, p.Name))
 		if err != nil {
-			return nil, err
+			return nil, service, err
 		}
-		mounts[bindMount.Target] = bindMount
+		if img.Config != nil {
+			imageVolumes = img.Config.Volumes
+		}
 	}
-
-	secretMounts, err := buildContainerSecretMounts(project, service)
-	if err != nil {
-		return nil, err
-	}
-	for _, secretMount := range secretMounts {
-		if _, found := mounts[secretMount.Target]; found {
+	inherited := map[string]mount.Mount{}
+	for _, m := range inherit.Mounts {
+		if m.Type == "tmpfs" {
 			continue
 		}
-		mounts[secretMount.Target] = secretMount
-	}
-
-	configMounts, err := buildContainerConfigMounts(project, service)
-	if err != nil {
-		return nil, err
-	}
-	for _, configMount := range configMounts {
-		if _, found := mounts[configMount.Target]; found {
-			continue
+		src := m.Source
+		if m.Type == "volume" {
+			src = m.Name
 		}
-		mounts[configMount.Target] = configMount
+		previous := mount.Mount{
+			Type:     m.Type,
+			Source:   src,
+			Target:   m.Destination,
+			ReadOnly: !m.RW,
+		}
+
+		if _, ok := imageVolumes[m.Destination]; ok {
+			inherited[m.Destination] = previous
+		}
+		var anonymousVolume, anonymousMount bool
+		service.Volumes, anonymousVolume = withoutAnonymousVolume(service.Volumes, m.Destination)
+		service.Mounts, anonymousMount = withoutAnonymousMount(service.Mounts, m.Destination)
+		if anonymousVolume || anonymousMount {
+			inherited[m.Destination] = previous
+		}
 	}
-	return mounts, nil
+	// sorted by target, for a stable result
+	return slices.SortedFunc(maps.Values(inherited), func(a, b mount.Mount) int { return strings.Compare(a.Target, b.Target) }), service, nil
+}
+
+// withoutAnonymousVolume returns the volumes but for the anonymous volume at the target, and whether there was one
+func withoutAnonymousVolume(volumes []types.ServiceVolumeConfig, target string) ([]types.ServiceVolumeConfig, bool) {
+	kept := make([]types.ServiceVolumeConfig, 0, len(volumes))
+	for _, v := range volumes {
+		if v.Target != target || v.Source != "" {
+			kept = append(kept, v)
+		}
+	}
+	return kept, len(kept) != len(volumes)
+}
+
+// withoutAnonymousMount returns the mounts but for the anonymous volume at the target, and whether there was one
+func withoutAnonymousMount(mounts []types.ServiceMountConfig, target string) ([]types.ServiceMountConfig, bool) {
+	kept := make([]types.ServiceMountConfig, 0, len(mounts))
+	for _, m := range mounts {
+		if m.Target != target || m.Source != "" || m.Type != types.VolumeTypeVolume {
+			kept = append(kept, m)
+		}
+	}
+	return kept, len(kept) != len(mounts)
 }
 
 func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount.Mount, error) {
@@ -1284,7 +1297,7 @@ func buildContainerConfigMounts(p types.Project, s types.ServiceConfig) ([]mount
 			continue
 		}
 
-		bindMount, err := buildMount(p, types.ServiceVolumeConfig{
+		bindMount, err := buildServiceMount(p, types.ServiceMountConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedConfig.File,
 			Target:   target,
@@ -1334,14 +1347,12 @@ func buildContainerSecretMounts(p types.Project, s types.ServiceConfig) ([]mount
 			logrus.Warnf("secret file %s does not exist", definedSecret.Name)
 		}
 
-		mnt, err := buildMount(p, types.ServiceVolumeConfig{
+		mnt, err := buildServiceMount(p, types.ServiceMountConfig{
 			Type:     types.VolumeTypeBind,
 			Source:   definedSecret.File,
 			Target:   target,
 			ReadOnly: true,
-			Bind: &types.ServiceVolumeBind{
-				CreateHostPath: false,
-			},
+			Bind:     &types.ServiceMountBind{},
 		})
 		if err != nil {
 			return nil, err
@@ -1367,107 +1378,73 @@ func isWindowsAbs(p string) bool {
 	return paths.IsWindowsAbs(p)
 }
 
-func buildMount(project types.Project, volume types.ServiceVolumeConfig) (mount.Mount, error) {
-	source := volume.Source
-	switch volume.Type {
+// buildServiceMount translates an entry of `mounts`, which has the structure of the Mount API, into a
+// mount of the engine. Unlike `volumes`, nothing is left to the implementation: it always goes through
+// the Mount API, and the options of the type are carried as they are.
+func buildServiceMount(project types.Project, m types.ServiceMountConfig) (mount.Mount, error) {
+	source := m.Source
+	switch m.Type {
 	case types.VolumeTypeBind:
-		if !filepath.IsAbs(source) && !isUnixAbs(source) && !isWindowsAbs(source) {
-			// volume source has already been prefixed with workdir if required, by compose-go project loader
-			var err error
-			source, err = filepath.Abs(source)
-			if err != nil {
-				return mount.Mount{}, err
+		var err error
+		if source, err = absoluteBindSource(source); err != nil {
+			return mount.Mount{}, err
+		}
+	case types.VolumeTypeVolume:
+		if pVolume, ok := project.Volumes[m.Source]; ok && m.Source != "" {
+			source = pVolume.Name
+		}
+	}
+
+	result := mount.Mount{
+		Type:        mount.Type(m.Type),
+		Source:      source,
+		Target:      m.Target,
+		ReadOnly:    m.ReadOnly,
+		Consistency: mount.Consistency(m.Consistency),
+	}
+	switch m.Type {
+	case types.VolumeTypeBind:
+		if m.Bind != nil {
+			result.BindOptions = &mount.BindOptions{
+				Propagation:      mount.Propagation(m.Bind.Propagation),
+				CreateMountpoint: m.Bind.CreateSrc,
+			}
+			switch m.Bind.Recursive {
+			case "disabled":
+				result.BindOptions.NonRecursive = true
+			case "writable":
+				result.BindOptions.ReadOnlyNonRecursive = true
+			case "readonly":
+				result.BindOptions.ReadOnlyForceRecursive = true
 			}
 		}
 	case types.VolumeTypeVolume:
-		if volume.Source != "" {
-			pVolume, ok := project.Volumes[volume.Source]
-			if ok {
-				source = pVolume.Name
+		if m.Volume != nil {
+			result.VolumeOptions = &mount.VolumeOptions{
+				NoCopy:  m.Volume.NoCopy,
+				Subpath: m.Volume.Subpath,
+				Labels:  m.Volume.Labels,
+			}
+			if m.Volume.Driver != "" || len(m.Volume.DriverOpts) > 0 {
+				result.VolumeOptions.DriverConfig = &mount.Driver{
+					Name:    m.Volume.Driver,
+					Options: m.Volume.DriverOpts,
+				}
 			}
 		}
-	}
-
-	bind, vol, tmpfs, img := buildMountOptions(volume)
-
-	if bind != nil {
-		volume.Type = types.VolumeTypeBind
-	}
-
-	return mount.Mount{
-		Type:          mount.Type(volume.Type),
-		Source:        source,
-		Target:        volume.Target,
-		ReadOnly:      volume.ReadOnly,
-		Consistency:   mount.Consistency(volume.Consistency),
-		BindOptions:   bind,
-		VolumeOptions: vol,
-		TmpfsOptions:  tmpfs,
-		ImageOptions:  img,
-	}, nil
-}
-
-func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *mount.VolumeOptions, *mount.TmpfsOptions, *mount.ImageOptions) {
-	if volume.Type != types.VolumeTypeBind && volume.Bind != nil {
-		logrus.Warnf("mount of type `%s` should not define `bind` option", volume.Type)
-	}
-	if volume.Type != types.VolumeTypeVolume && volume.Volume != nil {
-		logrus.Warnf("mount of type `%s` should not define `volume` option", volume.Type)
-	}
-	if volume.Type != types.VolumeTypeTmpfs && volume.Tmpfs != nil {
-		logrus.Warnf("mount of type `%s` should not define `tmpfs` option", volume.Type)
-	}
-	if volume.Type != types.VolumeTypeImage && volume.Image != nil {
-		logrus.Warnf("mount of type `%s` should not define `image` option", volume.Type)
-	}
-
-	switch volume.Type {
-	case "bind":
-		return buildBindOption(volume.Bind), nil, nil, nil
-	case "volume":
-		if volume.Volume == nil {
-			return nil, nil, nil, nil
+	case types.VolumeTypeTmpfs:
+		if m.Tmpfs != nil {
+			result.TmpfsOptions = &mount.TmpfsOptions{
+				SizeBytes: int64(m.Tmpfs.Size),
+				Mode:      os.FileMode(m.Tmpfs.Mode),
+			}
 		}
-		return nil, &mount.VolumeOptions{
-			NoCopy:  volume.Volume.NoCopy,
-			Subpath: volume.Volume.Subpath,
-			Labels:  volume.Volume.Labels,
-			// DriverConfig: , // FIXME missing from model ?
-		}, nil, nil
-	case "tmpfs":
-		if volume.Tmpfs == nil {
-			return nil, nil, nil, nil
+	case types.VolumeTypeImage:
+		if m.Image != nil {
+			result.ImageOptions = &mount.ImageOptions{Subpath: m.Image.SubPath}
 		}
-		return nil, nil, &mount.TmpfsOptions{
-			SizeBytes: int64(volume.Tmpfs.Size),
-			Mode:      os.FileMode(volume.Tmpfs.Mode),
-		}, nil
-	case "image":
-		if volume.Image == nil {
-			return nil, nil, nil, nil
-		}
-		return nil, nil, nil, &mount.ImageOptions{Subpath: volume.Image.SubPath}
 	}
-	return nil, nil, nil, nil
-}
-
-func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
-	if bind == nil {
-		return nil
-	}
-	bindOptions := &mount.BindOptions{
-		Propagation:      mount.Propagation(bind.Propagation),
-		CreateMountpoint: bool(bind.CreateHostPath),
-	}
-	switch bind.Recursive {
-	case "disabled":
-		bindOptions.NonRecursive = true
-	case "writable":
-		bindOptions.ReadOnlyNonRecursive = true
-	case "readonly":
-		bindOptions.ReadOnlyForceRecursive = true
-	}
-	return bindOptions
+	return result, nil
 }
 
 // createNetwork creates the given (managed) network with its compose labels and

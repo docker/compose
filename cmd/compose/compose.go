@@ -404,6 +404,10 @@ func (o *ProjectOptions) ociOptions() api.OCIOptions {
 	}
 }
 
+// keepVolumes loads the project with its `volumes` as they are declared, instead of moving to `mounts` the ones the
+// short syntax can't say, for what renders the model or hands it over to something else than the engine.
+var keepVolumes = cli.WithLoadOptions(func(o *loader.Options) { o.ConvertVolumesToMounts = false })
+
 func (o *ProjectOptions) toProjectOptions(po ...cli.ProjectOptionsFn) (*cli.ProjectOptions, error) {
 	opts := []cli.ProjectOptionsFn{
 		cli.WithWorkingDirectory(o.ProjectDir),

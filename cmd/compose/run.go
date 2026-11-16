@@ -21,11 +21,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 
 	composecli "github.com/compose-spec/compose-go/v2/cli"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/format"
+	"github.com/compose-spec/compose-go/v2/loader"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli"
 	"github.com/docker/cli/cli/command"
@@ -112,6 +114,9 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 		if err != nil {
 			return nil, err
 		}
+		// a volume of the command line replaces the one of the service at the same target
+		target.Volumes = slices.DeleteFunc(slices.Clone(target.Volumes), func(v types.ServiceVolumeConfig) bool { return v.Target == volume.Target })
+		target.Mounts = slices.DeleteFunc(slices.Clone(target.Mounts), func(m types.ServiceMountConfig) bool { return m.Target == volume.Target })
 		target.Volumes = append(target.Volumes, volume)
 	}
 
@@ -119,6 +124,12 @@ func (options runOptions) apply(project *types.Project) (*types.Project, error) 
 		if name == options.Service {
 			project.Services[name] = target
 			break
+		}
+	}
+	if len(options.volumes) > 0 {
+		// the volumes of --volume come after the project was loaded
+		if err := loader.ConvertVolumesToMounts(project); err != nil {
+			return nil, err
 		}
 	}
 	return project, nil

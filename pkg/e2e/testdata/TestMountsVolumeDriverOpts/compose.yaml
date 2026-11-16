@@ -1,0 +1,13 @@
+services:
+  app:
+    image: alpine
+    command: sleep infinity
+    mounts:
+      - type: volume
+        target: /scratch
+        volume:
+          driver: local
+          driver_opts:
+            type: tmpfs
+            device: tmpfs
+            o: size=16m

@@ -1,0 +1,8 @@
+services:
+  app:
+    image: alpine
+    command: sleep infinity
+    mounts:
+      - type: bind
+        source: ./missing
+        target: /data

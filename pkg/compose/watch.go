@@ -282,7 +282,7 @@ func prepareRebuildTriggers(project *types.Project, serviceName string, service 
 func (s *composeService) watchTriggerPaths(ctx context.Context, service types.ServiceConfig, config *types.DevelopConfig, syncer sync.Syncer) ([]string, error) {
 	var paths []string
 	for _, trigger := range config.Watch {
-		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, append(slices.Clone(service.Volumes), bindMountsAsVolumes(service.Mounts)...)) {
 			logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 			continue
 		}
@@ -790,7 +790,7 @@ func (s *composeService) initialSyncFiles(service types.ServiceConfig, trigger t
 		return initialSyncDirectory(trigger, service, ignore)
 	case mode.IsRegular():
 		// process file
-		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, append(slices.Clone(service.Volumes), bindMountsAsVolumes(service.Mounts)...)) {
 			return []*sync.PathMapping{{
 				HostPath:      trigger.Path,
 				ContainerPath: trigger.Target,
@@ -813,7 +813,7 @@ func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ig
 			// walk starts at the root directory
 			return nil
 		}
-		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, append(slices.Clone(service.Volumes), bindMountsAsVolumes(service.Mounts)...)) {
 			// By definition sync ignores bind mounted paths
 			if d.IsDir() {
 				// skip folder

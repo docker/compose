@@ -129,9 +129,12 @@ func ServiceOptions(service types.ServiceConfig) SpanOptions {
 	}
 	attrs = append(attrs, attribute.StringSlice("service.secrets", secretNames))
 
-	volNames := make([]string, len(service.Volumes))
+	volNames := make([]string, 0, len(service.Volumes)+len(service.Mounts))
 	for i := range service.Volumes {
-		volNames[i] = service.Volumes[i].Source
+		volNames = append(volNames, service.Volumes[i].Source)
+	}
+	for i := range service.Mounts {
+		volNames = append(volNames, service.Mounts[i].Source)
 	}
 	attrs = append(attrs, attribute.StringSlice("service.volumes", volNames))
 

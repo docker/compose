@@ -117,7 +117,12 @@ func (s *Service) buildProjectOptions(options api.ProjectLoadOptions, remoteLoad
 		projectOptionsFns = append(projectOptionsFns, unsupportedAttributesLoadOption(options.OnUnsupportedAttribute))
 	}
 
-	return cli.NewProjectOptions(options.ConfigPaths, append(options.ProjectOptionsFns, projectOptionsFns...)...)
+	// The volumes that the short syntax can't say are moved to `mounts`, so that the engine has no choice to make
+	// between the Bind and the Mount API when it creates a container. It comes first, for the caller to override it.
+	convertVolumes := cli.WithLoadOptions(func(o *loader.Options) { o.ConvertVolumesToMounts = true })
+	projectOptionsFns = append([]cli.ProjectOptionsFn{convertVolumes}, append(options.ProjectOptionsFns, projectOptionsFns...)...)
+
+	return cli.NewProjectOptions(options.ConfigPaths, projectOptionsFns...)
 }
 
 // postProcessProject applies post-loading transformations to the project

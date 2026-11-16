@@ -209,3 +209,32 @@ func TestJobTargetErr(t *testing.T) {
 		assert.Equal(t, err, original)
 	})
 }
+
+func TestRunVolumeReplacesTheOneOfTheServiceAtTheSameTarget(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"app": {Name: "app", ContainerSpec: types.ContainerSpec{
+				Image: "alpine",
+				Volumes: []types.ServiceVolumeConfig{
+					{Type: types.VolumeTypeBind, Source: "/declared", Target: "/data"},
+					{Type: types.VolumeTypeBind, Source: "/other", Target: "/other"},
+				},
+				Mounts: []types.ServiceMountConfig{
+					{Type: types.VolumeTypeTmpfs, Target: "/scratch"},
+				},
+			}},
+		},
+	}
+
+	project, err := runOptions{Service: "app", volumes: []string{"/cli:/data", "/cli-scratch:/scratch"}}.apply(project)
+	assert.NilError(t, err)
+
+	app := project.Services["app"]
+	assert.Equal(t, len(app.Mounts), 0)
+	sources := map[string]string{}
+	for _, v := range app.Volumes {
+		sources[v.Target] = v.Source
+	}
+	assert.DeepEqual(t, sources, map[string]string{"/data": "/cli", "/other": "/other", "/scratch": "/cli-scratch"})
+	assert.Equal(t, len(app.Volumes), 3)
+}
