@@ -329,6 +329,70 @@ func TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer(t *testing.T) {
 `)+"\n")
 }
 
+// Only the Stop a recreate emits itself skips the pre_stop hooks. A Stop the
+// recreate reuses (here the network recreate's) still runs them.
+func TestReconcile_RecreateStopSkipsPreStop(t *testing.T) {
+	skipPreStopByCause := func(plan *Plan) map[string]bool {
+		stops := map[string]bool{}
+		for _, n := range plan.Nodes {
+			if n.Operation.Type == OpStopContainer {
+				stops[n.Operation.Cause] = n.Operation.SkipPreStop
+			}
+		}
+		return stops
+	}
+
+	t.Run("recreate", func(t *testing.T) {
+		svc := types.ServiceConfig{Name: "web", Scale: intPtr(1)}
+		hash := mustServiceHash(t, svc)
+		project := &types.Project{Name: "myproject", Services: types.Services{"web": svc}}
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers: map[string][]ObservedContainer{
+				"web": {{
+					ID: "c1aabbccddee", Number: 1, State: container.StateRunning, ConfigHash: hash,
+					Summary: container.Summary{
+						ID: "c1aabbccddee", State: container.StateRunning,
+						Labels: map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+					},
+				}},
+			},
+			Networks: map[string][]ObservedNetwork{},
+			Volumes:  map[string][]ObservedVolume{},
+		}
+		opts := defaultReconcileOptions()
+		opts.Recreate = api.RecreateForce
+
+		plan, err := reconcile(t.Context(), project, observed, opts, noPrompt)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, skipPreStopByCause(plan), map[string]bool{"replaced by #1": true})
+	})
+
+	t.Run("recreate reusing the stop of a network recreate", func(t *testing.T) {
+		web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}}
+		project := &types.Project{
+			Name:     "myproject",
+			Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+			Services: types.Services{"web": web},
+		}
+		oc := networkAttachedContainer(t, web, "c1aabbccddee")
+		oc.ConfigHash = "stale"
+		oc.Summary.Labels[api.ConfigHashLabel] = "stale"
+		observed := &ObservedState{
+			ProjectName: "myproject",
+			Containers:  map[string][]ObservedContainer{"web": {oc}},
+			Networks: map[string][]ObservedNetwork{
+				"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}},
+			},
+			Volumes: map[string][]ObservedVolume{},
+		}
+
+		plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+		assert.NilError(t, err)
+		assert.DeepEqual(t, skipPreStopByCause(plan), map[string]bool{"network frontend config changed": false})
+	})
+}
+
 func TestReconcileNetworks_DivergedMultipleServices(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",

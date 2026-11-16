@@ -1659,14 +1659,17 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 	// reuse it instead of emitting a second one against an already-stopped
 	// container. The reused node carries no group, which is fine: the
 	// recreate's group tracker still drives Working/Done from the create.
+	// A reused Stop keeps running the pre_stop hooks: it stops the container
+	// for its own reason, before the replacement is created.
 	stopNode, alreadyStopped := r.stoppedByPlan[oc.ID]
 	if !alreadyStopped {
 		stopNode = r.plan.addNode(Operation{
-			Type:       OpStopContainer,
-			ResourceID: resID,
-			Cause:      fmt.Sprintf("replaced by #%d", createNode.ID),
-			Container:  &oc.Summary,
-			Timeout:    r.options.Timeout,
+			Type:        OpStopContainer,
+			ResourceID:  resID,
+			Cause:       fmt.Sprintf("replaced by #%d", createNode.ID),
+			Container:   &oc.Summary,
+			Timeout:     r.options.Timeout,
+			SkipPreStop: true,
 		}, group, createNode)
 		r.stoppedByPlan[oc.ID] = stopNode
 	}

@@ -143,6 +143,9 @@ type Operation struct {
 	// for purging stale pre_start hook runners (a failed removal only warns:
 	// it leaves the container visible, never blocks).
 	BestEffort bool
+	// SkipPreStop asks OpStopContainer not to run the pre_stop hooks: set on
+	// the stop of a recreate, whose replacement already exists.
+	SkipPreStop bool
 }
 
 // PlanNode is a single node in the reconciliation DAG. It represents one
