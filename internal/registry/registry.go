@@ -103,7 +103,17 @@ func EncodedAuth(ref reference.Named, cfg AuthProvider) (string, error) {
 
 // ImageDigestResolver returns a func resolving an image reference to the
 // descriptor digest its registry holds for it, with the credentials of auth.
-// The lookup is made through DistributionInspect with ctx.
+// The lookup is made through DistributionInspect with ctx. It serves pinning
+// image references in a reproducible compose model (`compose publish` /
+// `config --resolve-image-digests`).
+//
+// It deliberately returns the registry descriptor digest — the multi-platform
+// index digest for multi-arch images: a published compose file must stay
+// deployable on any platform. This is NOT the same digest kind as the local
+// content digest, which selects the platform-specific runnable manifest to
+// compare a running container with a fresh build/pull; never funnel this
+// resolution through the local content-digest producer, and never pin a
+// published reference with a per-platform digest.
 func ImageDigestResolver(ctx context.Context, auth AuthProvider, c client.APIClient) func(named reference.Named) (digest.Digest, error) {
 	return func(named reference.Named) (digest.Digest, error) {
 		encodedAuth, err := EncodedAuth(named, auth)
