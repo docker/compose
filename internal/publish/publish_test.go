@@ -843,7 +843,7 @@ func Test_generateImageDigestsOverride_resolvesJobImages(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
 	tested := &Service{backend: &fakeBackend{apiClient: apiClient, auth: configfile.New("")}}
 
-	const jobDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+	const jobDigest = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
 	project := &types.Project{
 		Name: "test",
 		Jobs: types.Jobs{

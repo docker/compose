@@ -364,27 +364,6 @@ func (s *Service) generateImageDigestsOverride(ctx context.Context, project *typ
 	if err != nil {
 		return nil, err
 	}
-	// WithImagesResolved only walks services: dress the jobs as services to
-	// run them through the exact same resolution, then fold the digests back
-	// into a jobs override.
-	if len(project.Jobs) > 0 {
-		jobsAsServices := &types.Project{Services: types.Services{}}
-		for name, job := range project.Jobs {
-			jobsAsServices.Services[name] = types.ServiceConfig{
-				Name:          name,
-				ContainerSpec: types.ContainerSpec{Image: job.Image},
-			}
-		}
-		jobsAsServices, err = jobsAsServices.WithImagesResolved(resolver)
-		if err != nil {
-			return nil, err
-		}
-		for name, resolved := range jobsAsServices.Services {
-			job := project.Jobs[name]
-			job.Image = resolved.Image
-			project.Jobs[name] = job
-		}
-	}
 	override := types.Project{
 		Services: types.Services{},
 		Jobs:     types.Jobs{},
