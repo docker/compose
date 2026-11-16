@@ -390,7 +390,7 @@ func (s *Service) watchEvents(ctx context.Context, project *types.Project, optio
 	batchEvents := watch.BatchDebounceEvents(ctx, watcher.Events())
 
 	scheduler := newRebuildScheduler(ctx, func(ctx context.Context, services []string) error {
-		return s.rebuild(ctx, project, services, options)
+		return s.Rebuild(ctx, project, services, options)
 	})
 	// Rebuilds run asynchronously in their own goroutine(s); cancel first so
 	// an in-flight one can unwind, then wait for it to settle so none
@@ -667,10 +667,6 @@ func (s *Service) exec(ctx context.Context, project *types.Project, serviceName 
 // Rebuild rebuilds the given services and converges what depends on them, as
 // the watch loop does when a rebuild trigger fires.
 func (s *Service) Rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
-	return s.rebuild(ctx, project, services, options)
-}
-
-func (s *Service) rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
 	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
 	// Work on a copy so concurrent watch events don't race on the shared
 	// BuildOptions pointer carried by WatchOptions.

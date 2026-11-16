@@ -238,7 +238,7 @@ func TestWatchRebuildTouchesTheRebuiltServiceAndItsDependentsOnly(t *testing.T) 
 		})
 
 	options := api.WatchOptions{Build: &api.BuildOptions{}, LogTo: &testLogConsumer{}}
-	assert.NilError(t, svc.rebuild(t.Context(), project, []string{"app"}, options))
+	assert.NilError(t, svc.devWatch().Rebuild(t.Context(), project, []string{"app"}, options))
 
 	touchesService := func(name, kind string) bool {
 		for id := range touched {
