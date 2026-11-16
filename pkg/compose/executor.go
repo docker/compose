@@ -52,6 +52,11 @@ type planExecutor struct {
 	containersMu        sync.Mutex
 	containersByService map[string]Containers
 
+	// optionalWarned records the (service, dependency) pairs whose optional
+	// dependency failure was already warned about (see warnOptionalDependency):
+	// one warning per service, not one per replica or hook node.
+	optionalWarned sync.Map
+
 	// waitTimeout, when non-zero, bounds OpWaitCondition nodes only (see
 	// executeNode) -- not the rest of the plan, and with its OWN fresh
 	// window per wait node rather than a single shared deadline counted

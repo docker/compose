@@ -22,6 +22,8 @@ import (
 	"slices"
 	"sync"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -258,10 +260,26 @@ func (exec *planExecutor) interruption(rs *runState, failed *PlanNode) string {
 	return "interrupted by the failure of " + rs.groups.resourceName(failed)
 }
 
+// declaresOptional reports whether node's service declared the dependency wait
+// is bound to, with that condition, as optional (required: false). A wait node
+// is shared by every dependent awaiting the same condition, one of them
+// requiring it is enough to make it strict for all: whether it holds a given
+// dependent is what that dependent declared, not what the node is.
+func declaresOptional(node, wait *PlanNode) bool {
+	svc := node.Operation.Service
+	if svc == nil {
+		return false
+	}
+	cfg, ok := svc.DependsOn[wait.Operation.Name]
+	return ok && cfg.Condition == wait.Operation.Condition && !cfg.Required
+}
+
 // unmetPrerequisite returns the wait node, among the prerequisites of node
 // (transitively: a start is held through its pre_start, a post_start through
 // its start), that has not succeeded, failed itself being preferred: which of
-// the nodes of a chain reports first must not change what is said.
+// the nodes of a chain reports first must not change what is said. A wait
+// node declares optional (see declaresOptional) holds nothing back: it is not
+// what the node was waiting for, nor is anything only reachable through it.
 func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNode {
 	var first *PlanNode
 	seen := map[int]bool{}
@@ -269,6 +287,9 @@ func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNo
 	walk = func(n *PlanNode) {
 		for _, dep := range n.DependsOn {
 			if seen[dep.ID] || succeeded(dep.ID) {
+				continue
+			}
+			if dep.Operation.Type == OpWaitCondition && declaresOptional(node, dep) {
 				continue
 			}
 			seen[dep.ID] = true
@@ -320,7 +341,30 @@ func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *pha
 	if failed == nil || failed == node {
 		return
 	}
+	exec.warnOptionalDependency(node, failed)
 	rs.groups.onNodeAborted(node, rs.events, exec.abortReason(node, rs, failed))
+}
+
+// warnOptionalDependency says, once per service, that the wait which ended the
+// phase was for a dependency node's service declared optional. Such a service
+// is not held back by that dependency (see declaresOptional), only caught in
+// the interruption: the warning tells the dependency failed and why the
+// service was not started anyway, as the failure of an optional dependency
+// always has.
+func (exec *planExecutor) warnOptionalDependency(node, failed *PlanNode) {
+	if failed.Operation.Type != OpWaitCondition || !declaresOptional(node, failed) {
+		return
+	}
+	if node.Operation.Type == OpRunPostStart {
+		// its service's start node says it, and a post_start whose container
+		// is started was not held by the wait: it is not "not started"
+		return
+	}
+	svc, dep := node.Operation.Service.Name, failed.Operation.Name
+	if _, warned := exec.optionalWarned.LoadOrStore(svc+":"+dep, true); warned {
+		return
+	}
+	logrus.Warnf("optional dependency %q did not meet condition %q: service %q is not started, the run was interrupted", dep, failed.Operation.Condition, svc)
 }
 
 // interruptedWait is the failure of a wait node left by the failure of

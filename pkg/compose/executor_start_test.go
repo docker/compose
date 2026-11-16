@@ -36,6 +36,8 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
@@ -1829,6 +1831,86 @@ func TestAbortReasonOfAFailedWait(t *testing.T) {
 	assert.Equal(t, exec.abortReason(other, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
 	// its start did not succeed: nothing is started for the hooks to be cut short
 	assert.Equal(t, exec.abortReason(postStart, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
+}
+
+// TestAbortReasonOfAnOptionalDependent pins docker/compose#14507: a wait node
+// is shared by the dependents awaiting the same condition, and one requiring it
+// makes it strict for all. A dependent that declared the dependency optional is
+// not held back by the wait that failed: it is not told its condition was not
+// met, only that the phase was interrupted. The dependent requiring it is.
+func TestAbortReasonOfAnOptionalDependent(t *testing.T) {
+	requiredCtr, optionalCtr := startTestSummary("needs_db"), startTestSummary("optional_db")
+	requiredSvc := serviceWithDeps("needs_db", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: true},
+	})
+	optionalSvc := serviceWithDeps("optional_db", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: false},
+	})
+	webCtr := startTestSummary("web")
+	plan := &Plan{}
+	wait := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "")
+	required := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:needs_db:1", Service: &requiredSvc, Container: &requiredCtr}, "start:needs_db:1", wait)
+	optional := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:optional_db:1", Service: &optionalSvc, Container: &optionalCtr}, "start:optional_db:1", wait)
+
+	failed := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:web:1", Container: &webCtr}, "start:web:1")
+
+	exec := &planExecutor{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return false }}
+	assert.Equal(t, exec.abortReason(required, rs, wait), `condition "service_healthy" of service "db" not met`)
+	assert.Equal(t, exec.abortReason(optional, rs, wait), `interrupted by the unmet condition "service_healthy" of service "db"`)
+
+	// another node interrupted the phase: the optional wait is still no
+	// reason for the dependent not to be started
+	assert.Equal(t, exec.abortReason(optional, rs, failed), "interrupted by the failure of Container test-web-1")
+	assert.Equal(t, exec.abortReason(required, rs, failed), `condition "service_healthy" of service "db" not reached: interrupted by the failure of Container test-web-1`)
+}
+
+// TestAbortReasonDoesNotWalkThroughAnOptionalWait pins that nothing reachable
+// only through a wait a dependent declared optional is what it was held by: the
+// wait of the dependency's own dependency is not the dependent's prerequisite.
+func TestAbortReasonDoesNotWalkThroughAnOptionalWait(t *testing.T) {
+	apiCtr, dbCtr := startTestSummary("api"), startTestSummary("db")
+	apiSvc := serviceWithDeps("api", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: false},
+	})
+	plan := &Plan{}
+	waitCache := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:cache:service_healthy", Name: "cache", Condition: types.ServiceConditionHealthy}, "")
+	dbStart := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:db:1", Container: &dbCtr}, "start:db:1", waitCache)
+	waitDB := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "", dbStart)
+	apiStart := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Service: &apiSvc, Container: &apiCtr}, "start:api:1", waitDB)
+
+	exec := &planExecutor{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return false }}
+	assert.Equal(t, exec.abortReason(apiStart, rs, waitCache), `interrupted by the unmet condition "service_healthy" of service "cache"`)
+}
+
+// TestWarnOptionalDependencyOncePerService pins that the failure of an optional
+// dependency is warned about once per service, whatever the number of its
+// nodes, and not at all for a service requiring it.
+func TestWarnOptionalDependencyOncePerService(t *testing.T) {
+	hook := logrustest.NewGlobal()
+	defer hook.Reset()
+
+	requiredSvc := serviceWithDeps("needs_db", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: true},
+	})
+	optionalSvc := serviceWithDeps("optional_db", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: false},
+	})
+	wait := &PlanNode{Operation: Operation{Type: OpWaitCondition, Name: "db", Condition: types.ServiceConditionHealthy}}
+	exec := &planExecutor{}
+	// a hook of the service is no reason to say the service is not started
+	exec.warnOptionalDependency(&PlanNode{Operation: Operation{Type: OpRunPostStart, Service: &optionalSvc}}, wait)
+
+	for range 2 {
+		exec.warnOptionalDependency(&PlanNode{Operation: Operation{Type: OpStartContainer, Service: &optionalSvc}}, wait)
+	}
+	exec.warnOptionalDependency(&PlanNode{Operation: Operation{Type: OpStartContainer, Service: &requiredSvc}}, wait)
+
+	entries := hook.AllEntries()
+	assert.Equal(t, len(entries), 1, "%v", entries)
+	assert.Equal(t, entries[0].Level, logrus.WarnLevel)
+	assert.Equal(t, entries[0].Message, `optional dependency "db" did not meet condition "service_healthy": service "optional_db" is not started, the run was interrupted`)
 }
 
 // TestExecutePlanCanceledCallerMidInspectionKeepsItsError keeps what a caller
