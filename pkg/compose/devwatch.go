@@ -46,10 +46,6 @@ func (s *composeService) watch(ctx context.Context, project *types.Project, opti
 	return s.devWatch().Watch(ctx, project, options)
 }
 
-func (s *composeService) rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
-	return s.devWatch().Rebuild(ctx, project, services, options)
-}
-
 // devWatchBackend is the engine of a composeService, as internal/devwatch sees it.
 type devWatchBackend struct {
 	engineBackend
