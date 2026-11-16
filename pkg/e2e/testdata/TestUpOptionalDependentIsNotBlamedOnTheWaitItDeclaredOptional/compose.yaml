@@ -1,0 +1,26 @@
+services:
+  # becomes unhealthy: the dependents below wait for it, with the same condition
+  db:
+    image: alpine
+    command: sleep infinity
+    healthcheck:
+      test: ["CMD", "false"]
+      interval: 1s
+      retries: 1
+
+  # requires db to be healthy: can never start
+  needs_db:
+    image: alpine
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # only wants db to be healthy: held by the same wait, but not blocked by it
+  optional_db:
+    image: alpine
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy
+        required: false

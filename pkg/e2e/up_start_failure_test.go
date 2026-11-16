@@ -45,3 +45,21 @@ func TestUpUnhealthyDependencyNamesTheConditionNotMet(t *testing.T) {
 			OutputContains(`not started: condition "service_healthy" of service "db" not met`),
 			OutputNotContains("wait:"))
 }
+
+// TestUpOptionalDependentIsNotBlamedOnTheWaitItDeclaredOptional locks
+// docker/compose#14507: the wait on a dependency is shared by every dependent
+// awaiting the same condition, and one requiring it makes it strict for all.
+// When it fails, the dependent that declared the dependency optional is given
+// up with the others (up fails fast), but it is not reported as held by a
+// condition that does not apply to it: it is interrupted, and a warning says
+// why.
+func TestUpOptionalDependentIsNotBlamedOnTheWaitItDeclaredOptional(t *testing.T) {
+	NewScenario(t, "up must not report an optional dependent as held by the unmet condition of a dependency it declared optional").
+		Step("db turns unhealthy: needs_db is blocked by it, optional_db only interrupted",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains(`needs_db-1 not started: condition "service_healthy" of service "db" not met`),
+			OutputContains(`optional_db-1 not started: interrupted by the unmet condition "service_healthy" of service "db"`),
+			OutputNotContains(`optional_db-1 not started: condition "service_healthy" of service "db" not met`),
+			OutputContains(`level=warning msg="optional dependency \"db\" did not meet condition \"service_healthy\"`))
+}
