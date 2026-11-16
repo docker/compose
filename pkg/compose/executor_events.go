@@ -279,7 +279,7 @@ func declaresOptional(node, wait *PlanNode) bool {
 // its start), that has not succeeded, failed itself being preferred: which of
 // the nodes of a chain reports first must not change what is said. A wait
 // node declares optional (see declaresOptional) holds nothing back: it is not
-// what the node was waiting for.
+// what the node was waiting for, nor is anything only reachable through it.
 func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNode {
 	var first *PlanNode
 	seen := map[int]bool{}
@@ -289,15 +289,18 @@ func unmetPrerequisite(node, failed *PlanNode, succeeded func(int) bool) *PlanNo
 			if seen[dep.ID] || succeeded(dep.ID) {
 				continue
 			}
+			if dep.Operation.Type == OpWaitCondition && declaresOptional(node, dep) {
+				continue
+			}
 			seen[dep.ID] = true
-			if dep.Operation.Type == OpWaitCondition && first == nil && !declaresOptional(node, dep) {
+			if dep.Operation.Type == OpWaitCondition && first == nil {
 				first = dep
 			}
 			walk(dep)
 		}
 	}
 	walk(node)
-	if failed != nil && seen[failed.ID] && failed.Operation.Type == OpWaitCondition && !declaresOptional(node, failed) {
+	if failed != nil && seen[failed.ID] && failed.Operation.Type == OpWaitCondition {
 		return failed
 	}
 	return first
@@ -350,6 +353,11 @@ func (exec *planExecutor) reportAborted(node *PlanNode, rs *runState, phase *pha
 // always has.
 func (exec *planExecutor) warnOptionalDependency(node, failed *PlanNode) {
 	if failed.Operation.Type != OpWaitCondition || !declaresOptional(node, failed) {
+		return
+	}
+	if node.Operation.Type == OpRunPostStart {
+		// its service's start node says it, and a post_start whose container
+		// is started was not held by the wait: it is not "not started"
 		return
 	}
 	svc, dep := node.Operation.Service.Name, failed.Operation.Name

@@ -1865,6 +1865,25 @@ func TestAbortReasonOfAnOptionalDependent(t *testing.T) {
 	assert.Equal(t, exec.abortReason(required, rs, failed), `condition "service_healthy" of service "db" not reached: interrupted by the failure of Container test-web-1`)
 }
 
+// TestAbortReasonDoesNotWalkThroughAnOptionalWait pins that nothing reachable
+// only through a wait a dependent declared optional is what it was held by: the
+// wait of the dependency's own dependency is not the dependent's prerequisite.
+func TestAbortReasonDoesNotWalkThroughAnOptionalWait(t *testing.T) {
+	apiCtr, dbCtr := startTestSummary("api"), startTestSummary("db")
+	apiSvc := serviceWithDeps("api", types.DependsOnConfig{
+		"db": {Condition: types.ServiceConditionHealthy, Required: false},
+	})
+	plan := &Plan{}
+	waitCache := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:cache:service_healthy", Name: "cache", Condition: types.ServiceConditionHealthy}, "")
+	dbStart := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:db:1", Container: &dbCtr}, "start:db:1", waitCache)
+	waitDB := plan.addNode(Operation{Type: OpWaitCondition, ResourceID: "wait:db:service_healthy", Name: "db", Condition: types.ServiceConditionHealthy}, "", dbStart)
+	apiStart := plan.addNode(Operation{Type: OpStartContainer, ResourceID: "service:api:1", Service: &apiSvc, Container: &apiCtr}, "start:api:1", waitDB)
+
+	exec := &planExecutor{}
+	rs := &runState{groups: exec.buildGroupTracker(plan), succeeded: func(int) bool { return false }}
+	assert.Equal(t, exec.abortReason(apiStart, rs, waitCache), `interrupted by the unmet condition "service_healthy" of service "cache"`)
+}
+
 // TestWarnOptionalDependencyOncePerService pins that the failure of an optional
 // dependency is warned about once per service, whatever the number of its
 // nodes, and not at all for a service requiring it.
@@ -1880,6 +1899,9 @@ func TestWarnOptionalDependencyOncePerService(t *testing.T) {
 	})
 	wait := &PlanNode{Operation: Operation{Type: OpWaitCondition, Name: "db", Condition: types.ServiceConditionHealthy}}
 	exec := &planExecutor{}
+	// a hook of the service is no reason to say the service is not started
+	exec.warnOptionalDependency(&PlanNode{Operation: Operation{Type: OpRunPostStart, Service: &optionalSvc}}, wait)
+
 	for range 2 {
 		exec.warnOptionalDependency(&PlanNode{Operation: Operation{Type: OpStartContainer, Service: &optionalSvc}}, wait)
 	}
