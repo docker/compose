@@ -579,6 +579,20 @@ func TestGetRestartPolicy(t *testing.T) {
 		},
 		{"restart_policy without condition keeps restart", "    restart: always\n    deploy: {restart_policy: {delay: 5s}}\n", container.RestartPolicy{Name: container.RestartPolicyAlways}},
 		{"restart_policy without condition and no restart", "    deploy: {restart_policy: {delay: 5s}}\n", container.RestartPolicy{}},
+		{
+			"retry count the loader cannot carry",
+			"    deploy: {restart_policy: {condition: any, max_attempts: 5}}\n",
+			container.RestartPolicy{Name: container.RestartPolicyAlways, MaximumRetryCount: 5},
+		},
+		{"unknown condition", "    deploy: {restart_policy: {condition: bogus}}\n", container.RestartPolicy{Name: "bogus"}},
+		{"unknown condition and restart", "    restart: always\n    deploy: {restart_policy: {condition: bogus}}\n", container.RestartPolicy{Name: "bogus"}},
+		{"unknown restart and condition", "    restart: bogus\n    deploy: {restart_policy: {condition: always}}\n", container.RestartPolicy{Name: container.RestartPolicyAlways}},
+		{"any carried as always", "    restart: unless-stopped\n    deploy: {restart_policy: {condition: any}}\n", container.RestartPolicy{Name: container.RestartPolicyAlways}},
+		{
+			"condition keeps the retry count of restart",
+			"    restart: on-failure:3\n    deploy: {restart_policy: {condition: on-failure}}\n",
+			container.RestartPolicy{Name: container.RestartPolicyOnFailure, MaximumRetryCount: 3},
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			service, err := loadService(t, tc.attributes)

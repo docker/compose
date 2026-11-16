@@ -755,24 +755,42 @@ func umaskOption(service types.ServiceConfig, version string) (*uint32, error) {
 }
 
 // getRestartPolicy reads the restart policy of the service. The loader has
-// already merged deploy.restart_policy into restart, and rejected the two when
-// they contradict each other, so restart is the only attribute to read.
+// already merged deploy.restart_policy into restart, deploy.restart_policy
+// winning with a warning when the two contradict each other. What it cannot
+// express as restart (an unknown condition, a retry count on a policy that does
+// not retry) is left in deploy.restart_policy, for the engine to report.
 //
 // This relies on compose-go v2.17.0 or later: a service built without going
-// through the loader would get no restart policy from deploy.restart_policy.
+// through the loader would get no restart policy from deploy.restart_policy
+// unless it sets a condition.
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
-	if service.Restart == "" {
-		return container.RestartPolicy{}
+	var restart container.RestartPolicy
+	if service.Restart != "" {
+		name, num, ok := strings.Cut(service.Restart, ":")
+		var attempts int
+		if ok {
+			attempts, _ = strconv.Atoi(num)
+		}
+		restart = container.RestartPolicy{
+			Name:              mapRestartPolicyCondition(name),
+			MaximumRetryCount: attempts,
+		}
 	}
-	name, num, ok := strings.Cut(service.Restart, ":")
-	var attempts int
-	if ok {
-		attempts, _ = strconv.Atoi(num)
+	if service.Deploy != nil && service.Deploy.RestartPolicy != nil && service.Deploy.RestartPolicy.Condition != "" {
+		policy := *service.Deploy.RestartPolicy
+		if name := mapRestartPolicyCondition(policy.Condition); name != restart.Name {
+			// the loader did not carry this policy into restart
+			var attempts int
+			if policy.MaxAttempts != nil {
+				attempts = int(*policy.MaxAttempts)
+			}
+			return container.RestartPolicy{
+				Name:              name,
+				MaximumRetryCount: attempts,
+			}
+		}
 	}
-	return container.RestartPolicy{
-		Name:              mapRestartPolicyCondition(name),
-		MaximumRetryCount: attempts,
-	}
+	return restart
 }
 
 func mapRestartPolicyCondition(condition string) container.RestartPolicyMode {
