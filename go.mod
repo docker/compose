@@ -3,7 +3,7 @@ module github.com/docker/compose/v5
 go 1.26.10
 
 require (
-	github.com/DefangLabs/secret-detector v0.0.0-20260916192156-3e28d7ed64df
+	github.com/DefangLabs/secret-detector v1.1.0
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
@@ -90,7 +90,6 @@ require (
 	github.com/in-toto/attestation v1.2.0 // indirect
 	github.com/in-toto/in-toto-golang v0.11.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
-	github.com/inhies/go-bytesize v0.0.0-20220417184213-4913239db9cf // indirect
 	github.com/klauspost/compress v1.20.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/locker v1.0.1 // indirect
