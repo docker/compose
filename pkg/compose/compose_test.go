@@ -20,10 +20,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/swarm"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 func swarmInfo(state swarm.LocalNodeState) client.SystemInfoResult {
@@ -66,4 +70,23 @@ func TestDrainTimeout(t *testing.T) {
 	assert.Equal(t, other.drainTimeout(), defaultLogStreamDrainTimeout)
 
 	assert.Equal(t, (&composeService{}).drainTimeout(), defaultLogStreamDrainTimeout)
+}
+
+// TestWithDryRunKeepsLogLevel guards that switching to the dry-run client
+// does not reset the log level: re-initializing the Docker CLI with fresh
+// client options would otherwise drop --verbose back to info, hiding every
+// debug log of the dry-run operation.
+func TestWithDryRunKeepsLogLevel(t *testing.T) {
+	previous := logrus.GetLevel()
+	t.Cleanup(func() { logrus.SetLevel(previous) })
+	logrus.SetLevel(logrus.TraceLevel)
+
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(mocks.NewMockAPIClient(mockCtrl)).AnyTimes()
+	cli.EXPECT().CurrentContext().Return("default").AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+
+	assert.NilError(t, WithDryRun(&composeService{dockerCli: cli}))
+	assert.Equal(t, logrus.GetLevel(), logrus.TraceLevel)
 }

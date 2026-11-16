@@ -177,6 +177,9 @@ func WithDryRun(s *composeService) error {
 
 	options := flags.NewClientOptions()
 	options.Context = s.dockerCli.CurrentContext()
+	// Initialize applies options.LogLevel, resetting an empty one to info:
+	// keep the level already set (e.g. by --verbose).
+	options.LogLevel = logrus.GetLevel().String()
 	err = cli.Initialize(options, command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
 		return dryrun.NewDryRunClient(s.apiClient(), s.dockerCli)
 	}))
