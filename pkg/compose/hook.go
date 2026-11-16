@@ -27,6 +27,7 @@ import (
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
@@ -44,6 +45,7 @@ func (s *composeService) runHook(ctx context.Context, ctr container.Summary, ser
 	// A dry-run must have no side effects, and the dry-run client cannot
 	// attach to an exec: skip the hook rather than fail on it.
 	if s.dryRun {
+		logrus.Debugf("dry-run: skipping hook %v of service %s", hook.Command, service.Name)
 		return nil
 	}
 
