@@ -62,7 +62,8 @@ func incompatible(reason string, options ...string) error {
 // when Create holds a value that CreateOptions.Validate rejects.
 //
 // Up has two modes, selected by Start.Attach: detached (nil) returns once the
-// containers are started, interactive (set) keeps running a foreground session.
+// containers are started, interactive (set) keeps running a foreground session,
+// which Wait ends once the services are running or healthy.
 // Validate only checks the combinations listed below: OnExit, ExitCodeFrom or
 // Watch without Attach, or with Wait. Other mode-specific fields
 // (e.g. Services, AttachTo, NavigationMenu) are not checked and may be ignored

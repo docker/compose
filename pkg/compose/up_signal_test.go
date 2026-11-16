@@ -19,12 +19,15 @@
 package compose
 
 import (
+	"context"
 	"errors"
 	"os"
 	"os/signal"
 	"syscall"
 	"testing"
+	"time"
 
+	"github.com/moby/moby/api/types/events"
 	"gotest.tools/v3/assert"
 )
 
@@ -162,5 +165,65 @@ func TestUpInteractiveIgnoresTheStartPhaseErrorOfAnInterruptedUp(t *testing.T) {
 	case err := <-killErr:
 		t.Error(err)
 	default:
+	}
+}
+
+// TestUpInteractiveInterruptedWhileTheStartPhaseOutlivesTheMonitor pins that an
+// interruption met while the Start phase is still running stops the application
+// even though the monitor already ended: every attached container is gone (here
+// it died before its start went through) while the Start phase is blocked (on a
+// dependency wait of an unattached service in a real project, on the start gate
+// here). The monitor ending must not end the event loop with it, which is the
+// one handling the interruption: nothing would, and the up would hang on the
+// Start phase with Ctrl+C swallowed.
+//
+// The interruption is a real signal (see
+// TestUpInteractiveStopsAContainerThatStartsAfterTheTeardownSweep).
+func TestUpInteractiveInterruptedWhileTheStartPhaseOutlivesTheMonitor(t *testing.T) {
+	for name, wait := range map[string]bool{"up": false, "up --wait": true} {
+		t.Run(name, func(t *testing.T) {
+			mine := make(chan os.Signal, 1)
+			signal.Notify(mine, syscall.SIGINT)
+			defer signal.Stop(mine)
+
+			h := newInteractiveUpHarness(t)
+			h.daemon.startGate = make(chan struct{})
+			killErr := make(chan error, 1)
+			go func() {
+				select {
+				case <-h.daemon.callSignal("start-requested"):
+				case <-t.Context().Done():
+					return
+				}
+				// the attached container is gone: the monitor ends
+				h.daemon.eventLog.emit(containerMessage(events.ActionDie, "c1", "test-web-1", "web", map[string]string{"exitCode": "0"}))
+				time.Sleep(3 * containerExitDelay)
+				if err := syscall.Kill(os.Getpid(), syscall.SIGINT); err != nil {
+					killErr <- err
+					return
+				}
+				// the Start phase stays blocked until the application is stopped
+				select {
+				case <-h.daemon.callSignal("stop"):
+				case <-time.After(3 * time.Second):
+				case <-t.Context().Done():
+					return
+				}
+				close(h.daemon.startGate)
+			}()
+			options := interactiveUpOptions()
+			options.Start.Wait = wait
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+
+			_ = h.upWithOptions(t, ctx, cancel, options)
+
+			assert.Assert(t, callsOf(h.daemon, "stop") >= 1, "the interruption must stop the application while the Start phase is blocked: %v", h.daemon.recorded())
+			select {
+			case err := <-killErr:
+				t.Error(err)
+			default:
+			}
+		})
 	}
 }

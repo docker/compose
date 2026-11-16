@@ -206,7 +206,7 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			return client.ContainerInspectResult{Container: container.InspectResponse{
 				ID:              "c1",
 				Name:            "/test-web-1",
-				Config:          &container.Config{Labels: labels},
+				Config:          inspectedConfig(labels, state),
 				State:           state,
 				NetworkSettings: &container.NetworkSettings{},
 			}}, nil
@@ -274,6 +274,17 @@ func expectInteractiveUpDaemon(t *testing.T, apiClient *mocks.MockAPIClient) *in
 			return client.ContainerStartResult{}, d.containerStart(t, labels)
 		})
 	return d
+}
+
+// inspectedConfig is the config the engine reports for the container: one that
+// reports a health status has a healthcheck, without which a running container
+// counts as ready.
+func inspectedConfig(labels map[string]string, state *container.State) *container.Config {
+	config := &container.Config{Labels: labels}
+	if state.Health != nil {
+		config.Healthcheck = &container.HealthConfig{Test: []string{"CMD", "true"}}
+	}
+	return config
 }
 
 // containerStart is the engine starting the container: once the events
@@ -527,13 +538,106 @@ func TestUpInteractiveDryRunWaitStaysDetached(t *testing.T) {
 	options := interactiveUpOptions()
 	options.Start.Wait = true
 
-	_ = h.svc.Up(t.Context(), interactiveUpProject(), options)
+	err := h.svc.Up(t.Context(), interactiveUpProject(), options)
 
+	assert.ErrorContains(t, err, "container test-web-1 exited")
 	for _, call := range []string{"attach", "events"} {
 		assert.Equal(t, h.daemon.indexOf(call), -1, "%s must not be reached by a detached --wait: %v", call, h.daemon.recorded())
 	}
 	assert.Assert(t, h.daemon.indexOf("start") >= 0, "the detached plan ran: %v", h.daemon.recorded())
 	assert.Assert(t, !strings.Contains(h.out.String(), "interactive run is not supported in dry-run mode"), "output: %q", h.out.String())
+}
+
+// waitingUpOptions is interactiveUpOptions with --wait: the session streams the
+// logs until the services are running or healthy, then ends.
+func waitingUpOptions() api.UpOptions {
+	options := interactiveUpOptions()
+	options.Start.Wait = true
+	return options
+}
+
+// stillStarting is the state of a container whose healthcheck has not passed.
+func stillStarting() *container.State {
+	return &container.State{Status: container.StateRunning, Health: &container.Health{Status: container.Starting}}
+}
+
+// interruptedWaitingUp runs a --wait up whose service never becomes healthy and
+// interrupts it, as the CLI does on Ctrl+C by canceling the context, once the
+// container started and `after` has elapsed.
+func (h *interactiveUpHarness) interruptedWaitingUp(t *testing.T, after time.Duration) error {
+	t.Helper()
+	h.daemon.inspectState = stillStarting()
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	go func() {
+		select {
+		case <-h.daemon.callSignal("start"):
+		case <-ctx.Done():
+			return
+		}
+		select {
+		case <-time.After(after):
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return h.upWithOptions(t, ctx, cancel, waitingUpOptions())
+}
+
+// TestUpInteractiveWaitEndsTheSessionOnceTheServicesAreUp: --wait streams the
+// logs while the services come up, then ends the session and leaves them running.
+func TestUpInteractiveWaitEndsTheSessionOnceTheServicesAreUp(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.daemon.neverExits = true
+	h.daemon.inspectState = &container.State{Status: container.StateRunning}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := h.upWithOptions(t, ctx, cancel, waitingUpOptions())
+
+	assert.NilError(t, err)
+	assert.Assert(t, h.daemon.indexOf("attach") >= 0, "the session attached to stream the logs: %v", h.daemon.recorded())
+	assert.Equal(t, callsOf(h.daemon, "stop"), 0, "the services are left running: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveWaitFailsWhenAServiceExits: a service that exits instead of
+// getting up fails the up, naming it, and nothing is stopped.
+func TestUpInteractiveWaitFailsWhenAServiceExits(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	err := h.upWithOptions(t, ctx, cancel, waitingUpOptions())
+
+	assert.ErrorContains(t, err, "container test-web-1 exited")
+	assert.Assert(t, h.daemon.indexOf("attach") >= 0, "the session attached to stream the logs: %v", h.daemon.recorded())
+	assert.Equal(t, callsOf(h.daemon, "stop"), 0, "nothing is stopped on a failed wait: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveWaitInterruptedStopsTheStack: Ctrl+C while --wait waits for
+// the services stops the stack, once, like an interrupted session.
+func TestUpInteractiveWaitInterruptedStopsTheStack(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+	h.daemon.neverExits = true
+	h.daemon.stopEndsContainer = true
+
+	_ = h.interruptedWaitingUp(t, 200*time.Millisecond)
+
+	assert.Equal(t, callsOf(h.daemon, "stop"), 1, "the stack is stopped once: %v", h.daemon.recorded())
+}
+
+// TestUpInteractiveWaitInterruptedOnceTheMonitorEnded: the monitor, which only
+// follows the attached services (--no-attach leaves the others out), ends the
+// session's context once they are gone, and with it the event loop that handles
+// Ctrl+C. The wait on a service still starting goes on, and an interruption met
+// then must still stop the stack. Modeled by an attached container that exits
+// while the engine still reports it starting.
+func TestUpInteractiveWaitInterruptedOnceTheMonitorEnded(t *testing.T) {
+	h := newInteractiveUpHarness(t)
+
+	_ = h.interruptedWaitingUp(t, containerExitDelay+400*time.Millisecond)
+
+	assert.Equal(t, callsOf(h.daemon, "stop"), 1, "the stack is stopped once: %v", h.daemon.recorded())
 }
 
 // TestUpInteractiveStartPhaseSurvivesCancellation: the Start phase runs on a

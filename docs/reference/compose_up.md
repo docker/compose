@@ -10,7 +10,8 @@ One can optionally select a subset of services to attach to using `--attach` fla
 `--no-attach` to prevent output to be flooded by some verbose services.
 
 When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
-background and leaves them running.
+background and leaves them running. With `--wait`, the command exits once the services are running or healthy, and
+leaves them running.
 
 If there are existing containers for a service, and the service’s configuration or image was changed after the
 container’s creation, `docker compose up` picks up the changes by stopping and recreating the containers
@@ -83,7 +84,8 @@ One can optionally select a subset of services to attach to using `--attach` fla
 `--no-attach` to prevent output to be flooded by some verbose services. 
 
 When the command exits, all containers are stopped. Running `docker compose up --detach` starts the containers in the
-background and leaves them running.
+background and leaves them running. With `--wait`, the command exits once the services are running or healthy, and
+leaves them running.
 
 If there are existing containers for a service, and the service’s configuration or image was changed after the
 container’s creation, `docker compose up` picks up the changes by stopping and recreating the containers

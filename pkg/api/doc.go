@@ -40,8 +40,9 @@
 //     service's stop_grace_period) or its own default.
 //   - [StartOptions].WaitTimeout: 0 means no time limit on dependency waits.
 //   - [StartOptions].Attach: nil selects the detached mode of Up, a non-nil
-//     consumer selects the interactive session. See [UpOptions.Validate] for
-//     the options that only make sense in one of the two modes.
+//     consumer selects the interactive session, which [StartOptions].Wait
+//     ends once the services are running or healthy. See [UpOptions.Validate]
+//     for the options that only make sense in one of the two modes.
 //   - Project, on the options of operations that take a project name: for
 //     Start, Stop, Restart, Kill and Down, nil means the project is rebuilt
 //     from the labels of its containers. Pause and Logs only use it to narrow

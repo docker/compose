@@ -376,7 +376,8 @@ type StartOptions struct {
 	// Attach receives the containers' logs during Up's foreground session.
 	// It doubles as the mode switch: when nil, Up returns once containers
 	// are started (detached mode); when set, Up keeps running the
-	// interactive session (log streaming, cascade, keyboard menu).
+	// interactive session (log streaming, cascade, keyboard menu), which Wait
+	// ends once the services are running or healthy.
 	// Ignored by Start.
 	Attach LogConsumer
 	// AttachTo carries two unrelated meanings: for Start, the service names
