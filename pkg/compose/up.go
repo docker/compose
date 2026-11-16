@@ -232,6 +232,14 @@ type upSession struct {
 	mu           sync.Mutex
 	errs         []error
 	exitCode     int
+
+	// eventLoopEnded is set once runEventLoop returned: it no longer reacts to
+	// an interruption. globalCtx being done does not tell that: it is a child of
+	// the caller's ctx, so an interruption cancels it too, before the loop reacts.
+	eventLoopEnded atomic.Bool
+	// startReturned is closed once the Start phase returned, see
+	// awaitStartReturned.
+	startReturned chan struct{}
 }
 
 // runInteractiveUp sets up the attach/printer/monitor session around the
@@ -292,6 +300,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		cancel:         cancel,
 		logOpenLimiter: concurrency.NewLimiter(s.maxConcurrency),
 		signalChan:     signalChan,
+		startReturned:  make(chan struct{}),
 	}
 
 	u.eg.Go(func() error {
@@ -378,6 +387,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		case <-time.After(u.drainTimeout()):
 		case <-globalCtx.Done():
 		}
+		u.awaitStartReturned()
 		// cancel the global context to terminate signal-handler goroutines
 		cancel()
 		u.appendErr(err)
@@ -386,14 +396,14 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 
 	// We use the parent context without cancellation as we manage sigterm to stop the stack
 	err = created.run.runStart(context.WithoutCancel(ctx), u.printer.HandleEvent)
+	close(u.startReturned)
 	err = translateWaitTimeout(err)
 	if err == nil && options.Start.Wait {
 		// --wait streams the logs only until the services are running|healthy,
 		// then ends the session leaving them up. The caller's ctx, not
 		// globalCtx: the monitor cancels the latter once every container is
 		// gone, which must not abort the verification of one-shot services.
-		err = s.awaitProjectReady(ctx, project, options.Start.WaitTimeout)
-		cancel()
+		err = u.endWait(ctx, s.awaitProjectReady(ctx, project, options.Start.WaitTimeout))
 	}
 	if err != nil && !u.isTerminated.Load() { // Ignore error if the process is terminated
 		cancel()
@@ -413,10 +423,41 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 	return err
 }
 
+// awaitStartReturned holds the session open until the Start phase returned,
+// unless the session is canceled meanwhile. The Start phase may still be waiting
+// (a dependency of an unattached service) once every attached container is gone,
+// and it runs on a context that outlives the caller's: the event loop, which
+// ends with the session, is the only one left to handle an interruption, and
+// the stop it triggers is what lets the Start phase give up.
+func (u *upSession) awaitStartReturned() {
+	select {
+	case <-u.startReturned:
+	case <-u.globalCtx.Done():
+	}
+}
+
+// endWait ends the session once the --wait verification returned err. An
+// interruption (Ctrl+C/SIGTERM) says nothing about the services: the event loop
+// stops the stack, unless it ended already (the monitor cancels globalCtx once
+// every attached container is gone), in which case nobody is left to and it is
+// done here.
+func (u *upSession) endWait(ctx context.Context, err error) error {
+	if ctx.Err() == nil {
+		u.cancel()
+		return err
+	}
+	if u.eventLoopEnded.Load() && !u.isTerminated.Load() {
+		// set before stopApplication's listing, as gracefulTeardown does
+		u.isTerminated.Store(true)
+		u.stopApplication()
+	}
+	return nil
+}
+
 // setupNavigationMenu initializes the interactive keyboard menu when enabled.
-// It returns a nil menu when the menu is disabled (or Wait is set), when no menu implementation
-// was configured (WithNavigationMenu), or when the keyboard can't be grabbed —
-// then disabling the option.
+// It returns a nil menu when the menu is disabled (or Wait is set), when no
+// menu implementation was configured (WithNavigationMenu), or when the
+// keyboard can't be grabbed — then disabling the option.
 func (s *composeService) setupNavigationMenu(ctx context.Context, options *api.UpOptions, signalChan chan os.Signal) (NavigationMenu, error) {
 	if options.Start.Wait {
 		// the session ends on its own once the services are up: no menu to drive
@@ -472,6 +513,7 @@ func (u *upSession) appendErr(err error) {
 // the application terminates: a first interruption triggers a graceful stop,
 // a second one kills the services.
 func (u *upSession) runEventLoop(ctx context.Context) error {
+	defer u.eventLoopEnded.Store(true)
 	first := true
 	gracefulTeardown := func() {
 		first = false

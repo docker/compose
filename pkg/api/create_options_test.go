@@ -81,7 +81,7 @@ func TestUpOptionsValidateReportsInvalidCreateOptions(t *testing.T) {
 	assert.Assert(t, errors.Is(err, ErrInvalidOption), "got %v", err)
 
 	// invalid values and incompatible combinations are reported together
-	err = UpOptions{Create: CreateOptions{Recreate: "forced"}, Start: StartOptions{Wait: true, Attach: nopConsumer{}}}.Validate()
+	err = UpOptions{Create: CreateOptions{Recreate: "forced"}, Start: StartOptions{Wait: true, Attach: nopConsumer{}, Watch: true}}.Validate()
 	assert.Assert(t, errors.Is(err, ErrInvalidOption), "got %v", err)
 	assert.Assert(t, errors.Is(err, ErrIncompatibleOptions), "got %v", err)
 }
