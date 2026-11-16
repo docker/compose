@@ -1,13 +1,13 @@
 module github.com/docker/compose/v5
 
-go 1.26.10
+go 1.26.11
 
 require (
 	github.com/DefangLabs/secret-detector v1.1.0
 	github.com/Microsoft/go-winio v0.6.4
 	github.com/acarl005/stripansi v0.0.0-20180116102854-5a71ef0e047d
 	github.com/buger/goterm v1.0.4
-	github.com/compose-spec/compose-go/v2 v2.16.2
+	github.com/compose-spec/compose-go/v2 v2.17.0
 	github.com/containerd/console v1.0.5
 	github.com/containerd/containerd/v2 v2.4.2
 	github.com/containerd/errdefs v1.0.0
