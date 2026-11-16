@@ -318,3 +318,37 @@ type noBackend struct{}
 
 func (noBackend) APIClient() client.APIClient { return nil }
 func (noBackend) CLI() command.Cli            { return nil }
+
+// Resources no service uses are dropped unless they are asked for, with
+// IncludeUnused or with the deprecated All it replaces.
+func TestLoadProject_IncludeUnused(t *testing.T) {
+	composeFile := filepath.Join(t.TempDir(), "compose.yaml")
+	err := os.WriteFile(composeFile, []byte(`
+name: test-project
+services:
+  web:
+    image: nginx
+volumes:
+  unused:
+`), 0o600)
+	assert.NilError(t, err)
+
+	tests := []struct {
+		name     string
+		options  api.ProjectLoadOptions
+		expected bool
+	}{
+		{name: "dropped by default", options: api.ProjectLoadOptions{}, expected: false},
+		{name: "IncludeUnused", options: api.ProjectLoadOptions{IncludeUnused: true}, expected: true},
+		{name: "deprecated All", options: api.ProjectLoadOptions{All: true}, expected: true}, //nolint:staticcheck // the deprecated All still keeps them
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.options.ConfigPaths = []string{composeFile}
+			project, err := New(noBackend{}).LoadProject(t.Context(), tt.options)
+			assert.NilError(t, err)
+			_, found := project.Volumes["unused"]
+			assert.Equal(t, found, tt.expected)
+		})
+	}
+}

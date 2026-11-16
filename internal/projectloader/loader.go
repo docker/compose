@@ -153,7 +153,7 @@ func (s *Service) postProcessProject(project *types.Project, options api.Project
 	}
 
 	// Remove unnecessary resources if not All
-	if !options.All {
+	if !options.All && !options.IncludeUnused { //nolint:staticcheck // All is the deprecated alias of IncludeUnused, honored until it is removed
 		project = project.WithoutUnnecessaryResources()
 	}
 

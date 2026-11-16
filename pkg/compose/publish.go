@@ -33,6 +33,9 @@ import (
 // package the engine it acts on.
 
 func (s *composeService) Publish(ctx context.Context, project *types.Project, repository string, options api.PublishOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	return Run(ctx, func(ctx context.Context) error {
 		return publish.New(publishBackend{s}).Publish(ctx, project, repository, options)
 	}, "publish", s.events)
