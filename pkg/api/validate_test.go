@@ -37,6 +37,12 @@ func TestLogOptionsValidate(t *testing.T) {
 	}
 }
 
+func TestInvalidOptionErrorWithoutAllowedValues(t *testing.T) {
+	err := &InvalidOptionError{Option: "X", Value: "v"}
+	assert.Assert(t, errors.Is(err, ErrInvalidOption))
+	assert.Error(t, err, `invalid option (X): "v" is not a valid value`)
+}
+
 func TestEventsOptionsValidate(t *testing.T) {
 	assert.NilError(t, EventsOptions{Consumer: func(Event) error { return nil }}.Validate())
 
@@ -52,7 +58,7 @@ func TestPublishOptionsValidate(t *testing.T) {
 
 	err := PublishOptions{OCIVersion: "1.2"}.Validate()
 	assert.Assert(t, errors.Is(err, ErrInvalidOption), "got %v", err)
-	assert.Error(t, err, `invalid option (OCIVersion): "1.2" is not one of 1.0, 1.1`)
+	assert.Error(t, err, `invalid option (OCIVersion): "1.2" is not one of "1.0", "1.1"`)
 }
 
 func TestDownOptionsValidate(t *testing.T) {
@@ -62,5 +68,5 @@ func TestDownOptionsValidate(t *testing.T) {
 
 	err := DownOptions{Images: "bogus"}.Validate()
 	assert.Assert(t, errors.Is(err, ErrInvalidOption), "got %v", err)
-	assert.Error(t, err, `invalid option (Images): "bogus" is not one of local, all`)
+	assert.Error(t, err, `invalid option (Images): "bogus" is not one of "", "local", "all"`)
 }

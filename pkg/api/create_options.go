@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -48,7 +49,14 @@ func (e *InvalidOptionError) Error() string {
 	if e.Reason != "" {
 		return fmt.Sprintf("%s (%s): %s", ErrInvalidOption, e.Option, e.Reason)
 	}
-	return fmt.Sprintf("%s (%s): %q is not one of %s", ErrInvalidOption, e.Option, e.Value, strings.Join(e.Allowed, ", "))
+	if len(e.Allowed) == 0 {
+		return fmt.Sprintf("%s (%s): %q is not a valid value", ErrInvalidOption, e.Option, e.Value)
+	}
+	allowed := make([]string, len(e.Allowed))
+	for i, a := range e.Allowed {
+		allowed[i] = strconv.Quote(a)
+	}
+	return fmt.Sprintf("%s (%s): %q is not one of %s", ErrInvalidOption, e.Option, e.Value, strings.Join(allowed, ", "))
 }
 
 // Unwrap makes errors.Is(err, ErrInvalidOption) hold.

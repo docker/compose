@@ -73,7 +73,7 @@ func TestCreateOptionsValidate(t *testing.T) {
 
 func TestInvalidOptionErrorMessage(t *testing.T) {
 	err := CreateOptions{Recreate: "forced"}.Validate()
-	assert.Error(t, err, `invalid option (Recreate): "forced" is not one of diverged, force, never`)
+	assert.Error(t, err, `invalid option (Recreate): "forced" is not one of "diverged", "force", "never"`)
 }
 
 func TestUpOptionsValidateReportsInvalidCreateOptions(t *testing.T) {
