@@ -59,7 +59,7 @@ func TestDownRejectsInvalidImagePruneModeUpfront(t *testing.T) {
 		Images: "bogus",
 	})
 	assert.Assert(t, errors.Is(err, compose.ErrInvalidOption), "got %v", err)
-	assert.ErrorContains(t, err, `"bogus" is not one of local, all`)
+	assert.ErrorContains(t, err, `"bogus" is not one of "", "local", "all"`)
 }
 
 func TestDown(t *testing.T) {
