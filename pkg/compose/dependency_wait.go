@@ -278,6 +278,7 @@ func shouldWaitForDependency(serviceName string, dependencyConfig types.ServiceD
 }
 
 func (s *composeService) isServiceHealthy(ctx context.Context, containers Containers, fallbackRunning bool) (bool, error) {
+	pending := false
 	for _, ctr := range containers {
 		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
@@ -293,7 +294,10 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 		noHealthcheck := ctr.Config.Healthcheck == nil || (len(ctr.Config.Healthcheck.Test) > 0 && ctr.Config.Healthcheck.Test[0] == "NONE")
 		if noHealthcheck && fallbackRunning {
 			// Container does not define a health check, but we can fall back to "running" state
-			return ctr.State != nil && ctr.State.Status == container.StateRunning, nil
+			if ctr.State.Status != container.StateRunning {
+				pending = true
+			}
+			continue
 		}
 
 		if ctr.State == nil || ctr.State.Health == nil {
@@ -305,12 +309,12 @@ func (s *composeService) isServiceHealthy(ctx context.Context, containers Contai
 		case container.Unhealthy:
 			return false, fmt.Errorf("container %s is unhealthy", name)
 		case container.Starting:
-			return false, nil
+			pending = true
 		default:
 			return false, fmt.Errorf("container %s had unexpected health status %q", name, ctr.State.Health.Status)
 		}
 	}
-	return true, nil
+	return !pending, nil
 }
 
 func (s *composeService) isServiceCompleted(ctx context.Context, containers Containers) (bool, int, error) {
@@ -320,14 +324,23 @@ func (s *composeService) isServiceCompleted(ctx context.Context, containers Cont
 		// success instead of polling forever.
 		return true, 0, nil
 	}
+	pending := false
 	for _, ctr := range containers {
 		res, err := s.apiClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			return false, 0, err
 		}
-		if res.Container.State != nil && res.Container.State.Status == container.StateExited {
-			return true, res.Container.State.ExitCode, nil
+		state := res.Container.State
+		if state == nil || state.Status != container.StateExited {
+			pending = true
+			continue
+		}
+		if state.ExitCode != 0 {
+			return true, state.ExitCode, nil
 		}
 	}
-	return false, 0, nil
+	if len(containers) == 0 || pending {
+		return false, 0, nil
+	}
+	return true, 0, nil
 }

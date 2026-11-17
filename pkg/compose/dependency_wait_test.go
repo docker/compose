@@ -957,6 +957,107 @@ func TestCheckDependencyCompleted(t *testing.T) {
 	})
 }
 
+func TestIsServiceHealthyReplicas(t *testing.T) {
+	containers := Containers{{ID: "db-1"}, {ID: "db-2"}}
+	check := &container.HealthConfig{Test: []string{"CMD", "true"}}
+
+	t.Run("every replica without a healthcheck has to be running", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateRunning, 0, nil, nil), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateRunning, 0, nil, nil), nil)
+
+		healthy, err := svc.isServiceHealthy(t.Context(), containers, true)
+		assert.NilError(t, err)
+		assert.Assert(t, healthy)
+	})
+
+	t.Run("a later replica that is not running yet keeps the service pending", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateRunning, 0, nil, nil), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateCreated, 0, nil, nil), nil)
+
+		healthy, err := svc.isServiceHealthy(t.Context(), containers, true)
+		assert.NilError(t, err)
+		assert.Assert(t, !healthy)
+	})
+
+	t.Run("a later replica that exited fails the service", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateRunning, 0, nil, nil), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateExited, 1, nil, nil), nil)
+
+		_, err := svc.isServiceHealthy(t.Context(), containers, true)
+		assert.ErrorContains(t, err, "container test-db-2 exited (1)")
+	})
+
+	t.Run("a replica still starting does not hide an unhealthy one", func(t *testing.T) {
+		svc, apiClient, _ := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateRunning, 0, &container.Health{Status: container.Starting}, check), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateRunning, 0, &container.Health{Status: container.Unhealthy}, check), nil)
+
+		_, err := svc.isServiceHealthy(t.Context(), containers, false)
+		assert.ErrorContains(t, err, "container test-db-2 is unhealthy")
+	})
+}
+
+func TestCheckDependencyCompletedReplicas(t *testing.T) {
+	waitingFor := Containers{
+		{ID: "db-1", Names: []string{"/test-db-1"}, Labels: map[string]string{api.ServiceLabel: "db"}},
+		{ID: "db-2", Names: []string{"/test-db-2"}, Labels: map[string]string{api.ServiceLabel: "db"}},
+	}
+	required := types.ServiceDependency{Required: true}
+
+	t.Run("one replica still running", func(t *testing.T) {
+		svc, apiClient, recorder := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateExited, 0, nil, nil), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateRunning, 0, nil, nil), nil)
+
+		done, err := svc.checkDependencyCompleted(t.Context(), "db", required, waitingFor)
+		assert.NilError(t, err)
+		assert.Assert(t, !done)
+		assert.Equal(t, len(recorder.byID["Container test-db-1"]), 0)
+		assert.Equal(t, len(recorder.byID["Container test-db-2"]), 0)
+	})
+
+	t.Run("a later replica exited with an error", func(t *testing.T) {
+		svc, apiClient, recorder := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateExited, 0, nil, nil), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateExited, 2, nil, nil), nil)
+
+		done, err := svc.checkDependencyCompleted(t.Context(), "db", required, waitingFor)
+		assert.ErrorContains(t, err, `didn't complete successfully: exit 2`)
+		assert.Assert(t, !done)
+		assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusError})
+		assert.DeepEqual(t, recorder.byID["Container test-db-2"], []string{api.StatusError})
+	})
+
+	t.Run("every replica exited 0", func(t *testing.T) {
+		svc, apiClient, recorder := newStartPhaseTestService(t)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-1", gomock.Any()).
+			Return(inspectResultOf("db-1", "test-db-1", container.StateExited, 0, nil, nil), nil)
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), "db-2", gomock.Any()).
+			Return(inspectResultOf("db-2", "test-db-2", container.StateExited, 0, nil, nil), nil)
+
+		done, err := svc.checkDependencyCompleted(t.Context(), "db", required, waitingFor)
+		assert.NilError(t, err)
+		assert.Assert(t, done)
+		assert.DeepEqual(t, recorder.byID["Container test-db-1"], []string{api.StatusExited})
+		assert.DeepEqual(t, recorder.byID["Container test-db-2"], []string{api.StatusExited})
+	})
+}
+
 // TestWaitDependenciesReportsTheWait pins what a wait outside a plan (restart,
 // run, the --wait verification) shows of a dependency's containers: Waiting
 // first, then Healthy once the condition holds -- the progression a plan's wait
