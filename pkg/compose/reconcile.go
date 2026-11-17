@@ -1056,7 +1056,7 @@ func (r *reconciler) mustRecreate(expected types.ServiceConfig, expectedHash str
 	if oc.ImageVolumeDigest != expected.CustomLabels[api.ImageVolumeDigestLabel] {
 		return true
 	}
-	if oc.State == container.StateRunning && r.hasNetworkMismatch(expected, oc) {
+	if r.hasNetworkMismatch(expected, oc) {
 		return true
 	}
 	return r.hasVolumeMismatch(expected, oc)
@@ -1101,19 +1101,33 @@ func serviceHashWithResolvedRefs(service types.ServiceConfig, containers map[str
 	return confighash.ServiceHash(resolved)
 }
 
-// hasNetworkMismatch checks if the container is not connected to all expected networks.
+// hasNetworkMismatch checks if the container is not connected to all expected
+// networks, whatever its state: a stopped container still refers to the
+// networks it was attached to, and starting it once one was removed and created
+// again fails ("network <id> not found").
+//
+// When the network exists, the container must be connected to it by ID. When it
+// does not, because it was removed and is about to be created, a container that
+// is attached to a network of that name refers to the removed one. A container
+// that was created but never started has no network ID yet: its connection to
+// the network of that name can't be told apart from the expected one, and is
+// not a mismatch.
 func (r *reconciler) hasNetworkMismatch(expected types.ServiceConfig, oc ObservedContainer) bool {
 	for _, net := range slices.Sorted(maps.Keys(expected.Networks)) {
-		expectedID := ""
-		if obs, ok := r.resolvedNetworks[net]; ok {
-			expectedID = obs.ID
+		obs, exists := r.resolvedNetworks[net]
+		if !exists {
+			desired, ok := r.project.Networks[net]
+			if ok && !bool(desired.External) && oc.ConnectedNetworks[desired.Name] != "" {
+				return true
+			}
+			continue
 		}
-		if expectedID == "" || expectedID == "swarm" {
+		if obs.ID == "" || obs.ID == "swarm" {
 			continue
 		}
 		found := false
-		for _, netID := range oc.ConnectedNetworks {
-			if netID == expectedID {
+		for name, netID := range oc.ConnectedNetworks {
+			if netID == obs.ID || (netID == "" && name == obs.Name) {
 				found = true
 				break
 			}

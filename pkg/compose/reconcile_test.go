@@ -1300,6 +1300,64 @@ func TestReconcileContainers_ForceRecreate(t *testing.T) {
 `)+"\n")
 }
 
+// A stopped container still refers to the networks it was attached to, and
+// starting it after one was removed and created again fails (docker/compose#14516).
+// Whatever its state, a container attached to another network than the one of the
+// project, or to one that was removed, is recreated; one that was created and
+// never started has no network ID yet, and is not.
+func TestReconcileContainers_NetworkMismatchRecreates(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"default": {}}}}
+	hash := mustServiceHash(t, svc)
+
+	for _, tc := range []struct {
+		name      string
+		state     container.ContainerState
+		networkID string
+		// removed is set when the network no longer exists, and is to be created again
+		removed  bool
+		recreate bool
+	}{
+		{"running on the current network", container.StateRunning, "net-new", false, false},
+		{"running on another network", container.StateRunning, "net-old", false, true},
+		{"exited on the current network", container.StateExited, "net-new", false, false},
+		{"exited on another network", container.StateExited, "net-old", false, true},
+		{"exited on a removed network", container.StateExited, "net-old", true, true},
+		{"created and never started", container.StateCreated, "", false, false},
+		{"created and never started, network removed", container.StateCreated, "", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			project := &types.Project{
+				Name:     "myproject",
+				Networks: types.Networks{"default": {Name: "myproject_default"}},
+				Services: types.Services{"web": svc},
+			}
+			networks := map[string][]ObservedNetwork{"default": {{ID: "net-new", Name: "myproject_default"}}}
+			if tc.removed {
+				networks = map[string][]ObservedNetwork{}
+			}
+			observed := &ObservedState{
+				ProjectName: "myproject",
+				Containers: map[string][]ObservedContainer{
+					"web": {{
+						ID: "c1aabbccddee", Number: 1, State: tc.state, ConfigHash: hash,
+						ConnectedNetworks: map[string]string{"myproject_default": tc.networkID},
+						Summary: container.Summary{
+							ID: "c1aabbccddee", State: tc.state,
+							Labels: map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+						},
+					}},
+				},
+				Networks: networks,
+				Volumes:  map[string][]ObservedVolume{},
+			}
+
+			plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+			assert.NilError(t, err)
+			assert.Equal(t, strings.Contains(plan.String(), "CreateContainer"), tc.recreate, plan.String())
+		})
+	}
+}
+
 func TestReconcileContainers_NeverRecreate(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
