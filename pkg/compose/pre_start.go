@@ -213,7 +213,10 @@ func (s *composeService) execPreStartHook(
 		case <-waitRes.Result:
 		case <-ctx.Done():
 		}
-		return err
+		// The daemon's error (a missing executable, a bad mount…) names neither
+		// the hook nor its image, and surfaces on the row of the service
+		// container: say which hook it is.
+		return fmt.Errorf("service %q pre_start[%d]%s: failed to start the hook container: %w", service.Name, index, hookImageSuffix(service, index), err)
 	}
 
 	// Open the log stream once the hook is started: on a container still in
@@ -262,6 +265,15 @@ func (s *composeService) execPreStartHook(
 		return fmt.Errorf("%w (hook container %s retained for inspection)", waitErr, shortID)
 	}
 	return nil
+}
+
+// hookImageSuffix returns " (image <name>)" for the index-th pre_start hook of
+// service, or nothing when the model does not carry the image of the hook.
+func hookImageSuffix(service types.ServiceConfig, index int) string {
+	if index < 0 || index >= len(service.PreStart) || service.PreStart[index].Image == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (image %s)", service.PreStart[index].Image)
 }
 
 // createPreStartContainer creates the runner container for the index-th

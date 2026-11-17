@@ -539,6 +539,45 @@ func TestPreStart_ContainerStartFailurePropagates(t *testing.T) {
 	assert.ErrorContains(t, err, "container start failed")
 }
 
+// A hook container that cannot start (docker/compose#14513: the entrypoint
+// inherited from the service does not exist in the image of the hook) is
+// reported with the hook and its image, not as a bare daemon error that reads
+// as the failure of the service container.
+func TestPreStart_ContainerStartFailureNamesTheHook(t *testing.T) {
+	tested, apiClient := newPreStartTestService(t)
+
+	project := &types.Project{Name: "demo"}
+	service := types.ServiceConfig{
+		Name:          "web",
+		ContainerSpec: types.ContainerSpec{Image: "alpine"},
+		PreStart: []types.PreStartHook{
+			{ContainerSpec: types.ContainerSpec{Image: "alpine", Command: types.ShellCommand{"true"}}},
+			{ContainerSpec: types.ContainerSpec{Image: "debian:trixie-slim", Command: types.ShellCommand{"echo", "hook ran"}}},
+		},
+	}
+	daemonErr := errors.New(`exec: "/bin/busybox": stat /bin/busybox: no such file or directory`)
+
+	scan := expectRunnerScan(apiClient, runnerSummary("hook-1", 0), runnerSummary("hook-2", 1))
+	wait1 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
+		Return(waitResultExit(0)).After(scan)
+	start1 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
+		Return(client.ContainerStartResult{}, nil).After(wait1)
+	logs1 := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
+		Return(emptyLogs(), nil).After(start1)
+	remove1 := expectSuccessRemove(apiClient, "hook-1").After(logs1)
+	wait2 := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-2", gomock.Any()).
+		Return(waitResultExit(0)).After(remove1)
+	start2 := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-2", gomock.Any()).
+		Return(client.ContainerStartResult{}, daemonErr).After(wait2)
+	apiClient.EXPECT().ContainerRemove(gomock.Any(), "hook-2", client.ContainerRemoveOptions{Force: true, RemoveVolumes: true}).
+		Return(client.ContainerRemoveResult{}, nil).After(start2)
+
+	err := tested.runPreStart(t.Context(), project, service, func(api.ContainerEvent) {})
+	assert.ErrorContains(t, err, `service "web" pre_start[1] (image debian:trixie-slim): failed to start the hook container: `)
+	assert.ErrorContains(t, err, "stat /bin/busybox: no such file or directory")
+	assert.ErrorIs(t, err, daemonErr)
+}
+
 // TestPreStart_WaitResultPreferredOverNilError pins the fix for the scheduler
 // race in waitPreStart: when ContainerWait closes a successful stream cleanly
 // it delivers Result (exit code) AND a nil send on Error at the same time.

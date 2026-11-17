@@ -106,6 +106,20 @@ func TestPreStartHookInError(t *testing.T) {
 			ServiceState("sample", "created"))
 }
 
+// TestPreStartHookStartFailureNamesTheHook locks docker/compose#14513: a hook
+// inherits the entrypoint of the service, which may not exist in the image of
+// the hook, and the engine's error then named neither the hook nor its image,
+// and surfaced on the row of the service container.
+func TestPreStartHookStartFailureNamesTheHook(t *testing.T) {
+	NewScenario(t, "a pre_start hook that cannot start must be named in the error").
+		Step("up fails, naming the hook and its image",
+			ComposeCmd("up", "-d").MayFail(),
+			ExitCode(1),
+			OutputContains(`service "app" pre_start[0] (image hello-world): failed to start the hook container`),
+			OutputContains("/bin/busybox"),
+			ServiceState("app", "created"))
+}
+
 // The output of a failing hook is what tells why it failed: it must reach the
 // error, which is built from the log stream opened on the running hook.
 func TestPreStartHookFailureShowsOutput(t *testing.T) {
