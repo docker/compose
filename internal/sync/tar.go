@@ -88,10 +88,7 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 		}
 	}
 
-	var deleteCmd []string
-	if len(pathsToDelete) != 0 {
-		deleteCmd = append([]string{"rm", "-rf"}, pathsToDelete...)
-	}
+	deleteCmds := deleteCommands(pathsToDelete)
 
 	// no fail-fast: every container's errors are collected, so the context the
 	// group derives is not used.
@@ -106,11 +103,12 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 		tarReader := tarArchive(pathsToCopy, keepImpliedDirectories)
 
 		eg.Go(func() error {
-			if len(deleteCmd) != 0 {
+			for _, deleteCmd := range deleteCmds {
 				if err := t.client.Exec(ctx, containerID, deleteCmd, nil); err != nil {
 					errMu.Lock()
 					errs = append(errs, fmt.Errorf("deleting paths in %s: %w", containerID, err))
 					errMu.Unlock()
+					break
 				}
 			}
 
@@ -140,6 +138,33 @@ func (t *Tar) Sync(ctx context.Context, service string, paths []*PathMapping) er
 
 	_ = eg.Wait()
 	return errors.Join(errs...)
+}
+
+// maxDeleteArgsSize caps the arguments of each `rm` exec, well below Linux's default
+// 2 MiB ARG_MAX: above it the exec fails with "argument list too long".
+const maxDeleteArgsSize = 128 * 1024
+
+// deleteCommands splits the paths into `rm -rf` commands of at most maxDeleteArgsSize.
+func deleteCommands(paths []string) [][]string {
+	var cmds [][]string
+	var cmd []string
+	size := 0
+	for _, p := range paths {
+		if len(cmd) > 2 && size+len(p)+1 > maxDeleteArgsSize {
+			cmds = append(cmds, cmd)
+			cmd = nil
+		}
+		if cmd == nil {
+			cmd = []string{"rm", "-rf"}
+			size = len("rm") + 1 + len("-rf") + 1
+		}
+		cmd = append(cmd, p)
+		size += len(p) + 1
+	}
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return cmds
 }
 
 type ArchiveBuilder struct {

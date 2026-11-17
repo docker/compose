@@ -18,10 +18,12 @@ import (
 	"archive/tar"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -253,6 +255,41 @@ func TestSync_MixedPaths(t *testing.T) {
 	assert.Equal(t, client.untarCount, 1, "existing path should be copied")
 	assert.Equal(t, len(client.execCmds), 1)
 	assert.Check(t, cmp.Contains(client.execCmds[0][len(client.execCmds[0])-1], "removed.txt"))
+}
+
+// A large batch of deletions, such as a branch switch, must not become one `rm` whose
+// arguments exceed the container kernel's ARG_MAX (2 MiB by default on Linux): that exec
+// fails with "argument list too long" and none of the paths are removed.
+func TestSync_SplitsALargeDeletionIntoSeveralExecs(t *testing.T) {
+	const linuxDefaultArgMax = 2 * 1024 * 1024
+
+	client := &fakeLowLevelClient{
+		containers: []container.Summary{{ID: "ctr1"}},
+	}
+	syncer := NewTar("proj", client, 0)
+
+	var paths []*PathMapping
+	var want []string
+	for i := range 12000 {
+		containerPath := fmt.Sprintf("/app/%s/file-%05d.txt", strings.Repeat("d", 180), i)
+		paths = append(paths, &PathMapping{HostPath: "/no/such/path", ContainerPath: containerPath})
+		want = append(want, containerPath)
+	}
+
+	err := syncer.Sync(t.Context(), "svc", paths)
+	assert.NilError(t, err)
+
+	var deleted []string
+	for _, cmd := range client.execCmds {
+		assert.DeepEqual(t, cmd[:2], []string{"rm", "-rf"})
+		size := 0
+		for _, arg := range cmd {
+			size += len(arg) + 1
+		}
+		assert.Check(t, size < linuxDefaultArgMax, "rm with %d paths takes %d bytes of arguments", len(cmd)-2, size)
+		deleted = append(deleted, cmd[2:]...)
+	}
+	assert.DeepEqual(t, deleted, want)
 }
 
 // A directory that arrives already populated keeps its own header: left implied, the engine
