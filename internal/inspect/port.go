@@ -34,8 +34,17 @@ func (s *Service) Ports(ctx context.Context, projectName string, serviceName str
 		return nil, err
 	}
 
-	var publishers api.PortPublishers
+	// the single definition of "published": exposed by the image but not
+	// published to the host, a port has nothing to report, like `docker port`
+	var published api.PortPublishers
 	for _, p := range containerPublishers(ctr) {
+		if p.PublishedPort != 0 {
+			published = append(published, p)
+		}
+	}
+
+	var publishers api.PortPublishers
+	for _, p := range published {
 		if options.Protocol != "" && p.Protocol != options.Protocol {
 			continue
 		}
@@ -45,21 +54,24 @@ func (s *Service) Ports(ctx context.Context, projectName string, serviceName str
 		publishers = append(publishers, p)
 	}
 	if port != 0 && len(publishers) == 0 {
-		return nil, portNotFoundError(options.Protocol, port, ctr)
+		return nil, portNotFoundError(options.Protocol, port, ctr, published)
 	}
 	return publishers, nil
 }
 
-func portNotFoundError(protocol string, port uint16, ctr container.Summary) error {
-	formatPort := func(protocol string, port uint16) string {
+func portNotFoundError(protocol string, port uint16, ctr container.Summary, published api.PortPublishers) error {
+	formatPort := func(protocol string, port int) string {
 		return fmt.Sprintf("%d/%s", port, protocol)
 	}
 
-	var containerPorts []string
-	for _, p := range ctr.Ports {
-		containerPorts = append(containerPorts, formatPort(p.Type, p.PrivatePort))
+	containerPorts := make([]string, 0, len(published))
+	for _, p := range published {
+		containerPorts = append(containerPorts, formatPort(p.Protocol, p.TargetPort))
 	}
 
 	name := strings.TrimPrefix(ctr.Names[0], "/")
-	return fmt.Errorf("no port %s for container %s: %s", formatPort(protocol, port), name, strings.Join(containerPorts, ", "))
+	if len(containerPorts) == 0 {
+		return fmt.Errorf("no port %s for container %s", formatPort(protocol, int(port)), name)
+	}
+	return fmt.Errorf("no port %s for container %s: %s", formatPort(protocol, int(port)), name, strings.Join(containerPorts, ", "))
 }
