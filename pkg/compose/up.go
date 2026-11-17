@@ -233,10 +233,10 @@ type upSession struct {
 	errs         []error
 	exitCode     int
 
-	// eventLoopEnded is set once runEventLoop returned: it no longer reacts to
+	// eventLoopDone is closed once runEventLoop returned: it no longer reacts to
 	// an interruption. globalCtx being done does not tell that: it is a child of
 	// the caller's ctx, so an interruption cancels it too, before the loop reacts.
-	eventLoopEnded atomic.Bool
+	eventLoopDone chan struct{}
 	// startReturned is closed once the Start phase returned, see
 	// awaitStartReturned.
 	startReturned chan struct{}
@@ -301,6 +301,7 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		logOpenLimiter: concurrency.NewLimiter(s.maxConcurrency),
 		signalChan:     signalChan,
 		startReturned:  make(chan struct{}),
+		eventLoopDone:  make(chan struct{}),
 	}
 
 	u.eg.Go(func() error {
@@ -438,15 +439,18 @@ func (u *upSession) awaitStartReturned() {
 
 // endWait ends the session once the --wait verification returned err. An
 // interruption (Ctrl+C/SIGTERM) says nothing about the services: the event loop
-// stops the stack, unless it ended already (the monitor cancels globalCtx once
-// every attached container is gone), in which case nobody is left to and it is
-// done here.
+// stops the stack, unless it left without doing so (the monitor cancels
+// globalCtx once every attached container is gone, and the loop may pick that
+// over the interruption), in which case nobody is left to and it is done here.
 func (u *upSession) endWait(ctx context.Context, err error) error {
 	if ctx.Err() == nil {
 		u.cancel()
 		return err
 	}
-	if u.eventLoopEnded.Load() && !u.isTerminated.Load() {
+	// Only the loop's return tells whether it reacted to the interruption. Waiting
+	// for it adds no delay: the session waits for the loop right after anyway.
+	<-u.eventLoopDone
+	if !u.isTerminated.Load() {
 		// set before stopApplication's listing, as gracefulTeardown does
 		u.isTerminated.Store(true)
 		u.stopApplication()
@@ -513,7 +517,7 @@ func (u *upSession) appendErr(err error) {
 // the application terminates: a first interruption triggers a graceful stop,
 // a second one kills the services.
 func (u *upSession) runEventLoop(ctx context.Context) error {
-	defer u.eventLoopEnded.Store(true)
+	defer close(u.eventLoopDone)
 	first := true
 	gracefulTeardown := func() {
 		first = false
