@@ -1,0 +1,9 @@
+services:
+  app:
+    image: alpine
+    # inherited by the hook, whose image has no such executable
+    entrypoint: ["/bin/busybox", "sh", "-c"]
+    command: ["echo app ran"]
+    pre_start:
+      - image: hello-world
+        command: ["echo", "hook ran"]
