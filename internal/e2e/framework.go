@@ -273,7 +273,7 @@ func (c *CLI) BaseEnvironment() []string {
 		"KUBECONFIG=invalid",
 		"PATH=" + os.Getenv("PATH"),
 	}
-	for _, name := range []string{"DOCKER_HOST", "DOCKER_CONTEXT"} {
+	for _, name := range []string{"DOCKER_HOST", "DOCKER_CONTEXT", "DOCKER_TLS_VERIFY", "DOCKER_CERT_PATH", "DOCKER_API_VERSION"} {
 		if value, ok := os.LookupEnv(name); ok {
 			env = append(env, name+"="+value)
 		}
