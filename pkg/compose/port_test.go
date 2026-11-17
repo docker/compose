@@ -53,7 +53,6 @@ func TestPorts(t *testing.T) {
 				{TargetPort: 53, PublishedPort: 5353, Protocol: "udp"},
 				{URL: "0.0.0.0", TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"},
 				{URL: "::", TargetPort: 80, PublishedPort: 8080, Protocol: "tcp"},
-				{TargetPort: 3000, Protocol: "tcp"},
 			},
 		},
 		{
@@ -76,7 +75,13 @@ func TestPorts(t *testing.T) {
 			name:     "unmatched port returns an error naming the container",
 			port:     9999,
 			protocol: "tcp",
-			wantErr:  "no port 9999/tcp for container 123",
+			wantErr:  "no port 9999/tcp for container 123: 53/udp, 80/tcp, 80/tcp",
+		},
+		{
+			name:     "a port that is exposed but not published is not found",
+			port:     3000,
+			protocol: "tcp",
+			wantErr:  "no port 3000/tcp for container 123: 53/udp, 80/tcp, 80/tcp",
 		},
 	}
 
