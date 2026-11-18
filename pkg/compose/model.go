@@ -23,12 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/spf13/cobra"
@@ -49,6 +49,10 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	}
 	defer mdlAPI.Close()
 	availableModels, err := mdlAPI.ListModels(ctx)
+	available := make(map[string]struct{}, len(availableModels))
+	for _, m := range availableModels {
+		available[normalizeModelReference(m)] = struct{}{}
+	}
 
 	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
@@ -60,7 +64,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 			config.Name = name
 		}
 		eg.Go(func() error {
-			if !slices.Contains(availableModels, config.Model) {
+			if _, ok := available[normalizeModelReference(config.Model)]; !ok {
 				err = mdlAPI.PullModel(ctx, config, quietPull, s.events)
 				if err != nil {
 					return err
@@ -70,6 +74,19 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		})
 	}
 	return eg.Wait()
+}
+
+// normalizeModelReference gives a model reference its full form, such as
+// docker.io/ai/smollm2:latest for ai/smollm2: the model runner lists the models it
+// has by their full tags, whatever way they were asked for. A reference that is not
+// one of an image (the case of the repository is not free in all registries) is
+// left as it is.
+func normalizeModelReference(model string) string {
+	ref, err := reference.ParseNormalizedNamed(model)
+	if err != nil {
+		return model
+	}
+	return reference.TagNameOnly(ref).String()
 }
 
 type modelAPI struct {
