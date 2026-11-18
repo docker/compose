@@ -404,6 +404,14 @@ func Test_buildContainerVolumes(t *testing.T) {
 	pwd, err := os.Getwd()
 	assert.NilError(t, err)
 
+	// The "bind mount, not create host path" case below points at ./data,
+	// which must exist for the mount to be accepted now that a missing
+	// source with create_host_path: false is an error.
+	assert.NilError(t, os.MkdirAll("data", 0o755))
+	t.Cleanup(func() {
+		assert.NilError(t, os.RemoveAll("data"))
+	})
+
 	tests := []struct {
 		name   string
 		yaml   string
@@ -518,6 +526,33 @@ volumes:
 			assert.DeepEqual(t, tt.mounts, mounts)
 		})
 	}
+}
+
+func TestBuildContainerVolumesReturnsErrorWhenBindSourceMissingAndCreateHostPathFalse(t *testing.T) {
+	p, err := composeloader.LoadWithContext(t.Context(), composetypes.ConfigDetails{
+		ConfigFiles: []composetypes.ConfigFile{
+			{
+				Filename: "test",
+				Content: []byte(`
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./missing-dir
+        target: /data
+        bind:
+          create_host_path: false
+`),
+			},
+		},
+	}, func(options *composeloader.Options) {
+		options.SkipValidation = true
+		options.SkipConsistencyCheck = true
+	})
+	assert.NilError(t, err)
+	s := &composeService{}
+	_, _, err = s.buildContainerVolumes(t.Context(), *p, p.Services["test"], nil)
+	assert.ErrorContains(t, err, "does not exist and bind.create_host_path is false")
 }
 
 func TestSetBlkio(t *testing.T) {

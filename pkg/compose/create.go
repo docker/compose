@@ -1269,6 +1269,17 @@ func fillBindMounts(project types.Project, service types.ServiceConfig, mounts m
 		if err != nil {
 			return nil, err
 		}
+		// A bind mount with create_host_path: false must not have its
+		// source directory created for it: fail fast when the resolved
+		// source does not exist, instead of letting the engine create
+		// the host path anyway and starting the service.
+		if bindMount.Type == mount.TypeBind && bindMount.BindOptions != nil && !bindMount.BindOptions.CreateMountpoint {
+			if _, err := os.Stat(bindMount.Source); os.IsNotExist(err) {
+				return nil, fmt.Errorf("bind mount source %q for service %q does not exist and bind.create_host_path is false", bindMount.Source, service.Name)
+			} else if err != nil {
+				return nil, err
+			}
+		}
 		mounts[bindMount.Target] = bindMount
 	}
 
