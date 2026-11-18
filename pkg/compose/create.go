@@ -30,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/compose-spec/compose-go/v2/format"
 	"github.com/compose-spec/compose-go/v2/paths"
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
@@ -1092,10 +1093,7 @@ func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, boo
 	if v == nil {
 		return "", false
 	}
-	if v.Type != types.VolumeTypeBind {
-		v.Source = m.Source
-	}
-	if bindRequiresMountAPI(v.Bind) {
+	if !expressibleAsBindString(*v, m.Source) {
 		return "", false
 	}
 	return toBindString(m.Source, v), true
@@ -1109,10 +1107,20 @@ func volumeBindString(p types.Project, service types.ServiceConfig, m mount.Moun
 	if v == nil || vol == nil {
 		return "", false
 	}
-	if volumeRequiresMountAPI(v.Volume) {
+	if !expressibleAsBindString(*v, vol.Name) {
 		return "", false
 	}
 	return toBindString(vol.Name, v), true
+}
+
+// expressibleAsBindString tells whether the volume, as it is sent to the engine with
+// source as its source, can be said as a plain `SOURCE:TARGET[:OPTIONS]` bind string
+// without losing or altering anything. Whether it can is the compose-go parser's call:
+// it knows the options the short syntax has no place for, and the paths it would read
+// otherwise (such as a colon in a target).
+func expressibleAsBindString(v types.ServiceVolumeConfig, source string) bool {
+	v.Source = source
+	return format.IsShortSyntaxExpressible(v)
 }
 
 // checkImageMountSupported verifies the negotiated API version supports image
@@ -1163,40 +1171,6 @@ func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *typ
 		}
 	}
 	return nil
-}
-
-// bindRequiresMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
-// options which require use of Mount API
-func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
-	switch {
-	case bind == nil:
-		return false
-	case !bool(bind.CreateHostPath):
-		return true
-	case bind.Propagation != "":
-		return true
-	case bind.Recursive != "":
-		return true
-	default:
-		return false
-	}
-}
-
-// volumeRequiresMountAPI check if Volume declaration can be implemented by the plain old Bind API or uses any of the advanced
-// options which require use of Mount API
-func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
-	switch {
-	case vol == nil:
-		return false
-	case len(vol.Labels) > 0:
-		return true
-	case vol.Subpath != "":
-		return true
-	case vol.NoCopy:
-		return true
-	default:
-		return false
-	}
 }
 
 func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, inherit *container.Summary) ([]mount.Mount, error) {
@@ -1463,7 +1437,12 @@ func buildMountOptions(volume types.ServiceVolumeConfig) (*mount.BindOptions, *m
 
 	switch volume.Type {
 	case "bind":
-		return buildBindOption(volume.Bind), nil, nil, nil
+		bind := volume.Bind
+		if bind == nil {
+			// a bind that doesn't say creates its host path, as the Bind API does
+			bind = &types.ServiceVolumeBind{CreateHostPath: true}
+		}
+		return buildBindOption(bind), nil, nil, nil
 	case "volume":
 		if volume.Volume == nil {
 			return nil, nil, nil, nil
