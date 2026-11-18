@@ -496,6 +496,157 @@ volumes:
 				},
 			},
 		},
+		{
+			// the engine splits a bind string on colons: only the Mount API carries them
+			name: "mount volume, target with a colon",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: /foo/bar:baz
+volumes:
+  data:
+    name: my_volume
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:   "volume",
+					Source: "my_volume",
+					Target: "/foo/bar:baz",
+				},
+			},
+		},
+		{
+			name: "bind mount, target with a colon",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /foo/bar:baz
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:        "bind",
+					Source:      filepath.Join(pwd, "data"),
+					Target:      "/foo/bar:baz",
+					BindOptions: &mountTypes.BindOptions{CreateMountpoint: true},
+				},
+			},
+		},
+		{
+			name: "mount volume, windows target keeps the bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: C:\data
+volumes:
+  data:
+    name: my_volume
+`,
+			binds:  []string{`my_volume:C:\data:rw`},
+			mounts: nil,
+		},
+		{
+			name: "bind mount, source with a colon",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./da:ta
+        target: /data
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:        "bind",
+					Source:      filepath.Join(pwd, "da:ta"),
+					Target:      "/data",
+					BindOptions: &mountTypes.BindOptions{CreateMountpoint: true},
+				},
+			},
+		},
+		{
+			// read as a drive letter by the short syntax
+			name: "mount volume, one-letter name",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: c
+        target: /data
+volumes:
+  c:
+    name: c
+`,
+			binds: nil,
+			mounts: []mountTypes.Mount{
+				{
+					Type:   "volume",
+					Source: "c",
+					Target: "/data",
+				},
+			},
+		},
+		{
+			name: "bind mount, readonly with propagation stays a bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        read_only: true
+        bind:
+          propagation: rshared
+`,
+			binds:  []string{filepath.Join(pwd, "data") + ":/data:ro,rshared"},
+			mounts: nil,
+		},
+		{
+			name: "mount volume, nocopy stays a bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: volume
+        source: data
+        target: /data
+        volume:
+          nocopy: true
+volumes:
+  data:
+    name: my_volume
+`,
+			binds:  []string{"my_volume:/data:rw,nocopy"},
+			mounts: nil,
+		},
+		{
+			name: "bind mount, propagation stays a bind string",
+			yaml: `
+services:
+  test:
+    volumes:
+      - type: bind
+        source: ./data
+        target: /data
+        bind:
+          propagation: rshared
+`,
+			binds:  []string{filepath.Join(pwd, "data") + ":/data:rw,rshared"},
+			mounts: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
