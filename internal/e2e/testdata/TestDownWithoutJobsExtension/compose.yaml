@@ -1,0 +1,11 @@
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  migrate:
+    image: alpine
+    command: echo migration done
+    triggers:
+      manual: true

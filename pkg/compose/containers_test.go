@@ -17,10 +17,13 @@
 package compose
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
@@ -66,6 +69,38 @@ func TestIsOrphaned(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			assert.Equal(t, pred(tc.c), tc.want)
+		})
+	}
+}
+
+// TestGetSpecifiedContainerNotRunning pins the error of an operation that
+// targets a service with no running container: callers must be able to tell it
+// from any other failure without matching the message, which stays the same.
+func TestGetSpecifiedContainerNotRunning(t *testing.T) {
+	tests := []struct {
+		name    string
+		index   int
+		message string
+	}{
+		{name: "any replica", index: 0, message: `service "web" is not running`},
+		{name: "given replica", index: 2, message: `service "web" is not running container #2`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			apiClient, cli := prepareMocks(mockCtrl)
+			tested, err := NewComposeService(cli)
+			assert.NilError(t, err)
+			apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+			_, err = tested.(*composeService).getSpecifiedContainer(t.Context(), testProject, oneOffExclude, false, "web", tt.index)
+			assert.Error(t, err, tt.message)
+			assert.Assert(t, errors.Is(err, api.ErrNotRunning), "got %v", err)
+
+			var notRunning *api.ServiceNotRunningError
+			assert.Assert(t, errors.As(err, &notRunning))
+			assert.Equal(t, notRunning.Service, "web")
+			assert.Equal(t, notRunning.Index, tt.index)
 		})
 	}
 }

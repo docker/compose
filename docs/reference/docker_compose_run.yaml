@@ -168,6 +168,17 @@ options:
       experimentalcli: false
       kubernetes: false
       swarm: false
+    - option: no-recreate
+      value_type: bool
+      default_value: "false"
+      description: |
+        If dependent containers already exist, don't recreate them, even if their configuration diverged
+      deprecated: false
+      hidden: false
+      experimental: false
+      experimentalcli: false
+      kubernetes: false
+      swarm: false
     - option: no-tty
       shorthand: T
       value_type: bool

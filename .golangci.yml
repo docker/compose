@@ -15,6 +15,7 @@ linters:
   enable:
     - copyloopvar
     - depguard
+    - dupl
     - errcheck
     - errorlint
     - forbidigo
@@ -55,6 +56,19 @@ linters:
               desc: Use "gotest.tools/v3/assert" instead
             - pkg: github.com/stretchr/testify/suite
               desc: Do not use
+        library-not-cli:
+          # pkg/ is the SDK and internal/ its support code: neither may depend
+          # on the CLI. A CLI-only component the library needs goes behind an
+          # interface that cmd/ implements and injects (e.g. WithNavigationMenu).
+          files:
+            - "**/pkg/**"
+            - "**/internal/**"
+            - "!**/internal/e2e/**"
+          deny:
+            - pkg: github.com/docker/compose/v5/cmd
+              desc: the library must not depend on the CLI, inject an implementation instead.
+    dupl:
+      threshold: 80
     forbidigo:
       analyze-types: true
       forbid:
@@ -102,6 +116,11 @@ linters:
       - path-except: '_test\.go'
         linters:
           - forbidigo
+      # Tests repeat their setup on purpose, to stay readable on their own, and the
+      # e2e DSL spells its checks one by one.
+      - path: '(_test\.go|(pkg|internal)/e2e/)'
+        linters:
+          - dupl
 issues:
   max-issues-per-linter: 0
   max-same-issues: 0

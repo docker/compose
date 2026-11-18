@@ -25,6 +25,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -57,8 +58,8 @@ func TestVolumes(t *testing.T) {
 		},
 	}
 
-	listOpts := client.ContainerListOptions{Filters: projectFilter(testProject)}
-	volumeListOpts := client.VolumeListOptions{Filters: projectFilter(testProject)}
+	listOpts := client.ContainerListOptions{Filters: naming.ProjectFilter(testProject)}
+	volumeListOpts := client.VolumeListOptions{Filters: naming.ProjectFilter(testProject)}
 	volumeReturn := client.VolumeListResult{
 		Items: []volume.Volume{vol1, vol2, vol3},
 	}

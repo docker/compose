@@ -22,6 +22,7 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/moby/moby/api/pkg/stdcopy"
@@ -30,6 +31,7 @@ import (
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -148,8 +150,8 @@ func (s *composeService) runPreStart(ctx context.Context, project *types.Project
 // old-generation container without an index label is not executable; only a
 // fresh runner prepared by the reconciliation plan is.
 func (s *composeService) listPreStartRunners(ctx context.Context, projectName, serviceName string) (map[int]container.Summary, error) {
-	f := projectFilter(projectName)
-	f.Add("label", serviceFilter(serviceName))
+	f := naming.ProjectFilter(projectName)
+	f.Add("label", naming.ServiceFilter(serviceName))
 	f.Add("label", hookFilter(preStartHookType))
 	f.Add("status", "created")
 	res, err := s.apiClient().ContainerList(ctx, client.ContainerListOptions{
@@ -198,14 +200,6 @@ func (s *composeService) execPreStartHook(
 		Condition: container.WaitConditionNextExit,
 	})
 
-	// Open the log stream before ContainerStart so a fast-exiting hook cannot
-	// race us to a 404. The dedicated logCtx lets us force the follow stream
-	// closed once the hook has exited, so a daemon that keeps the connection
-	// open cannot deadlock `<-logsDone`.
-	logCtx, cancelLogs := context.WithCancel(ctx)
-	defer cancelLogs()
-	logsDone, getTail := s.streamPreStartLogs(logCtx, containerID, service, index, listener)
-
 	if _, err := s.apiClient().ContainerStart(ctx, containerID, client.ContainerStartOptions{}); err != nil {
 		// AutoRemove is false, so we must remove the never-started container
 		// explicitly. A failed removal is logged so the orphan is visible.
@@ -215,16 +209,37 @@ func (s *composeService) execPreStartHook(
 		// Drain waitRes so the client's wait goroutine exits without having to
 		// wait for the parent context to be canceled.
 		select {
-		case <-waitRes.Error:
+		case <-waitRes.Error: //nolint:errcheck // only draining: the error that matters is the one being returned
 		case <-waitRes.Result:
 		case <-ctx.Done():
 		}
-		cancelLogs()
-		<-logsDone
-		return err
+		// The daemon's error (a missing executable, a bad mount…) names neither
+		// the hook nor its image, and surfaces on the row of the service
+		// container: say which hook it is.
+		return fmt.Errorf("service %q pre_start[%d]%s: failed to start the hook container: %w", service.Name, index, hookImageSuffix(service, index), err)
 	}
 
+	// Open the log stream once the hook is started: on a container still in
+	// "created" state a follow stream ends at once, empty, so a stream opened
+	// before ContainerStart would never carry a line. A fast-exiting hook can't
+	// race us to a 404: the runner is retained after it exits (AutoRemove is
+	// off, runPreStart removes it once we return). The dedicated logCtx lets us
+	// force the follow stream closed, so a daemon that keeps the connection
+	// open cannot deadlock `<-logsDone`.
+	logCtx, cancelLogs := context.WithCancel(ctx)
+	defer cancelLogs()
+	logsDone, getTail := s.streamPreStartLogs(logCtx, containerID, service, index, listener)
+
 	waitErr := waitPreStart(ctx, service.Name, index, waitRes)
+	if ctx.Err() == nil {
+		// The daemon ends the follow stream itself once the hook has exited,
+		// after sending what it buffered: cancelling right away would cut that
+		// output off. Bounded, for a daemon that keeps the connection open.
+		select {
+		case <-logsDone:
+		case <-time.After(s.drainTimeout()):
+		}
+	}
 	cancelLogs()
 	<-logsDone
 	if waitErr != nil {
@@ -250,6 +265,15 @@ func (s *composeService) execPreStartHook(
 		return fmt.Errorf("%w (hook container %s retained for inspection)", waitErr, shortID)
 	}
 	return nil
+}
+
+// hookImageSuffix returns " (image <name>)" for the index-th pre_start hook of
+// service, or nothing when the model does not carry the image of the hook.
+func hookImageSuffix(service types.ServiceConfig, index int) string {
+	if index < 0 || index >= len(service.PreStart) || service.PreStart[index].Image == "" {
+		return ""
+	}
+	return fmt.Sprintf(" (image %s)", service.PreStart[index].Image)
 }
 
 // createPreStartContainer creates the runner container for the index-th

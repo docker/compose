@@ -389,9 +389,13 @@ examples: |-
 
     ### Configuring parallelism
 
-    Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls.
+    Use `--parallel` to specify the maximum level of parallelism for concurrent engine calls or builds.
     Calling `docker compose --parallel 1 pull` pulls the pullable images defined in the Compose file
-    one at a time. This can also be used to control build concurrency.
+    one at a time.
+
+    Limiting build concurrency requires Buildx 0.38.0 or later. When services are linked by
+    `additional_contexts` (`service:`), Buildx rejects a limit lower than the number of images to
+    build, so Compose ignores it with a warning.
 
     Parallelism can also be set by the `COMPOSE_PARALLEL_LIMIT` environment variable.
 

@@ -21,7 +21,6 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 
 	composeloader "github.com/compose-spec/compose-go/v2/loader"
@@ -166,9 +165,6 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	mock.EXPECT().ImageInspect(gomock.Any(), "myProject-myService").AnyTimes().Return(client.ImageInspectResult{}, nil)
 
 	mounts, err := s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
-	sort.Slice(mounts, func(i, j int) bool {
-		return mounts[i].Target < mounts[j].Target
-	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 4)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
@@ -178,9 +174,6 @@ func TestBuildContainerMountOptions(t *testing.T) {
 	assert.Equal(t, mounts[3].Target, "\\\\.\\pipe\\docker_engine")
 
 	mounts, err = s.buildContainerMountOptions(t.Context(), project, project.Services["myService"], inherit)
-	sort.Slice(mounts, func(i, j int) bool {
-		return mounts[i].Target < mounts[j].Target
-	})
 	assert.NilError(t, err)
 	assert.Assert(t, len(mounts) == 4)
 	assert.Equal(t, mounts[0].Target, "/var/myvolume1")
@@ -360,6 +353,53 @@ func TestCreateEndpointSettings(t *testing.T) {
 	}, cmpopts.EquateComparable(netip.Addr{})))
 }
 
+func TestGetAliases(t *testing.T) {
+	enabled, disabled := true, false
+	tests := []struct {
+		name              string
+		cfg               *composetypes.ServiceNetworkConfig
+		useNetworkAliases bool
+		expected          []string
+	}{
+		{
+			name:              "no network config",
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "serviceName"},
+		},
+		{
+			name:              "use_service_name_alias unset",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}},
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "serviceName", "alias1"},
+		},
+		{
+			name:              "use_service_name_alias true",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}, UseServiceNameAlias: &enabled},
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "serviceName", "alias1"},
+		},
+		{
+			name:              "use_service_name_alias false keeps the container name and the aliases",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}, UseServiceNameAlias: &disabled},
+			useNetworkAliases: true,
+			expected:          []string{"containerName", "alias1"},
+		},
+		{
+			name:              "network aliases disabled for the run",
+			cfg:               &composetypes.ServiceNetworkConfig{Aliases: []string{"alias1"}},
+			useNetworkAliases: false,
+			expected:          []string{"containerName"},
+		},
+	}
+	service := composetypes.ServiceConfig{Name: "serviceName", ContainerName: "containerName"}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			aliases := getAliases(&composetypes.Project{Name: "projName"}, service, 0, tt.cfg, tt.useNetworkAliases)
+			assert.DeepEqual(t, aliases, tt.expected)
+		})
+	}
+}
+
 func Test_buildContainerVolumes(t *testing.T) {
 	pwd, err := os.Getwd()
 	assert.NilError(t, err)
@@ -478,4 +518,22 @@ volumes:
 			assert.DeepEqual(t, tt.mounts, mounts)
 		})
 	}
+}
+
+func TestSetBlkio(t *testing.T) {
+	resources := &container.Resources{}
+	setBlkio(&composetypes.BlkioConfig{
+		Weight:         300,
+		WeightDevice:   []composetypes.WeightDevice{{Path: "/dev/sda", Weight: 400}},
+		DeviceReadBps:  []composetypes.ThrottleDevice{{Path: "/dev/sda", Rate: 1}},
+		DeviceReadIOps: []composetypes.ThrottleDevice{{Path: "/dev/sdb", Rate: 2}},
+		DeviceWriteBps: []composetypes.ThrottleDevice{{Path: "/dev/sdc", Rate: 3}},
+	}, resources)
+	assert.Equal(t, resources.BlkioWeight, uint16(300))
+	assert.Equal(t, len(resources.BlkioWeightDevice), 1)
+	assert.Equal(t, resources.BlkioDeviceReadBps[0].Path, "/dev/sda")
+	assert.Equal(t, resources.BlkioDeviceReadBps[0].Rate, uint64(1))
+	assert.Equal(t, resources.BlkioDeviceReadIOps[0].Rate, uint64(2))
+	assert.Equal(t, resources.BlkioDeviceWriteBps[0].Rate, uint64(3))
+	assert.Assert(t, resources.BlkioDeviceWriteIOps == nil)
 }

@@ -23,6 +23,9 @@ import (
 
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -72,7 +75,7 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 
 	var names []string
 	for _, ctr := range stoppedContainers {
-		names = append(names, getCanonicalContainerName(ctr))
+		names = append(names, naming.CanonicalContainerName(ctr))
 	}
 
 	if len(names) == 0 {
@@ -97,17 +100,17 @@ func (s *composeService) Remove(ctx context.Context, projectName string, options
 }
 
 func (s *composeService) remove(ctx context.Context, containers Containers, options api.RemoveOptions) error {
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	for _, ctr := range containers {
 		eg.Go(func() error {
 			eventName := getContainerProgressName(ctr)
-			s.events.On(removingEvent(eventName))
+			s.events.On(progress.Removing(eventName))
 			_, err := s.apiClient().ContainerRemove(ctx, ctr.ID, client.ContainerRemoveOptions{
 				RemoveVolumes: options.Volumes,
 				Force:         options.Force,
 			})
 			if err == nil {
-				s.events.On(removedEvent(eventName))
+				s.events.On(progress.Removed(eventName))
 			}
 			return err
 		})

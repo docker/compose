@@ -79,6 +79,9 @@ func TestApplyScaleOpt(t *testing.T) {
 	assert.NilError(t, err)
 	assert.Equal(t, *bar.Scale, 3)
 	assert.Equal(t, *bar.Deploy.Replicas, 3)
+
+	err = applyScaleOpts(&p, []string{"=2"})
+	assert.Error(t, err, `invalid --scale option "=2". Should be SERVICE=NUM`)
 }
 
 func TestUpOptions_OnExit(t *testing.T) {
@@ -180,20 +183,33 @@ services:
 	assert.Assert(t, !strings.Contains(fmt.Sprint(err), "invalid ip address"), fmt.Sprint(err))
 }
 
-func TestRejectScheduledJobs(t *testing.T) {
+func TestManualJobNames(t *testing.T) {
 	yes := true
 	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
 	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
 		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
 	}}
 
-	assert.NilError(t, rejectScheduledJobs(&types.Project{}))
-	assert.NilError(t, rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual}}))
-	// profile-disabled scheduled jobs don't block up
-	assert.NilError(t, rejectScheduledJobs(&types.Project{DisabledJobs: types.Jobs{"backup": scheduled}}))
+	assert.DeepEqual(t, manualJobNames(&types.Project{}), []string{})
+	assert.DeepEqual(t, manualJobNames(&types.Project{Jobs: types.Jobs{"backup": scheduled}}), []string{})
+	assert.DeepEqual(t,
+		manualJobNames(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": manual, "migrate": manual}}),
+		[]string{"migrate", "sync"},
+	)
+}
 
-	err := rejectScheduledJobs(&types.Project{Jobs: types.Jobs{"backup": scheduled, "sync": scheduled, "migrate": manual}})
-	assert.Error(t, err, "scheduled jobs are not supported in this version: backup, sync")
+// A project with no service still has something for up to do when a job is
+// scheduled: only then is the "no service selected" error not the right answer.
+func TestHasScheduledJobs(t *testing.T) {
+	yes := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
+	scheduled := types.JobConfig{Triggers: &types.TriggerConfig{
+		Schedule: []types.ScheduleConfig{{Cron: "0 3 * * *"}},
+	}}
+
+	assert.Assert(t, !hasScheduledJobs(&types.Project{}))
+	assert.Assert(t, !hasScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual}}))
+	assert.Assert(t, hasScheduledJobs(&types.Project{Jobs: types.Jobs{"migrate": manual, "backup": scheduled}}))
 }
 
 // warnIgnoredJobs must only name profile-enabled jobs: a job disabled by
@@ -203,13 +219,42 @@ func TestRejectScheduledJobs(t *testing.T) {
 func TestWarnIgnoredJobs(t *testing.T) {
 	hook := logrustest.NewGlobal()
 
+	yes := true
+	manual := types.JobConfig{Triggers: &types.TriggerConfig{Manual: &yes}}
 	warnIgnoredJobs(&types.Project{
-		Jobs:         types.Jobs{"migrate": {}},
-		DisabledJobs: types.Jobs{"backup": {}},
+		Jobs:         types.Jobs{"migrate": manual},
+		DisabledJobs: types.Jobs{"backup": manual},
 	})
 
 	assert.Equal(t, len(hook.AllEntries()), 1)
 	msg := hook.LastEntry().Message
 	assert.Assert(t, strings.Contains(msg, "migrate"), msg)
 	assert.Assert(t, !strings.Contains(msg, "backup"), msg)
+}
+
+// --wait alone keeps the session attached to stream the logs until the services
+// are running|healthy; only an explicit --detach silences it.
+func TestValidateFlagsWait(t *testing.T) {
+	tests := []struct {
+		name    string
+		up      upOptions
+		wantErr string
+	}{
+		{name: "wait alone stays attached", up: upOptions{wait: true}},
+		{name: "wait with watch", up: upOptions{wait: true, watch: true}, wantErr: "--wait cannot be combined with"},
+		{name: "wait with abort on container failure", up: upOptions{wait: true, cascadeFail: true}, wantErr: "--wait cannot be combined with"},
+		{name: "wait with abort on container exit", up: upOptions{wait: true, cascadeStop: true}, wantErr: "--wait cannot be combined with"},
+		{name: "wait with attach", up: upOptions{wait: true, attach: []string{"web"}}, wantErr: "--wait cannot be combined with"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateFlags(&tt.up, &createOptions{})
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+				return
+			}
+			assert.NilError(t, err)
+			assert.Assert(t, !tt.up.Detach, "--wait must not imply --detach")
+		})
+	}
 }

@@ -26,6 +26,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 )
 
@@ -93,7 +94,7 @@ func TestPorts(t *testing.T) {
 			ctr.Ports = append([]container.PortSummary(nil), ports...)
 
 			api.EXPECT().ContainerList(t.Context(), client.ContainerListOptions{
-				Filters: projectFilter(projectName).Add("label", serviceFilter(service), compose.ConfigHashLabel),
+				Filters: naming.ProjectFilter(projectName).Add("label", naming.ServiceFilter(service), compose.ConfigHashLabel),
 			}).Return(client.ContainerListResult{Items: []container.Summary{ctr}}, nil)
 
 			got, err := tested.Ports(t.Context(), projectName, service, tt.port, compose.PortOptions{Protocol: tt.protocol})
@@ -104,43 +105,5 @@ func TestPorts(t *testing.T) {
 			assert.NilError(t, err)
 			assert.DeepEqual(t, got, tt.want)
 		})
-	}
-}
-
-// TestContainerPublishersPreservesTieOrder guards against containerPublishers
-// reordering same-PrivatePort entries (e.g. a dual-stack publish exposing the
-// same target port on both an IPv4 and an IPv6 host address): Ports() picks
-// publishers[0] as *the* answer for a single-port lookup, so a sort that
-// merely orders by PrivatePort must not additionally scramble ties.
-//
-// sort.Slice's pdqsort falls back to a (stable) insertion sort for slices of
-// <=12 elements, so a small fixture can't tell a stable sort from an unstable
-// one; this uses enough tied groups to force the quicksort partitioning path.
-func TestContainerPublishersPreservesTieOrder(t *testing.T) {
-	var ports []container.PortSummary
-	privatePorts := []int{80, 53, 443}
-	for _, pp := range privatePorts {
-		for i := range 5 {
-			ports = append(ports, container.PortSummary{
-				PrivatePort: uint16(pp),
-				PublicPort:  uint16(i), // tags each tied entry with its input position
-				Type:        "tcp",
-			})
-		}
-	}
-	ports = append(ports, container.PortSummary{PrivatePort: 22, PublicPort: 0, Type: "tcp"})
-
-	ctr := testContainer("web", "123", false)
-	ctr.Ports = ports
-
-	got := containerPublishers(ctr)
-
-	lastPosByTargetPort := map[int]int{}
-	for _, p := range got {
-		pos := p.PublishedPort
-		if prev, ok := lastPosByTargetPort[p.TargetPort]; ok {
-			assert.Assert(t, pos > prev, "tied entries for private port %d out of input order: got position %d after %d", p.TargetPort, pos, prev)
-		}
-		lastPosByTargetPort[p.TargetPort] = pos
 	}
 }

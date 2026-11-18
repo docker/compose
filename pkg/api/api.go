@@ -100,12 +100,16 @@ type OCIOptions struct {
 // named, and only drive side concerns (recreation policy, log scoping) as
 // documented on each field.
 type Compose interface {
-	// Build executes the equivalent to a `compose build`
-	Build(ctx context.Context, project *types.Project, options BuildOptions) error
-	// Push executes the equivalent to a `compose push`
-	Push(ctx context.Context, project *types.Project, options PushOptions) error
-	// Pull executes the equivalent of a `compose pull`
-	Pull(ctx context.Context, project *types.Project, options PullOptions) error
+	Lifecycle
+	Inspector
+	ImageManager
+	Runner
+	Watcher
+	ProjectLoader
+}
+
+// Lifecycle groups the operations that create, run, change and remove a project's resources.
+type Lifecycle interface {
 	// Create executes the equivalent to a `compose create`
 	Create(ctx context.Context, project *types.Project, options CreateOptions) error
 	// Start executes the equivalent to a `compose start`
@@ -118,61 +122,104 @@ type Compose interface {
 	Up(ctx context.Context, project *types.Project, options UpOptions) error
 	// Down executes the equivalent to a `compose down`
 	Down(ctx context.Context, projectName string, options DownOptions) error
-	// Logs executes the equivalent to a `compose logs`
-	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
+	// Kill executes the equivalent to a `compose kill`
+	Kill(ctx context.Context, projectName string, options KillOptions) error
+	// Pause executes the equivalent to a `compose pause`
+	Pause(ctx context.Context, projectName string, options PauseOptions) error
+	// UnPause executes the equivalent to a `compose unpause`
+	UnPause(ctx context.Context, projectName string, options PauseOptions) error
+	// Scale sets the number of replicas of the selected services
+	// (ScaleOptions.Replicas) and converges the project to it, creating,
+	// removing and starting containers as needed
+	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
+	// Remove executes the equivalent to a `compose rm`
+	Remove(ctx context.Context, projectName string, options RemoveOptions) error
+	// Wait blocks until at least one of the services' container exits
+	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
+}
+
+// Inspector groups the read-only operations that report on a project and its resources.
+type Inspector interface {
 	// Ps executes the equivalent to a `compose ps`
 	Ps(ctx context.Context, projectName string, options PsOptions) ([]ContainerSummary, error)
 	// List executes the equivalent to a `docker stack ls`
 	List(ctx context.Context, options ListOptions) ([]Stack, error)
-	// Kill executes the equivalent to a `compose kill`
-	Kill(ctx context.Context, projectName string, options KillOptions) error
+	// Top executes the equivalent to a `compose top`
+	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
+	// Ports executes the equivalent to a `compose port`
+	Ports(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (PortPublishers, error)
+	// Images executes the equivalent of a `compose images`
+	Images(ctx context.Context, projectName string, options ImagesOptions) (map[string]ImageSummary, error)
+	// Volumes executes the equivalent to a `docker volume ls`
+	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
+	// Events executes the equivalent to a `compose events`
+	Events(ctx context.Context, projectName string, options EventsOptions) error
+	// Logs executes the equivalent to a `compose logs`
+	Logs(ctx context.Context, projectName string, consumer LogConsumer, options LogOptions) error
+	// Viz generates a graphviz graph of the project services
+	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
+}
+
+// ImageManager groups the operations on the images of a project: building them and moving them to or from a registry.
+type ImageManager interface {
+	// Build executes the equivalent to a `compose build`
+	Build(ctx context.Context, project *types.Project, options BuildOptions) error
+	// Push executes the equivalent to a `compose push`
+	Push(ctx context.Context, project *types.Project, options PushOptions) error
+	// Pull executes the equivalent of a `compose pull`
+	Pull(ctx context.Context, project *types.Project, options PullOptions) error
+	// Publish executes the equivalent to a `compose publish`
+	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
+}
+
+// Runner groups the operations that run, or interact with, a command in a service container.
+type Runner interface {
 	// RunOneOffContainer creates a service oneoff container and starts its dependencies
 	RunOneOffContainer(ctx context.Context, project *types.Project, opts RunOptions) (int, error)
-	// Remove executes the equivalent to a `compose rm`
-	Remove(ctx context.Context, projectName string, options RemoveOptions) error
+	// RunJob triggers a Run of the job on the engine's jobs API, starts its
+	// dependencies first, streams the logs and returns the Run's exit code
+	// (124 on timeout, 130 when cancelled). A manual job goes through
+	// CreateAndRun; a scheduled job is run as `up` or `create` registered it: an
+	// override in options, or a job the engine does not know, is an error. The job must already be in
+	// project.Services, the way the CLI materializes it, and options.Service
+	// must be name. options carries the same CLI overrides RunOneOffContainer
+	// accepts (User, Command, Entrypoint, WorkingDir, CapAdd/CapDrop,
+	// Environment, Labels, NoDeps). Name has no effect: the jobs API assigns the
+	// run container's identity itself. A manual job is registered under the
+	// project and job name and removed when its run ends, so concurrent runs of
+	// the same manual job are not supported: the first to end cancels the others.
+	// Detach is refused, a run is waited for;
+	// a dry run starts the dependencies and stops there. When the engine cannot
+	// run jobs, the error wraps ErrJobsNotSupported and nothing was done, so the
+	// caller can fall back to RunOneOffContainer.
+	RunJob(ctx context.Context, project *types.Project, name string, options RunOptions) (int, error)
 	// Exec executes a command in a running service container
 	Exec(ctx context.Context, projectName string, options RunOptions) (int, error)
 	// Attach STDIN,STDOUT,STDERR to a running service container
 	Attach(ctx context.Context, projectName string, options AttachOptions) error
 	// Copy copies a file/folder between a service container and the local filesystem
 	Copy(ctx context.Context, projectName string, options CopyOptions) error
-	// Pause executes the equivalent to a `compose pause`
-	Pause(ctx context.Context, projectName string, options PauseOptions) error
-	// UnPause executes the equivalent to a `compose unpause`
-	UnPause(ctx context.Context, projectName string, options PauseOptions) error
-	// Top executes the equivalent to a `compose top`
-	Top(ctx context.Context, projectName string, services []string) ([]ContainerProcSummary, error)
-	// Events executes the equivalent to a `compose events`
-	Events(ctx context.Context, projectName string, options EventsOptions) error
-	// Ports executes the equivalent to a `compose port`
-	Ports(ctx context.Context, projectName string, service string, port uint16, options PortOptions) (PortPublishers, error)
-	// Publish executes the equivalent to a `compose publish`
-	Publish(ctx context.Context, project *types.Project, repository string, options PublishOptions) error
-	// Images executes the equivalent of a `compose images`
-	Images(ctx context.Context, projectName string, options ImagesOptions) (map[string]ImageSummary, error)
-	// Watch services' development context and sync/notify/rebuild/restart on changes
-	Watch(ctx context.Context, project *types.Project, options WatchOptions) error
-	// Viz generates a graphviz graph of the project services
-	Viz(ctx context.Context, project *types.Project, options VizOptions) (string, error)
-	// Wait blocks until at least one of the services' container exits
-	Wait(ctx context.Context, projectName string, options WaitOptions) (int64, error)
-	// Scale sets the number of replicas of the selected services
-	// (ScaleOptions.Replicas) and converges the project to it, creating,
-	// removing and starting containers as needed
-	Scale(ctx context.Context, project *types.Project, options ScaleOptions) error
 	// Export a service container's filesystem as a tar archive
 	Export(ctx context.Context, projectName string, options ExportOptions) error
 	// Create a new image from a service container's changes
 	Commit(ctx context.Context, projectName string, options CommitOptions) error
-	// Generate generates a Compose Project from existing containers
-	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
-	// Volumes executes the equivalent to a `docker volume ls`
-	Volumes(ctx context.Context, project string, options VolumesOptions) ([]VolumesSummary, error)
+}
+
+// Watcher groups the development-loop operations.
+type Watcher interface {
+	// Watch services' development context and sync/notify/rebuild/restart on changes
+	Watch(ctx context.Context, project *types.Project, options WatchOptions) error
+}
+
+// ProjectLoader groups the operations that obtain a Compose project, from configuration files or from existing containers.
+type ProjectLoader interface {
 	// LoadProject loads and validates a Compose project from configuration files.
 	// Set ProjectLoadOptions.OnUnsupportedAttribute to also be notified of
 	// compose-file attributes accepted by the schema but not honored by this
 	// runtime outside Swarm mode.
 	LoadProject(ctx context.Context, options ProjectLoadOptions) (*types.Project, error)
+	// Generate generates a Compose Project from existing containers
+	Generate(ctx context.Context, options GenerateOptions) (*types.Project, error)
 }
 
 // UnsupportedAttribute reports a compose-file attribute that is accepted by
@@ -318,11 +365,17 @@ type CreateOptions struct {
 	RemoveOrphans bool
 	// Ignore legacy containers for services that are not defined in the project
 	IgnoreOrphans bool
-	// Recreate define the strategy to apply on existing containers
+	// Recreate define the strategy to apply on existing containers: one of
+	// RecreateDiverged (the default, also used for ""), RecreateForce or
+	// RecreateNever. Any other value is rejected by Validate.
 	Recreate string
-	// RecreateDependencies define the strategy to apply on dependencies services
+	// RecreateDependencies define the strategy to apply on dependencies
+	// services, with the same values as Recreate.
 	RecreateDependencies string
-	// Inherit reuse anonymous volumes from previous container
+	// Inherit reuse anonymous volumes from previous container. Beware that
+	// the zero value (false) recreates the anonymous volumes of the containers
+	// that get recreated, like `up --renew-anon-volumes` does for them: set it
+	// to true to get what the CLI does by default.
 	Inherit bool
 	// Timeout set delay to wait for container to gracefully stop before sending SIGKILL
 	Timeout *time.Duration
@@ -334,12 +387,14 @@ type CreateOptions struct {
 
 // StartOptions group options of the Start API
 type StartOptions struct {
-	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
+	// Project is the compose project used to define this app. Might be nil if user ran command just with project name.
+	// Ignored by Up, which works on the project it is given.
 	Project *types.Project
 	// Attach receives the containers' logs during Up's foreground session.
 	// It doubles as the mode switch: when nil, Up returns once containers
 	// are started (detached mode); when set, Up keeps running the
-	// interactive session (log streaming, cascade, keyboard menu).
+	// interactive session (log streaming, cascade, keyboard menu), which Wait
+	// ends once the services are running or healthy.
 	// Ignored by Start.
 	Attach LogConsumer
 	// AttachTo carries two unrelated meanings: for Start, the service names
@@ -352,7 +407,11 @@ type StartOptions struct {
 	// ExitCodeFrom reports the exit code of the specified service. Honored
 	// by Up's foreground session only; ignored by Start.
 	ExitCodeFrom string
-	// Wait won't return until containers reached the running|healthy state
+	// Wait won't return until containers reached the running|healthy state.
+	// Up honors it in detached mode (Attach nil), and combined with Attach it
+	// streams the logs until that state is reached, then returns leaving the
+	// containers running. The session options OnExit, ExitCodeFrom and Watch
+	// are rejected with it, see UpOptions.Validate.
 	Wait        bool
 	WaitTimeout time.Duration
 	// Services names the services the user explicitly targeted; it only
@@ -363,7 +422,7 @@ type StartOptions struct {
 	// Start.
 	Watch bool
 	// NavigationMenu enables the keyboard menu of Up's foreground session;
-	// ignored by Start.
+	// ignored by Start, and by Up when Wait is set.
 	NavigationMenu bool
 }
 
@@ -448,6 +507,8 @@ type DownOptions struct {
 }
 
 // ConfigOptions group options of the Config API
+//
+// Deprecated: no operation of Compose takes these options, they will be removed.
 type ConfigOptions struct {
 	// Format define the output format used to dump converted application model (json|yaml)
 	Format string
@@ -461,6 +522,8 @@ type ConfigOptions struct {
 type PushOptions struct {
 	Quiet          bool
 	IgnoreFailures bool
+	// IgnoreMissing skips the images that are not available locally instead of failing to push them
+	IgnoreMissing  bool
 	ImageMandatory bool
 }
 
@@ -510,9 +573,9 @@ type RemoveOptions struct {
 // Detach.
 type RunOptions struct {
 	// CreateOptions is embedded, but creating the one-off's dependencies
-	// only honors Build, IgnoreOrphans, RemoveOrphans and QuietPull; the
-	// other fields (Recreate, RecreateDependencies, Inherit, Timeout,
-	// Services, SkipProviders) are ignored.
+	// only honors Build, IgnoreOrphans, RemoveOrphans, QuietPull, Recreate
+	// and RecreateDependencies; Inherit is always true, and the other fields
+	// (Timeout, Services, SkipProviders) are ignored.
 	CreateOptions
 	// Project is the compose project used to define this app. Might be nil if user ran command just with project name
 	Project           *types.Project
@@ -608,12 +671,16 @@ func (e Event) String() string {
 
 // ListOptions group options of the ls API
 type ListOptions struct {
+	// All takes stopped containers into account, so that a project whose
+	// containers are all stopped is listed
 	All bool
 }
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
-	Project  *types.Project
+	Project *types.Project
+	// All includes the stopped containers and the one-off containers, which
+	// are both left out by default
 	All      bool
 	Services []string
 }
@@ -622,10 +689,11 @@ type PsOptions struct {
 type CopyOptions struct {
 	Source      string
 	Destination string
-	All         bool
-	Index       int
-	FollowLink  bool
-	CopyUIDGID  bool
+	// All includes the one-off containers of the service
+	All        bool
+	Index      int
+	FollowLink bool
+	CopyUIDGID bool
 }
 
 // PortPublisher hold status about published port
@@ -719,6 +787,8 @@ type ImageSummary struct {
 }
 
 // ServiceStatus hold status about a service
+//
+// Deprecated: no operation of Compose returns it, it will be removed.
 type ServiceStatus struct {
 	ID         string
 	Name       string
@@ -777,16 +847,28 @@ type GenerateOptions struct {
 
 const (
 	// STARTING indicates that stack is being deployed
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	STARTING string = "Starting"
 	// RUNNING indicates that stack is deployed and services are running
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	RUNNING string = "Running"
 	// UPDATING indicates that some stack resources are being recreated
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	UPDATING string = "Updating"
 	// REMOVING indicates that stack is being deleted
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	REMOVING string = "Removing"
 	// UNKNOWN indicates unknown stack state
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	UNKNOWN string = "Unknown"
 	// FAILED indicates that stack deployment failed
+	//
+	// Deprecated: Stack.Status never takes this value, it will be removed.
 	FAILED string = "Failed"
 )
 

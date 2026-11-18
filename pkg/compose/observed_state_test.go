@@ -30,6 +30,8 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
@@ -230,7 +232,7 @@ func TestCollectObservedState(t *testing.T) {
 		},
 	}, nil)
 
-	state, err := tested.(*composeService).collectObservedState(t.Context(), project)
+	state, err := tested.(*composeService).collectObservedState(t.Context(), project, ScopeCreate)
 	assert.NilError(t, err)
 
 	// Containers classified by service
@@ -269,6 +271,56 @@ func TestCollectObservedState(t *testing.T) {
 	assert.Equal(t, vol.ConfigHash, "volhash1")
 }
 
+// TestCollectObservedState_ScopeStartSkipsNetworksAndVolumes is a regression
+// test for a Copilot review finding on #14296: ScopeStart's planStartPhase
+// never reads resolvedNetworks/resolvedVolumes (only reconcileNetworks/
+// reconcileVolumes, which ScopeStart never runs, do), so querying them
+// unconditionally gave `compose start` new daemon dependencies it never had
+// (it only ever called getContainers) -- a problem
+// for an authorization plugin permitting container list/start but denying
+// network or volume listing. No NetworkList/VolumeList/NetworkInspect/
+// VolumeInspect expectation is registered here: gomock fails the test if
+// collectObservedState calls any of them under ScopeStart.
+func TestCollectObservedState_ScopeStartSkipsNetworksAndVolumes(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": {Name: "web"}},
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend"}},
+		Volumes:  types.Volumes{"data": {Name: "myproject_data"}},
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeStart)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.Networks), 0)
+	assert.Equal(t, len(state.Volumes), 0)
+}
+
+// TestCollectObservedState_ScopeStartSkipsHookContainerQuery is a regression
+// test for a second Copilot review finding in the same vein: hook-runner
+// snapshots (mergeHookContainers/getHookContainers) are consumed exclusively
+// by create-phase runner reconciliation (planPreStartHookRunners) -- the
+// start phase's own RunPreStart never reads observed.HookContainers. Only
+// one ContainerList expectation is registered (the default Times(1)):
+// gomock fails the test if collectObservedState issues the extra
+// getHookContainers listing under ScopeStart for a service declaring
+// pre_start hooks.
+func TestCollectObservedState_ScopeStartSkipsHookContainerQuery(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{
+		Name: "myproject",
+		Services: types.Services{
+			"web": {Name: "web", PreStart: []types.PreStartHook{{}}},
+		},
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeStart)
+	assert.NilError(t, err)
+	assert.Equal(t, len(state.HookContainers["web"]), 0)
+}
+
 // TestCollectObservedState_LegacyHookRunnerNotDuplicated covers a runner
 // created before the ConfigHashLabel exclusion existed (or by an older
 // compose version): it still carries the label, so it matches getContainers'
@@ -300,7 +352,7 @@ func TestCollectObservedState_LegacyHookRunnerNotDuplicated(t *testing.T) {
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
 	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
 
-	state, err := svc.collectObservedState(t.Context(), project)
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreate)
 	assert.NilError(t, err)
 	assert.Equal(t, len(state.HookContainers["web"]), 1, "the legacy runner must be classified exactly once")
 	assert.Equal(t, len(state.Containers["web"]), 0, "a hook runner must never be classified as a replica")
@@ -322,7 +374,7 @@ func TestCollectObservedState_AggregatesDuplicateLabels(t *testing.T) {
 		},
 	}, nil)
 
-	state, err := svc.collectObservedState(t.Context(), project)
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreate)
 	assert.NilError(t, err)
 	assert.Equal(t, len(state.Volumes["data"]), 2, "both label-sharing volumes must be recorded")
 }
@@ -388,7 +440,7 @@ func collectByNameDiscovery(t *testing.T, project *types.Project, inspect func(a
 	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
 	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
 	inspect(apiClient)
-	return svc.collectObservedState(t.Context(), project)
+	return svc.collectObservedState(t.Context(), project, ScopeCreate)
 }
 
 // TestCollectObservedState_LegacyNetworkMatchedByName verifies that a network
@@ -623,7 +675,7 @@ func TestWarnUnmanagedVolumes(t *testing.T) {
 }
 
 type capturingEvents struct {
-	noopEventProcessor
+	progress.Noop
 	resources []api.Resource
 }
 
@@ -652,7 +704,7 @@ func TestEmitRunningEvents(t *testing.T) {
 		}
 		events := &capturingEvents{}
 
-		emitRunningEvents(project, observed, &Plan{}, events)
+		emitRunningEvents(project, observed, &planning.Plan{}, events)
 
 		assert.Equal(t, len(events.resources), 2)
 		names := map[string]bool{}
@@ -683,7 +735,7 @@ func TestEmitRunningEvents(t *testing.T) {
 		}
 		events := &capturingEvents{}
 
-		emitRunningEvents(project, observed, &Plan{}, events)
+		emitRunningEvents(project, observed, &planning.Plan{}, events)
 
 		assert.Equal(t, len(events.resources), 0)
 	})
@@ -695,9 +747,9 @@ func TestEmitRunningEvents(t *testing.T) {
 		observed := &ObservedState{
 			Containers: map[string][]ObservedContainer{"web": {runningWeb}},
 		}
-		plan := &Plan{}
-		plan.addNode(Operation{
-			Type:      OpStopContainer,
+		plan := &planning.Plan{}
+		plan.AddNode(planning.Operation{
+			Type:      planning.OpStopContainer,
 			Container: &container.Summary{ID: runningWeb.ID},
 		}, "")
 		events := &capturingEvents{}
@@ -716,8 +768,90 @@ func TestEmitRunningEvents(t *testing.T) {
 		}
 		events := &capturingEvents{}
 
-		emitRunningEvents(project, observed, &Plan{}, events)
+		emitRunningEvents(project, observed, &planning.Plan{}, events)
 
 		assert.Equal(t, len(events.resources), 0)
 	})
+}
+
+// A project narrowed to a selection of services (watch's rebuild) moves the
+// others to DisabledServices: their containers are known to the project, so
+// they must not be reported as orphans -- that would print the "Found orphan
+// containers" warning on every rebuild, and let --remove-orphans remove live
+// services. A container of a service absent from the model altogether still is.
+func TestCollectObservedState_SelectionDoesNotMakeDisabledServicesOrphans(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project, err := (&types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": {Name: "web"}, "api": {Name: "api"}},
+	}).WithSelectedServices([]string{"web"})
+	assert.NilError(t, err)
+
+	replica := func(id, service string) container.Summary {
+		return container.Summary{
+			ID:    id,
+			Names: []string{"/myproject-" + service + "-1"},
+			State: container.StateRunning,
+			Labels: map[string]string{
+				api.ServiceLabel:         service,
+				api.ProjectLabel:         "myproject",
+				api.ConfigHashLabel:      "hash-" + service,
+				api.ContainerNumberLabel: "1",
+				api.OneoffLabel:          "False",
+			},
+		}
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{replica("c1", "web"), replica("c2", "api"), replica("c3", "removed")},
+	}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreateStart)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(state.Containers["web"]), 1)
+	assert.Equal(t, len(state.Containers["api"]), 1, "the disabled service's container is observed as its own")
+	assert.Equal(t, len(state.Orphans), 1)
+	assert.Equal(t, state.Orphans[0].ID, "c3", "only the service absent from the model is an orphan")
+}
+
+// A run of a job is not a service replica: the project does not define its
+// "service", so it reads as an orphan. up --remove-orphans sweeps the finished
+// ones, the failures kept for postmortem, but must leave a run still going
+// alone, like a live `compose run` session: a cron firing while the user
+// deploys would otherwise be killed.
+func TestCollectObservedState_RunningJobRunIsNotAnOrphan(t *testing.T) {
+	svc, apiClient := newTestService(t)
+	project := &types.Project{Name: "myproject", Services: types.Services{"web": {Name: "web"}}}
+
+	jobRun := func(id string, state container.ContainerState) container.Summary {
+		return container.Summary{
+			ID:    id,
+			Names: []string{"/job-myproject.backup-1-" + id},
+			State: state,
+			Labels: map[string]string{
+				api.ServiceLabel:         "backup",
+				api.ProjectLabel:         "myproject",
+				api.ConfigHashLabel:      "hash-backup",
+				api.ContainerNumberLabel: "1",
+				api.OneoffLabel:          "False",
+				jobContainerIDLabel:      "job-1",
+			},
+		}
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).Return(client.ContainerListResult{
+		Items: []container.Summary{
+			jobRun("running", container.StateRunning),
+			jobRun("failed", container.StateExited),
+		},
+	}, nil)
+	apiClient.EXPECT().NetworkList(gomock.Any(), gomock.Any()).Return(client.NetworkListResult{}, nil)
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{}, nil)
+
+	state, err := svc.collectObservedState(t.Context(), project, ScopeCreateStart)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(state.Orphans), 1)
+	assert.Equal(t, state.Orphans[0].ID, "failed", "the finished run is swept, the running one is left alone")
 }

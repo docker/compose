@@ -33,16 +33,11 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/planning"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
-
-// noopEventProcessor discards all events.
-type noopEventProcessor struct{}
-
-func (noopEventProcessor) Start(_ context.Context, _ string) {}
-func (noopEventProcessor) On(_ ...api.Resource)              {}
-func (noopEventProcessor) Done(_ string, _ bool)             {}
 
 // peakConcurrencyTracker records the highest number of overlapping
 // enter()/leave() pairs seen, used to assert a --parallel bound was honored.
@@ -98,14 +93,14 @@ func newTestService(t *testing.T, opts ...Option) (*composeService, *mocks.MockA
 	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
 	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
-	svc, err := NewComposeService(cli, append([]Option{WithEventProcessor(noopEventProcessor{})}, opts...)...)
+	svc, err := NewComposeService(cli, append([]Option{WithEventProcessor(progress.Noop{})}, opts...)...)
 	assert.NilError(t, err)
 	return svc.(*composeService), apiClient
 }
 
 func TestExecutePlanEmpty(t *testing.T) {
 	svc, _ := newTestService(t)
-	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), &Plan{})
+	err := svc.executePlan(t.Context(), &types.Project{Name: "test"}, emptyObservedState("test"), &planning.Plan{})
 	assert.NilError(t, err)
 }
 
@@ -123,9 +118,9 @@ func TestExecutePlanCreateNetwork(t *testing.T) {
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
 		Return(client.NetworkCreateResult{ID: "net1"}, nil)
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Cause:      "not found",
 		Name:       nw.Name,
@@ -158,9 +153,9 @@ func TestExecutePlanCreateNetworkWithIPAMOptions(t *testing.T) {
 			return client.NetworkCreateResult{ID: "net1"}, nil
 		})
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Cause:      "not found",
 		Name:       nw.Name,
@@ -188,15 +183,15 @@ func TestExecutePlanStopRemoveContainer(t *testing.T) {
 	apiClient.EXPECT().ContainerRemove(gomock.Any(), "c1", gomock.Any()).
 		Return(client.ContainerRemoveResult{}, nil)
 
-	plan := &Plan{}
-	stopNode := plan.addNode(Operation{
-		Type:       OpStopContainer,
+	plan := &planning.Plan{}
+	stopNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpStopContainer,
 		ResourceID: "service:web:1",
 		Cause:      "scale down",
 		Container:  &ctr,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpRemoveContainer,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpRemoveContainer,
 		ResourceID: "service:web:1",
 		Cause:      "scale down",
 		Container:  &ctr,
@@ -227,7 +222,7 @@ func emptyObservedState(project string) *ObservedState {
 // wiring and group tracker — not a hand-rolled loop over executeNode.
 // A best-effort removal failure (stale pre_start hook runner purge) is
 // warn-only: the plan carries on, and the removal passes RemoveVolumes so the
-// runner's anonymous volumes go with it — the imperative purge semantics.
+// runner's anonymous volumes go with it.
 func TestExecutePlanBestEffortRemoveContainerFailureTolerated(t *testing.T) {
 	svc, apiClient := newTestService(t)
 
@@ -243,9 +238,9 @@ func TestExecutePlanBestEffortRemoveContainerFailureTolerated(t *testing.T) {
 			return client.ContainerRemoveResult{}, errors.New("device or resource busy")
 		})
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:          OpRemoveContainer,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:          planning.OpRemoveContainer,
 		ResourceID:    "hook:web:stale:hook1",
 		Cause:         "stale pre_start hook container",
 		Container:     &ctr,
@@ -283,21 +278,21 @@ func TestExecutePlanRemoveContainerDropsFromCache(t *testing.T) {
 		Volumes:  map[string][]ObservedVolume{},
 	}
 
-	plan := &Plan{}
-	stopNode := plan.addNode(Operation{
-		Type:       OpStopContainer,
+	plan := &planning.Plan{}
+	stopNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpStopContainer,
 		ResourceID: "service:web:1",
 		Cause:      "scale down",
 		Container:  &oldCtr,
 	}, "")
-	plan.addNode(Operation{
-		Type:       OpRemoveContainer,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpRemoveContainer,
 		ResourceID: "service:web:1",
 		Cause:      "scale down",
 		Container:  &oldCtr,
 	}, "", stopNode)
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed, nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
 	assert.NilError(t, exec.run(t.Context(), plan))
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
@@ -347,23 +342,23 @@ func TestExecutePlanConcurrentRemovesCacheCoherence(t *testing.T) {
 
 	// Build N independent Stop→Remove chains. The errgroup will fan them out
 	// across goroutines that all hammer containersByService under the mutex.
-	plan := &Plan{}
+	plan := &planning.Plan{}
 	for i := range ctrs {
-		stop := plan.addNode(Operation{
-			Type:       OpStopContainer,
+		stop := plan.AddNode(planning.Operation{
+			Type:       planning.OpStopContainer,
 			ResourceID: "service:web:" + strconv.Itoa(i+1),
 			Cause:      "scale down",
 			Container:  &ctrs[i],
 		}, "")
-		plan.addNode(Operation{
-			Type:       OpRemoveContainer,
+		plan.AddNode(planning.Operation{
+			Type:       planning.OpRemoveContainer,
 			ResourceID: "service:web:" + strconv.Itoa(i+1),
 			Cause:      "scale down",
 			Container:  &ctrs[i],
 		}, "", stop)
 	}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed, nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, observed)
 	assert.NilError(t, exec.run(t.Context(), plan))
 
 	assert.Equal(t, len(exec.containersByService["web"]), 0,
@@ -397,22 +392,22 @@ func TestExecutePlanRespectsMaxConcurrencyAcrossDependencyChain(t *testing.T) {
 	}
 
 	// A -> B -> C: each node depends on the previous one.
-	plan := &Plan{}
-	var last *PlanNode
+	plan := &planning.Plan{}
+	var last *planning.PlanNode
 	for i := range ctrs {
-		var deps []*PlanNode
+		var deps []*planning.PlanNode
 		if last != nil {
-			deps = []*PlanNode{last}
+			deps = []*planning.PlanNode{last}
 		}
-		last = plan.addNode(Operation{
-			Type:       OpStopContainer,
+		last = plan.AddNode(planning.Operation{
+			Type:       planning.OpStopContainer,
 			ResourceID: "service:web:" + strconv.Itoa(i+1),
 			Cause:      "chain",
 			Container:  &ctrs[i],
 		}, "", deps...)
 	}
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	done := make(chan error, 1)
 	go func() { done <- exec.run(t.Context(), plan) }()
@@ -470,18 +465,18 @@ func TestExecutePlanIndependentNodeNotSerializedBehindADependencyWait(t *testing
 
 	// slow -> waiter (waiter depends on slow); independent has no deps and
 	// shares no resource with either.
-	plan := &Plan{}
-	slowNode := plan.addNode(Operation{
-		Type: OpStopContainer, ResourceID: "service:web:1", Cause: "chain", Container: &slow,
+	plan := &planning.Plan{}
+	slowNode := plan.AddNode(planning.Operation{
+		Type: planning.OpStopContainer, ResourceID: "service:web:1", Cause: "chain", Container: &slow,
 	}, "")
-	plan.addNode(Operation{
-		Type: OpStopContainer, ResourceID: "service:web:2", Cause: "chain", Container: &waiter,
+	plan.AddNode(planning.Operation{
+		Type: planning.OpStopContainer, ResourceID: "service:web:2", Cause: "chain", Container: &waiter,
 	}, "", slowNode)
-	plan.addNode(Operation{
-		Type: OpStopContainer, ResourceID: "service:app:1", Cause: "unrelated", Container: &independent,
+	plan.AddNode(planning.Operation{
+		Type: planning.OpStopContainer, ResourceID: "service:app:1", Cause: "unrelated", Container: &independent,
 	}, "")
 
-	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil)
+	exec := svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"))
 
 	done := make(chan error, 1)
 	go func() { done <- exec.run(t.Context(), plan) }()
@@ -541,27 +536,27 @@ func TestExecutePlanRecreateVolume(t *testing.T) {
 		Volumes: types.Volumes{"data": vol},
 	}
 
-	plan := &Plan{}
-	stopNode := plan.addNode(Operation{
-		Type:       OpStopContainer,
+	plan := &planning.Plan{}
+	stopNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpStopContainer,
 		ResourceID: "service:db:1",
 		Cause:      "mounted volume config changed",
 		Container:  &ctr,
 	}, "")
-	removeNode := plan.addNode(Operation{
-		Type:       OpRemoveContainer,
+	removeNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpRemoveContainer,
 		ResourceID: "service:db:1",
 		Cause:      "mounted volume config changed",
 		Container:  &ctr,
 	}, "", stopNode)
-	removeVolNode := plan.addNode(Operation{
-		Type:       OpRemoveVolume,
+	removeVolNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpRemoveVolume,
 		ResourceID: "volume:data",
 		Cause:      "config hash diverged",
 		Name:       vol.Name,
 	}, "", removeNode)
-	plan.addNode(Operation{
-		Type:       OpCreateVolume,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateVolume,
 		ResourceID: "volume:data",
 		Cause:      "recreate after config change",
 		Name:       vol.Name,
@@ -605,35 +600,35 @@ func TestExecutePlanRecreateNetwork(t *testing.T) {
 		Networks: types.Networks{"frontend": nw},
 	}
 
-	plan := &Plan{}
-	stopNode := plan.addNode(Operation{
-		Type:       OpStopContainer,
+	plan := &planning.Plan{}
+	stopNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpStopContainer,
 		ResourceID: "service:web:1",
 		Cause:      "network frontend config changed",
 		Container:  &ctr,
 	}, "")
-	disconnectNode := plan.addNode(Operation{
-		Type:       OpDisconnectNetwork,
+	disconnectNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpDisconnectNetwork,
 		ResourceID: "service:web:1",
 		Cause:      "network frontend recreate",
 		Container:  &ctr,
 		Name:       nw.Name,
 	}, "", stopNode)
-	removeNode := plan.addNode(Operation{
-		Type:       OpRemoveNetwork,
+	removeNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpRemoveNetwork,
 		ResourceID: "network:frontend",
 		Cause:      "config hash diverged",
 		Name:       nw.Name,
 	}, "", disconnectNode)
-	createNode := plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	createNode := plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:frontend",
 		Cause:      "recreate after config change",
 		Name:       nw.Name,
 		Network:    &nw,
 	}, "", removeNode)
-	plan.addNode(Operation{
-		Type:       OpConnectNetwork,
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpConnectNetwork,
 		ResourceID: "service:web:1",
 		Cause:      "network frontend recreate",
 		Container:  &ctr,
@@ -656,9 +651,9 @@ func TestExecutePlanCreateNetworkConflictIsSuccess(t *testing.T) {
 	apiClient.EXPECT().NetworkCreate(gomock.Any(), "test_default", gomock.Any()).
 		Return(client.NetworkCreateResult{}, conflictError{})
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateNetwork,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:default",
 		Cause:      "not found",
 		Name:       nw.Name,
@@ -674,25 +669,25 @@ func TestExecutePlanCreateNetworkConflictIsSuccess(t *testing.T) {
 func TestExecRemoveNetworkBestEffort(t *testing.T) {
 	newExec := func(t *testing.T) (*planExecutor, *mocks.MockAPIClient) {
 		svc, apiClient := newTestService(t)
-		return svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test"), nil), apiClient
+		return svc.newPlanExecutor(&types.Project{Name: "test"}, emptyObservedState("test")), apiClient
 	}
 
 	t.Run("best-effort ignores conflict", func(t *testing.T) {
 		exec, apiClient := newExec(t)
 		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, conflictError{})
-		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: true})
+		err := exec.execRemoveNetwork(t.Context(), planning.Operation{Type: planning.OpRemoveNetwork, Name: "old", BestEffort: true})
 		assert.NilError(t, err)
 	})
 	t.Run("best-effort propagates non-conflict", func(t *testing.T) {
 		exec, apiClient := newExec(t)
 		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, errors.New("transport failure"))
-		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: true})
+		err := exec.execRemoveNetwork(t.Context(), planning.Operation{Type: planning.OpRemoveNetwork, Name: "old", BestEffort: true})
 		assert.ErrorContains(t, err, "transport failure")
 	})
 	t.Run("mandatory removal propagates conflict", func(t *testing.T) {
 		exec, apiClient := newExec(t)
 		apiClient.EXPECT().NetworkRemove(gomock.Any(), "old", gomock.Any()).Return(client.NetworkRemoveResult{}, conflictError{})
-		err := exec.execRemoveNetwork(t.Context(), Operation{Type: OpRemoveNetwork, Name: "old", BestEffort: false})
+		err := exec.execRemoveNetwork(t.Context(), planning.Operation{Type: planning.OpRemoveNetwork, Name: "old", BestEffort: false})
 		assert.Assert(t, err != nil, "mandatory removal must propagate conflict")
 	})
 }
@@ -746,9 +741,9 @@ func TestExecutePlanCreateHookContainer(t *testing.T) {
 			return client.ContainerCreateResult{ID: "hook-1"}, nil
 		})
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateHookContainer,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateHookContainer,
 		ResourceID: "hook:web:pre_start:0",
 		Cause:      "pre_start hook",
 		Service:    &service,
@@ -775,9 +770,9 @@ func TestExecutePlanCreateHookContainerNoReplica(t *testing.T) {
 		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
 	}
 
-	plan := &Plan{}
-	plan.addNode(Operation{
-		Type:       OpCreateHookContainer,
+	plan := &planning.Plan{}
+	plan.AddNode(planning.Operation{
+		Type:       planning.OpCreateHookContainer,
 		ResourceID: "hook:web:pre_start:0",
 		Cause:      "pre_start hook",
 		Service:    &service,

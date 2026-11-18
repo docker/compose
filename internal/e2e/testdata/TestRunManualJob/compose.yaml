@@ -1,0 +1,33 @@
+services:
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+jobs:
+  migrate:
+    image: alpine
+    command: sh -c 'echo "migration done"'
+    # run is invoked twice below and must build the identical spec hash each time
+    environment:
+      A: "1"
+      B: "2"
+      C: "3"
+      D: "4"
+    triggers:
+      manual: true
+    depends_on:
+      db:
+        condition: service_started
+  backup:
+    image: alpine
+    command: echo backup
+    triggers:
+      schedule:
+        - cron: "0 3 * * *"
+  rotation:
+    image: alpine
+    command: echo rotation
+    triggers:
+      manual: false
+      schedule:
+        - cron: "0 3 1 * *"

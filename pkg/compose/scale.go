@@ -35,11 +35,7 @@ func (s *composeService) Scale(ctx context.Context, project *types.Project, opti
 		if len(services) == 0 {
 			services = slices.Collect(maps.Keys(options.Replicas))
 		}
-		err := s.create(ctx, project, api.CreateOptions{Services: services})
-		if err != nil {
-			return err
-		}
-		return s.start(ctx, project.Name, api.StartOptions{Project: project, Services: services}, nil)
+		return s.createAndStart(ctx, project, api.CreateOptions{Services: services})
 	}), "scale", s.events)
 }
 

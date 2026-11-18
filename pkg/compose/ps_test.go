@@ -26,6 +26,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 )
 
@@ -38,7 +39,7 @@ func TestPs(t *testing.T) {
 	assert.NilError(t, err)
 
 	listOpts := client.ContainerListOptions{
-		Filters: projectFilter(strings.ToLower(testProject)).Add("label", compose.ConfigHashLabel, oneOffFilter(false)),
+		Filters: naming.ProjectFilter(strings.ToLower(testProject)).Add("label", compose.ConfigHashLabel, oneOffFilter(false)),
 		All:     false,
 	}
 	c1, inspect1 := containerDetails("service1", "123", containerType.StateRunning, containerType.Healthy, 0)

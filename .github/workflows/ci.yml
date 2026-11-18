@@ -48,7 +48,7 @@ jobs:
           make ${{ matrix.target }}
 
   binary:
-    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a31d2311da4d55e21b978c1c52bab82ba97d51ee # v1.19.0
     permissions:
       contents: read # same as global permission
       id-token: write # for signing attestation(s) with GitHub OIDC Token
@@ -70,7 +70,7 @@ jobs:
     steps:
       -
         name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: /tmp/compose-output
           name: ${{ needs.binary.outputs.artifact-name }}
@@ -114,7 +114,7 @@ jobs:
           find bin/release -type f -exec file -e ascii -- {} +
       -
         name: Upload artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release
           path: ./bin/release/*
@@ -122,7 +122,7 @@ jobs:
 
   bin-image-test:
     if: github.event_name == 'pull_request'
-    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a31d2311da4d55e21b978c1c52bab82ba97d51ee # v1.19.0
     with:
       runner: amd64
       target: image-cross
@@ -140,7 +140,7 @@ jobs:
 
   relay-image-test:
     if: github.event_name == 'pull_request'
-    uses: docker/github-builder/.github/workflows/bake.yml@58cb9f5b71b1836d6f690c1e95effdeb9b98cb8a # v1.17.0
+    uses: docker/github-builder/.github/workflows/bake.yml@a31d2311da4d55e21b978c1c52bab82ba97d51ee # v1.19.0
     with:
       runner: amd64
       target: relay-image-cross
@@ -164,7 +164,7 @@ jobs:
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
       -
         name: Test
-        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         with:
           targets: test
           set: |
@@ -172,7 +172,7 @@ jobs:
             *.cache-to=type=gha,scope=test
       -
         name: Gather coverage data
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-data-unit
           path: bin/coverage/unit/
@@ -186,7 +186,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}, ${{ matrix.store }})
+    name: e2e (${{ matrix.mode }}, ${{ matrix.channel }}, ${{ matrix.store }}${{ matrix.name-suffix }})
     strategy:
       fail-fast: false
       matrix:
@@ -195,30 +195,47 @@ jobs:
           # bugs only manifest on one of them (graphdriver vs containerd)
           - mode: plugin
             engine: 29
+            version: latest
             channel: stable
             store: graphdriver
           - mode: plugin
             engine: 29
+            version: latest
             channel: stable
             store: containerd
           - mode: standalone
             engine: 29
+            version: latest
             channel: stable
             store: graphdriver
           - mode: standalone
             engine: 29
+            version: latest
             channel: stable
             store: containerd
 
-          # old stable (latest major - 1)
+          # old stable (latest major - 1). The archive source only resolves exact
+          # versions, so use the image source, which has a floating major tag.
           - mode: plugin
             engine: 28
+            version: type=image,tag=28
             channel: oldstable
             store: graphdriver
           - mode: standalone
             engine: 28
+            version: type=image,tag=28
             channel: oldstable
             store: graphdriver
+
+          # first engine shipping the jobs extension (disabled by default, not
+          # stable yet): the jobs scenarios needing it only run here
+          - mode: plugin
+            engine: 29-jobs
+            version: type=archive,version=29.10.0-rc.1,channel=test
+            channel: test
+            store: graphdriver
+            daemon-extra: ', "extensions": {"enable": ["org.mobyproject.jobs.v0"]}'
+            name-suffix: ', jobs extension'
     steps:
       - name: Prepare
         run: |
@@ -231,35 +248,28 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install Docker ${{ matrix.engine }}
-        run: |
-          sudo systemctl stop docker.service
-          sudo apt-get purge docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-ce-rootless-extras docker-buildx-plugin
-          sudo apt-get install curl
-          curl -fsSL https://test.docker.com -o get-docker.sh
-          sudo sh ./get-docker.sh --version ${{ matrix.engine }}
+        uses: docker/setup-docker-action@3f1ab1ab0e29231562e4db4ca600c1a49653bac6 # v5.7.0
+        with:
+          version: ${{ matrix.version }}
+          # the e2e framework forwards DOCKER_HOST to the commands it runs
+          set-host: true
+          daemon-config: |
+            {"features": {"containerd-snapshotter": ${{ matrix.store == 'containerd' }}}${{ matrix.daemon-extra }}}
 
       - name: Check Docker Version
-        run: docker --version
+        run: docker version
 
-      - name: Enable containerd image store
+      - name: Check containerd image store
         if: ${{ matrix.store == 'containerd' }}
-        run: |
-          sudo mkdir -p /etc/docker
-          if [ -s /etc/docker/daemon.json ]; then
-            jq -s '.[0] * .[1]' /etc/docker/daemon.json <(echo '{"features": {"containerd-snapshotter": true}}') \
-              | sudo tee /etc/docker/daemon.json.new > /dev/null
-            sudo mv /etc/docker/daemon.json.new /etc/docker/daemon.json
-          else
-            echo '{"features": {"containerd-snapshotter": true}}' | sudo tee /etc/docker/daemon.json > /dev/null
-          fi
-          sudo systemctl restart docker.service
-          docker info -f '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1
+        run: docker info -f '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
 
       - name: Set up Docker Model
         run: |
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh ./get-docker.sh --setup-repo
           sudo apt-get install docker-model-plugin
           docker model version
 
@@ -274,7 +284,7 @@ jobs:
         run: make example-provider
 
       - name: Build
-        uses: docker/bake-action@018cb6412ab401ebaa809aa5f85966b74628600f # v7.4.0
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
         with:
           source: .
           targets: binary-with-coverage
@@ -301,7 +311,7 @@ jobs:
 
       - name: Gather coverage data
         if: ${{ matrix.mode == 'plugin' }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-data-e2e-${{ env.MODE_ENGINE_PAIR }}
           path: bin/coverage/e2e/
@@ -335,13 +345,13 @@ jobs:
           go-version-file: '.go-version'
           check-latest: true
       - name: Download unit test coverage
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: coverage-data-unit
           path: coverage/unit
           merge-multiple: true
       - name: Download E2E test coverage
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: coverage-data-e2e-*
           path: coverage/e2e
@@ -350,7 +360,7 @@ jobs:
         run: |
           go tool covdata textfmt -i=./coverage/unit,./coverage/e2e -o ./coverage.txt
       - name: Store coverage report in GitHub Actions
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: go-covdata-txt
           path: ./coverage.txt
@@ -359,6 +369,33 @@ jobs:
         uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7.1.1
         with:
           files: ./coverage.txt
+
+  # Single required check for branch protection: it fails if any gating job
+  # failed, was cancelled or was skipped, except the pull_request-only image
+  # tests, which are expected to be skipped on push. Adding, renaming or
+  # splitting a job in the matrices above then needs no change to the
+  # repository settings. coverage and release are left out on purpose: the
+  # former depends on an external service, the latter only runs on tags.
+  ci-ok:
+    if: always()
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - validate
+      - binary
+      - binary-finalize
+      - bin-image-test
+      - relay-image-test
+      - test
+      - e2e
+    steps:
+      -
+        name: Check the result of the required jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$NEEDS" | jq -e 'to_entries | all(.[]; .value.result == "success" or ((.key | IN("bin-image-test", "relay-image-test")) and .value.result == "skipped"))' > /dev/null
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -373,7 +410,7 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       -
         name: Download artifacts
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ./bin/release
           name: release
@@ -389,7 +426,7 @@ jobs:
           find bin/release -type f -exec file -e ascii -- {} +
       -
         name: GitHub Release
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        uses: softprops/action-gh-release@8a0cd651e5b2365bd640854a3fa5dfc70e4875f3 # v3.0.4
         with:
           files: ./bin/release/*
           generate_release_notes: true

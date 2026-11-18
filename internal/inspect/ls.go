@@ -1,0 +1,121 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package inspect
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"slices"
+	"strings"
+
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+
+	"github.com/docker/compose/v5/pkg/api"
+)
+
+func (s *Service) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
+	list, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: make(client.Filters).Add("label", api.ProjectLabel).Add("label", api.ConfigHashLabel),
+		All:     options.All,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return containersToStacks(list.Items)
+}
+
+func containersToStacks(containers []container.Summary) ([]api.Stack, error) {
+	containersByLabel, keys, err := groupContainerByLabel(containers, api.ProjectLabel)
+	if err != nil {
+		return nil, err
+	}
+	var projects []api.Stack
+	for _, project := range keys {
+		configFiles, err := combinedConfigFiles(containersByLabel[project])
+		if err != nil {
+			logrus.Warn(err.Error())
+			configFiles = "N/A"
+		}
+
+		projects = append(projects, api.Stack{
+			ID:          project,
+			Name:        project,
+			Status:      combinedStatus(containerToState(containersByLabel[project])),
+			ConfigFiles: configFiles,
+		})
+	}
+	return projects, nil
+}
+
+func combinedConfigFiles(containers []container.Summary) (string, error) {
+	configFiles := []string{}
+
+	for _, ctr := range containers {
+		files, ok := ctr.Labels[api.ConfigFilesLabel]
+		if !ok {
+			return "", fmt.Errorf("no label %q set on container %q of compose project", api.ConfigFilesLabel, ctr.ID)
+		}
+
+		for f := range strings.SplitSeq(files, ",") {
+			if !slices.Contains(configFiles, f) {
+				configFiles = append(configFiles, f)
+			}
+		}
+	}
+
+	return strings.Join(configFiles, ","), nil
+}
+
+func containerToState(containers []container.Summary) []string {
+	statuses := []string{}
+	for _, ctr := range containers {
+		statuses = append(statuses, string(ctr.State))
+	}
+	return statuses
+}
+
+func combinedStatus(statuses []string) string {
+	nbByStatus := map[string]int{}
+	for _, status := range statuses {
+		nbByStatus[status]++
+	}
+	result := ""
+	for _, status := range slices.Sorted(maps.Keys(nbByStatus)) {
+		nb := nbByStatus[status]
+		if result != "" {
+			result += ", "
+		}
+		result += fmt.Sprintf("%s(%d)", status, nb)
+	}
+	return result
+}
+
+func groupContainerByLabel(containers []container.Summary, labelName string) (map[string][]container.Summary, []string, error) {
+	containersByLabel := map[string][]container.Summary{}
+	for _, ctr := range containers {
+		label, ok := ctr.Labels[labelName]
+		if !ok {
+			return nil, nil, fmt.Errorf("no label %q set on container %q of compose project", labelName, ctr.ID)
+		}
+		containersByLabel[label] = append(containersByLabel[label], ctr)
+	}
+	return containersByLabel, slices.Sorted(maps.Keys(containersByLabel)), nil
+}

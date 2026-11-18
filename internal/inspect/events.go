@@ -1,0 +1,90 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package inspect
+
+import (
+	"context"
+	"errors"
+	"io"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/moby/moby/client"
+
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/pkg/api"
+)
+
+func (s *Service) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
+	projectName = strings.ToLower(projectName)
+	res := s.backend.APIClient().Events(ctx, client.EventsListOptions{
+		Filters: naming.ProjectFilter(projectName),
+		Since:   options.Since,
+		Until:   options.Until,
+	})
+	for {
+		select {
+		case event := <-res.Messages:
+			// TODO: support other event types
+			if event.Type != "container" {
+				continue
+			}
+
+			if event.Actor.Attributes[api.OneoffLabel] == "True" {
+				// ignore
+				continue
+			}
+			service := event.Actor.Attributes[api.ServiceLabel]
+			if len(options.Services) > 0 && !slices.Contains(options.Services, service) {
+				continue
+			}
+
+			attributes := map[string]string{}
+			for k, v := range event.Actor.Attributes {
+				if strings.HasPrefix(k, "com.docker.compose.") {
+					continue
+				}
+				attributes[k] = v
+			}
+
+			timestamp := time.Unix(event.Time, 0)
+			if event.TimeNano != 0 {
+				timestamp = time.Unix(0, event.TimeNano)
+			}
+			err := options.Consumer(api.Event{
+				Timestamp:  timestamp,
+				Service:    service,
+				Container:  event.Actor.ID,
+				Status:     string(event.Action),
+				Attributes: attributes,
+			})
+			if err != nil {
+				return err
+			}
+
+		case err := <-res.Err:
+			// A bounded stream (e.g. events --until) ends with io.EOF once the
+			// daemon has sent every matching event. That is a normal completion,
+			// not a command failure.
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+	}
+}

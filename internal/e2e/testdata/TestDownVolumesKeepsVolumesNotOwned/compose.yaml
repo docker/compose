@@ -1,0 +1,15 @@
+services:
+  app:
+    image: alpine
+    command: sleep infinity
+    volumes:
+      - shared:/shared
+      - unmanaged:/unmanaged
+      - own:/own
+
+volumes:
+  shared:
+    name: ${SHARED_VOLUME}
+  unmanaged:
+    name: ${UNMANAGED_VOLUME}
+  own:

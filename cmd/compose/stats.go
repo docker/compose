@@ -18,14 +18,10 @@ package compose
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/docker/cli/cli/command"
 	"github.com/docker/cli/cli/command/container"
-	"github.com/moby/moby/client"
 	"github.com/spf13/cobra"
-
-	"github.com/docker/compose/v5/pkg/api"
 )
 
 type statsOptions struct {
@@ -34,6 +30,8 @@ type statsOptions struct {
 	format         string
 	noStream       bool
 	noTrunc        bool
+	allProjects    bool
+	aggregate      bool
 }
 
 func statsCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
@@ -45,6 +43,9 @@ func statsCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 		Short: "Display a live stream of container(s) resource usage statistics",
 		Args:  cobra.MaximumNArgs(1),
 		RunE: Adapt(func(ctx context.Context, args []string) error {
+			if opts.allProjects || opts.aggregate {
+				return runStatsProjects(ctx, dockerCli, opts, args)
+			}
 			return runStats(ctx, dockerCli, opts, args)
 		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
@@ -59,6 +60,8 @@ func statsCommand(p *ProjectOptions, dockerCli command.Cli) *cobra.Command {
 Refer to https://docs.docker.com/engine/cli/formatting/ for more information about formatting output with templates`)
 	flags.BoolVar(&opts.noStream, "no-stream", false, "Disable streaming stats and only pull the first result")
 	flags.BoolVar(&opts.noTrunc, "no-trunc", false, "Do not truncate output")
+	flags.BoolVar(&opts.allProjects, "all-projects", false, "Show the containers of all projects instead of the current one, with their project (only 'table' and 'json' formats)")
+	flags.BoolVar(&opts.aggregate, "aggregate", false, "Show one line per project, summing the resource usage of its containers (only 'table' and 'json' formats)")
 	return cmd
 }
 
@@ -67,17 +70,11 @@ func runStats(ctx context.Context, dockerCli command.Cli, opts statsOptions, ser
 	if err != nil {
 		return err
 	}
-	f := client.Filters{}
-	f.Add("label", fmt.Sprintf("%s=%s", api.ProjectLabel, name))
-
-	if len(service) > 0 {
-		f.Add("label", fmt.Sprintf("%s=%s", api.ServiceLabel, service[0]))
-	}
 	return container.RunStats(ctx, dockerCli, &container.StatsOptions{
 		All:      opts.all,
 		NoStream: opts.noStream,
 		NoTrunc:  opts.noTrunc,
 		Format:   opts.format,
-		Filters:  f,
+		Filters:  projectFilters(name, service),
 	})
 }

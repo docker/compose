@@ -1,0 +1,26 @@
+services:
+  web:
+    image: alpine
+    init: true
+    command: sleep infinity
+    depends_on: [db]
+    volumes:
+      - cache:/cache
+      - shared:/shared
+  db:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+  worker:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - shared:/shared
+
+volumes:
+  cache:
+  data:
+  shared:

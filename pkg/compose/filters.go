@@ -17,29 +17,14 @@
 package compose
 
 import (
-	"fmt"
 	"strconv"
 
-	"github.com/moby/moby/client"
-
+	"github.com/docker/compose/v5/internal/naming"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// labelFilter returns a label filter string of the form "key=value".
-func labelFilter(key, value string) string {
-	return fmt.Sprintf("%s=%s", key, value)
-}
-
-func projectFilter(projectName string) client.Filters {
-	return make(client.Filters).Add("label", labelFilter(api.ProjectLabel, projectName))
-}
-
-func serviceFilter(serviceName string) string {
-	return labelFilter(api.ServiceLabel, serviceName)
-}
-
 func networkFilter(name string) string {
-	return labelFilter(api.NetworkLabel, name)
+	return naming.LabelFilter(api.NetworkLabel, name)
 }
 
 func oneOffFilter(b bool) string {
@@ -47,11 +32,11 @@ func oneOffFilter(b bool) string {
 	if b {
 		v = "True"
 	}
-	return labelFilter(api.OneoffLabel, v)
+	return naming.LabelFilter(api.OneoffLabel, v)
 }
 
 func containerNumberFilter(index int) string {
-	return labelFilter(api.ContainerNumberLabel, strconv.Itoa(index))
+	return naming.LabelFilter(api.ContainerNumberLabel, strconv.Itoa(index))
 }
 
 // hookFilter returns a label filter that matches containers by hook type
@@ -60,5 +45,5 @@ func containerNumberFilter(index int) string {
 //
 //nolint:unparam
 func hookFilter(hookType string) string {
-	return labelFilter(api.HookLabel, hookType)
+	return naming.LabelFilter(api.HookLabel, hookType)
 }

@@ -18,8 +18,14 @@ package compose
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 
+	"github.com/moby/moby/api/types/jsonstream"
+
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -28,109 +34,36 @@ type progressFunc func(context.Context) error
 func Run(ctx context.Context, pf progressFunc, operation string, bus api.EventProcessor) error {
 	bus.Start(ctx, operation)
 	err := pf(ctx)
-	bus.Done(operation, err != nil)
+	bus.Done(operation, err == nil)
 	return err
-}
-
-// errorEvent creates a new Error Resource with message
-func errorEvent(id string, msg string) api.Resource {
-	return api.Resource{
-		ID:      id,
-		Status:  api.Error,
-		Text:    api.StatusError,
-		Details: msg,
-	}
 }
 
 // errorEventf creates a new Error Resource with format message
 func errorEventf(id string, msg string, args ...any) api.Resource {
-	return errorEvent(id, fmt.Sprintf(msg, args...))
+	return progress.Error(id, fmt.Sprintf(msg, args...))
 }
 
-// creatingEvent creates a new Create in progress Resource
-func creatingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusCreating)
-}
-
-// createdEvent creates a new Created (done) Resource
-func createdEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusCreated)
-}
-
-// stoppingEvent creates a new Stopping in progress Resource
-func stoppingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusStopping)
-}
-
-// stoppedEvent creates a new Stopped (done) Resource
-func stoppedEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusStopped)
-}
-
-// removingEvent creates a new Removing in progress Resource
-func removingEvent(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusRemoving)
-}
-
-// removedEvent creates a new removed (done) Resource
-func removedEvent(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusRemoved)
-}
-
-// buildingEvent creates a new Building in progress Resource
-func buildingEvent(id string) api.Resource {
-	return newEvent("Image "+id, api.Working, api.StatusBuilding)
-}
-
-// builtEvent creates a new built (done) Resource
-func builtEvent(id string) api.Resource {
-	return newEvent("Image "+id, api.Done, api.StatusBuilt)
-}
-
-// waiting creates a new waiting event; kept as a named func for use as a function value.
-func waiting(id string) api.Resource {
-	return newEvent(id, api.Working, api.StatusWaiting)
-}
-
-// healthy creates a new healthy event; kept as a named func for use as a function value.
-func healthy(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusHealthy)
-}
-
-// exited creates a new exited event; kept as a named func for use as a function value.
-func exited(id string) api.Resource {
-	return newEvent(id, api.Done, api.StatusExited)
-}
-
-// skippedEvent creates a new Skipped Resource; kept as a named func for use as a function value.
-func skippedEvent(id string, reason string) api.Resource {
-	return api.Resource{
-		ID:     id,
-		Status: api.Warning,
-		Text:   "Skipped: " + reason,
+// decodeProgressStream reads the JSON messages the daemon streams while pulling or
+// pushing an image, handing each of them to onMessage. It stops at the first
+// message carrying an error, which it returns.
+func decodeProgressStream(stream io.Reader, onMessage func(jsonstream.Message)) error {
+	dec := json.NewDecoder(stream)
+	for {
+		var jm jsonstream.Message
+		if err := dec.Decode(&jm); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		if jm.Error != nil {
+			return errors.New(jm.Error.Message)
+		}
+		onMessage(jm)
 	}
 }
 
-// newEvent new event
-func newEvent(id string, status api.EventStatus, text string, reason ...string) api.Resource {
-	r := api.Resource{
-		ID:     id,
-		Status: status,
-		Text:   text,
-	}
-	if len(reason) > 0 {
-		r.Details = reason[0]
-	}
-	return r
-}
-
-type ignore struct{}
-
-func (q *ignore) Start(_ context.Context, _ string) {
-}
-
-func (q *ignore) Done(_ string, _ bool) {
-}
-
-func (q *ignore) On(_ ...api.Resource) {
+// progressPercent is how far current is from total, which must be positive, in percent.
+func progressPercent(current, total int64) int {
+	return min(int(current*100/total), 100)
 }

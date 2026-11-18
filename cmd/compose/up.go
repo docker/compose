@@ -30,7 +30,6 @@ import (
 	xprogress "github.com/moby/buildkit/util/progress/progressui"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/cmd/formatter"
@@ -122,15 +121,14 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 			create.pullChanged = cmd.Flags().Changed("pull")
 			create.timeChanged = cmd.Flags().Changed("timeout")
 			up.navigationMenuChanged = cmd.Flags().Changed("menu")
-			if !cmd.Flags().Changed("remove-orphans") {
-				create.removeOrphans = utils.StringToBool(os.Getenv(ComposeRemoveOrphans))
-			}
+			create.removeOrphans = removeOrphansFromEnv(cmd.Flags(), create.removeOrphans)
 			return validateFlags(&up, &create)
 		}),
 		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
-			create.ignoreOrphans = utils.StringToBool(project.Environment[ComposeIgnoreOrphans])
-			if create.ignoreOrphans && create.removeOrphans {
-				return fmt.Errorf("cannot combine %s and --remove-orphans", ComposeIgnoreOrphans)
+			ignoreOrphans, err := resolveIgnoreOrphans(project, create.removeOrphans)
+			create.ignoreOrphans = ignoreOrphans
+			if err != nil {
+				return err
 			}
 			if len(up.attach) != 0 && up.attachDependencies {
 				return errors.New("cannot combine --attach and --attach-dependencies")
@@ -138,7 +136,7 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 
 			up.resolveNavigationMenu(dockerCli)
 
-			if !p.All && len(project.Services) == 0 {
+			if !p.All && len(project.Services) == 0 && !hasScheduledJobs(project) {
 				return errors.New("no service selected")
 			}
 
@@ -171,19 +169,12 @@ func upCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backend
 	flags.StringArrayVar(&up.attach, "attach", []string{}, "Restrict attaching to the specified services. Incompatible with --attach-dependencies.")
 	flags.StringArrayVar(&up.noAttach, "no-attach", []string{}, "Do not attach (stream logs) to the specified services")
 	flags.BoolVar(&up.attachDependencies, "attach-dependencies", false, "Automatically attach to log output of dependent services")
-	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy. Implies detached mode.")
+	flags.BoolVar(&up.wait, "wait", false, "Wait for services to be running|healthy, streaming their logs unless --detach is set")
 	flags.IntVar(&up.waitTimeout, "wait-timeout", 0, "Maximum duration in seconds to wait for the project to be running|healthy")
 	flags.BoolVarP(&up.watch, "watch", "w", false, "Watch source code and rebuild/refresh containers when files are updated.")
 	flags.BoolVar(&up.navigationMenu, "menu", false, "Enable interactive shortcuts when running attached. Incompatible with --detach. Can also be enable/disable by setting COMPOSE_MENU environment var.")
 	flags.BoolVarP(&create.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
-	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		// assumeYes was introduced by mistake as `--y`
-		if name == "y" {
-			logrus.Warn("--y is deprecated, please use --yes instead")
-			name = "yes"
-		}
-		return pflag.NormalizedName(name)
-	})
+	flags.SetNormalizeFunc(normalizeYesFlag)
 	return upCmd
 }
 
@@ -197,16 +188,10 @@ func validateFlags(up *upOptions, create *createOptions) error {
 	if up.cascadeStop && up.cascadeFail {
 		return errors.New("--abort-on-container-failure cannot be combined with --abort-on-container-exit")
 	}
-	if up.wait {
-		if up.attachDependencies || up.cascadeStop || len(up.attach) > 0 {
-			return errors.New("--wait cannot be combined with --abort-on-container-exit, --attach or --attach-dependencies")
-		}
-		up.Detach = true
-	}
 	if create.Build && create.noBuild {
 		return errors.New("--build and --no-build are incompatible")
 	}
-	if up.Detach && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0 || up.watch) {
+	if (up.Detach || up.wait) && (up.attachDependencies || up.cascadeStop || up.cascadeFail || len(up.attach) > 0 || up.watch) {
 		if up.wait {
 			return errors.New("--wait cannot be combined with --abort-on-container-exit, --abort-on-container-failure, --attach, --attach-dependencies or --watch")
 		} else {
@@ -242,9 +227,6 @@ func runUp(
 		return err
 	}
 
-	if err := rejectScheduledJobs(project); err != nil {
-		return err
-	}
 	warnIgnoredJobs(project)
 
 	err := createOptions.Apply(project)
@@ -302,37 +284,15 @@ func runUp(
 
 	var consumer api.LogConsumer
 	var attach []string
-	if !upOptions.Detach {
+	// a project with no service, only scheduled jobs to register, has nothing
+	// to follow: attaching would pick up the containers of the jobs' runs
+	if !upOptions.Detach && len(project.Services) > 0 {
 		consumer = formatter.NewLogConsumer(ctx, dockerCli.Out(), dockerCli.Err(), !upOptions.noColor, !upOptions.noPrefix, upOptions.timestamp)
 
-		var attachSet utils.Set[string]
-		if len(upOptions.attach) != 0 {
-			// services are passed explicitly with --attach, verify they're valid and then use them as-is
-			attachSet = utils.NewSet(upOptions.attach...)
-			unexpectedSvcs := attachSet.Diff(utils.NewSet(project.ServiceNames()...))
-			if len(unexpectedSvcs) != 0 {
-				return fmt.Errorf("cannot attach to services not included in up: %s", strings.Join(unexpectedSvcs.Elements(), ", "))
-			}
-		} else {
-			// mark services being launched (and potentially their deps) for attach
-			// if they didn't opt-out via Compose YAML
-			attachSet = utils.NewSet[string]()
-			var dependencyOpt types.DependencyOption = types.IgnoreDependencies
-			if upOptions.attachDependencies {
-				dependencyOpt = types.IncludeDependencies
-			}
-			if err := project.ForEachService(services, func(serviceName string, s *types.ServiceConfig) error {
-				if s.Attach == nil || *s.Attach {
-					attachSet.Add(serviceName)
-				}
-				return nil
-			}, dependencyOpt); err != nil {
-				return err
-			}
+		attach, err = upOptions.attachedServices(project, services)
+		if err != nil {
+			return err
 		}
-		// filter out any services that have been explicitly marked for ignore with `--no-attach`
-		attachSet.RemoveAll(upOptions.noAttach...)
-		attach = attachSet.Elements()
 	}
 
 	var timeout time.Duration
@@ -356,34 +316,78 @@ func runUp(
 	})
 }
 
-// warnIgnoredJobs names the declared jobs up will not act on: manual jobs
-// wait for an explicit `compose run <job>` trigger.
+// attachedServices returns the services whose logs `up` follows: the ones
+// passed explicitly with --attach, or else the services being launched (and
+// their dependencies with --attach-dependencies) that didn't opt out through
+// the Compose file, minus the ones excluded with --no-attach.
+func (opts upOptions) attachedServices(project *types.Project, services []string) ([]string, error) {
+	var attachSet utils.Set[string]
+	if len(opts.attach) != 0 {
+		// services are passed explicitly with --attach, verify they're valid and then use them as-is
+		attachSet = utils.NewSet(opts.attach...)
+		unexpectedSvcs := attachSet.Diff(utils.NewSet(project.ServiceNames()...))
+		if len(unexpectedSvcs) != 0 {
+			return nil, fmt.Errorf("cannot attach to services not included in up: %s", strings.Join(unexpectedSvcs.Elements(), ", "))
+		}
+	} else {
+		// mark services being launched (and potentially their deps) for attach
+		// if they didn't opt-out via Compose YAML
+		attachSet = utils.NewSet[string]()
+		var dependencyOpt types.DependencyOption = types.IgnoreDependencies
+		if opts.attachDependencies {
+			dependencyOpt = types.IncludeDependencies
+		}
+		if err := project.ForEachService(services, func(serviceName string, s *types.ServiceConfig) error {
+			if s.Attach == nil || *s.Attach {
+				attachSet.Add(serviceName)
+			}
+			return nil
+		}, dependencyOpt); err != nil {
+			return nil, err
+		}
+	}
+	// filter out any services that have been explicitly marked for ignore with `--no-attach`
+	attachSet.RemoveAll(opts.noAttach...)
+	return attachSet.Elements(), nil
+}
+
+// warnIgnoredJobs names the declared manual jobs up will not act on: they
+// wait for an explicit `compose run <job>` trigger. Scheduled jobs are not
+// ignored — they are registered with the engine (see pkg/compose Up).
 func warnIgnoredJobs(project *types.Project) {
-	jobs := project.Jobs
-	if len(jobs) == 0 {
+	names := manualJobNames(project)
+	if len(names) == 0 {
 		return
 	}
-	names := make([]string, 0, len(jobs))
-	for name := range jobs {
-		names = append(names, name)
-	}
-	sort.Strings(names)
 	logrus.Warnf("jobs are not started by up; trigger them with `docker compose run`: %s", strings.Join(names, ", "))
 }
 
-// rejectScheduledJobs refuses to bring a project up when it declares active
-// scheduled jobs: silently not scheduling them would break the user's
-// expectations, unlike manual jobs which simply wait for an explicit trigger.
-func rejectScheduledJobs(project *types.Project) error {
+// manualJobNames returns the sorted names of the project's jobs that up
+// leaves untouched: a job with a schedule is registered with the engine
+// (see pkg/compose Up), so only jobs without one wait for an explicit
+// `compose run <job>` trigger — unless they opt out with `manual: false`.
+func manualJobNames(project *types.Project) []string {
 	names := make([]string, 0, len(project.Jobs))
 	for name, job := range project.Jobs {
-		if job.Triggers != nil && len(job.Triggers.Schedule) > 0 {
-			names = append(names, name)
+		if compose.HasSchedule(job) {
+			continue
 		}
-	}
-	if len(names) == 0 {
-		return nil
+		if compose.ManualTriggerDisabled(job) {
+			continue
+		}
+		names = append(names, name)
 	}
 	sort.Strings(names)
-	return fmt.Errorf("scheduled jobs are not supported in this version: %s", strings.Join(names, ", "))
+	return names
+}
+
+// hasScheduledJobs reports whether up has jobs to register, which is enough to
+// run on a project that has no service.
+func hasScheduledJobs(project *types.Project) bool {
+	for _, job := range project.Jobs {
+		if compose.HasSchedule(job) {
+			return true
+		}
+	}
+	return false
 }

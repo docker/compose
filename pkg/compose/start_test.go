@@ -19,12 +19,14 @@
 package compose
 
 import (
+	"archive/tar"
 	"context"
-	"fmt"
-	"net"
+	"io"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -38,12 +40,9 @@ import (
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
-// These tests characterize the imperative start path (startService,
-// startServiceContainer) before it converges into the plan engine (#14081):
-// which containers are started, in which order relative to file injection and
-// hooks, when pre_start runs, and which progress events are emitted.
-
 // recordingEventProcessor captures progress events for sequence assertions.
+// Shared by tests elsewhere in the package that exercise a single container
+// operation in isolation (e.g. stopContainer's relay guard in down_test.go).
 type recordingEventProcessor struct {
 	mu     sync.Mutex
 	events []api.Resource
@@ -84,6 +83,14 @@ func (r *recordingEventProcessor) contains(entry string) bool {
 // so "no expectation" doubles as a "no daemon interaction" assertion.
 func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *recordingEventProcessor) {
 	t.Helper()
+	return newStartTestServiceWithConfig(t, &configfile.ConfigFile{})
+}
+
+// newStartTestServiceWithConfig is newStartTestService for a given CLI
+// configuration, the source of the registry credentials use_api_socket hands
+// over.
+func newStartTestServiceWithConfig(t *testing.T, config *configfile.ConfigFile) (*composeService, *mocks.MockAPIClient, *recordingEventProcessor) {
+	t.Helper()
 	mockCtrl := gomock.NewController(t)
 	t.Cleanup(mockCtrl.Finish)
 	apiClient := mocks.NewMockAPIClient(mockCtrl)
@@ -94,7 +101,7 @@ func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *
 	apiClient.EXPECT().ClientVersion().Return("1.44").AnyTimes()
 	// the generic pre_start inheritance goes through getCreateConfigs, which
 	// reads the CLI configuration and the daemon host
-	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+	cli.EXPECT().ConfigFile().Return(config).AnyTimes()
 	apiClient.EXPECT().DaemonHost().Return("unix:///var/run/docker.sock").AnyTimes()
 
 	rec := &recordingEventProcessor{}
@@ -103,291 +110,192 @@ func newStartTestService(t *testing.T) (*composeService, *mocks.MockAPIClient, *
 	return svc.(*composeService), apiClient, rec
 }
 
-// runningContainer/stoppedContainer build container summaries the way the
-// daemon reports project containers: canonical name, service and
+// serviceContainer builds a running container summary the way the daemon
+// reports a project's first replica: canonical name, service and
 // container-number labels.
-func serviceContainer(service string, num int, state container.ContainerState) container.Summary {
-	name := "prj-" + service + "-" + strconv.Itoa(num)
+func serviceContainer(service string) container.Summary {
+	name := "prj-" + service + "-1"
 	return container.Summary{
 		ID:    name + "-id",
 		Names: []string{"/" + name},
-		State: state,
+		State: container.StateRunning,
 		Labels: map[string]string{
 			api.ServiceLabel:         service,
-			api.ContainerNumberLabel: strconv.Itoa(num),
+			api.ContainerNumberLabel: "1",
 		},
 	}
 }
 
-// TestStart_ConcurrencyIsBoundedAcrossServices guards against the same
-// per-service budget leak fixed on restart.go/down.go/stop.go:
-// InDependencyOrder dispatches independent services concurrently, and
-// startService's own per-container loop is sequential, so a missing
-// node-level maxConcurrency option left the dispatch itself unbounded.
-// ContainerStart is serialized process-wide by startMx regardless of this
-// bound, so the injected-secret copy (which isn't) is used as the observable
-// signal instead.
-func TestStart_ConcurrencyIsBoundedAcrossServices(t *testing.T) {
-	svc, apiClient := newTestService(t, WithMaxConcurrency(1))
+// stoppedServiceContainer builds a container summary of the given state for
+// replica num of service, carrying the labels collectObservedState reads.
+func stoppedServiceContainer(service string, num int, state container.ContainerState) container.Summary {
+	ctr := serviceContainer(service)
+	name := "prj-" + service + "-" + strconv.Itoa(num)
+	ctr.ID = name + "-id"
+	ctr.Names = []string{"/" + name}
+	ctr.State = state
+	ctr.Labels[api.ProjectLabel] = "prj"
+	ctr.Labels[api.ContainerNumberLabel] = strconv.Itoa(num)
+	return ctr
+}
 
-	const numServices = 4
-	project := &types.Project{Name: "prj", Services: types.Services{}, Secrets: types.Secrets{}}
-	var containers []container.Summary
-	for i := range numServices {
-		name := fmt.Sprintf("svc%d", i)
-		secretName := fmt.Sprintf("secret%d", i)
-		project.Secrets[secretName] = types.SecretConfig{Name: secretName, Content: "shh"}
-		project.Services[name] = types.ServiceConfig{
-			Name:          name,
-			ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: secretName}}},
-		}
-		containers = append(containers, testContainer(name, fmt.Sprintf("c%d", i), false))
-	}
+// TestStart_NoOpStartIsSilentAndOnlyListsContainers pins how start() wires
+// its plan: the observation is scoped to Start (only the container listing
+// reaches the daemon -- gomock fails on any network or volume listing), the
+// plan is start-only, and a no-op start (everything already running) starts
+// nothing and emits no event, not even the synthetic "Running" ones
+// up/create report.
+func TestStart_NoOpStartIsSilentAndOnlyListsContainers(t *testing.T) {
+	svc, apiClient, rec := newStartTestService(t)
+
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
 
 	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{Items: containers}, nil)
+		Return(client.ContainerListResult{Items: []container.Summary{
+			stoppedServiceContainer("web", 1, container.StateRunning),
+		}}, nil)
 
-	tracker := &peakConcurrencyTracker{}
-	apiClient.EXPECT().CopyToContainer(gomock.Any(), gomock.Any(), gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
-			tracker.enter()
-			time.Sleep(20 * time.Millisecond) // widen the window for a concurrency violation to show up
-			tracker.leave()
-			return client.CopyToContainerResult{}, nil
-		}).
-		Times(numServices)
-
-	apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).
-		Times(numServices)
-
-	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project}, nil)
+	err := svc.start(t.Context(), "prj", api.StartOptions{Project: project})
 	assert.NilError(t, err)
-	assert.Equal(t, tracker.Peak(), 1, "start must never dispatch more than maxConcurrency services concurrently")
+	assert.Equal(t, len(rec.summary()), 0, "a no-op start must be silent: %v", rec.summary())
 }
 
-func TestStartService_AlreadyRunningIsSilent(t *testing.T) {
-	svc, _, rec := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{Name: "web"}
-	containers := Containers{serviceContainer("web", 1, container.StateRunning)}
-
-	// No expectation registered: any ContainerStart (or other call) fails.
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
-	assert.Equal(t, len(rec.summary()), 0)
-}
-
-func TestStartService_ZeroReplicasIsNoop(t *testing.T) {
-	svc, _, _ := newStartTestService(t)
-
-	zero := 0
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{Name: "web", Deploy: &types.DeployConfig{Replicas: &zero}}
-
-	// Even with no containers at all, a zero-replicas service is not an error.
-	err := svc.startService(t.Context(), project, service, nil, nil, 0)
-	assert.NilError(t, err)
-}
-
-func TestStartService_NoContainers(t *testing.T) {
-	svc, _, _ := newStartTestService(t)
-	project := &types.Project{Name: "prj"}
-
-	t.Run("scaled service is an error", func(t *testing.T) {
-		service := types.ServiceConfig{Name: "web"}
-		err := svc.startService(t.Context(), project, service, nil, nil, 0)
-		assert.Error(t, err, `service "web" has no container to start`)
-	})
-
-	t.Run("scale zero is a no-op", func(t *testing.T) {
-		service := types.ServiceConfig{Name: "web", Scale: intPtr(0)}
-		err := svc.startService(t.Context(), project, service, nil, nil, 0)
-		assert.NilError(t, err)
-	})
-}
-
-// TestStartService_StartsOnlyStoppedReplicas locks three behaviors at once:
-// only non-running replicas of the target service are started, containers of
-// other services in the list are untouched, and pre_start does NOT run when at
-// least one replica is already running.
-func TestStartService_StartsOnlyStoppedReplicas(t *testing.T) {
-	svc, apiClient, rec := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:     "web",
-		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
-	}
-	running := serviceContainer("web", 1, container.StateRunning)
-	stopped := serviceContainer("web", 2, container.StateExited)
-	other := serviceContainer("db", 1, container.StateExited)
-	containers := Containers{running, stopped, other}
-
-	// Only the stopped web replica is started; no ContainerCreate expectation
-	// means any pre_start hook execution fails the test.
-	apiClient.EXPECT().ContainerStart(gomock.Any(), stopped.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil)
-
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
-
-	assert.DeepEqual(t, rec.summary(), []string{
-		"Container prj-web-2: Starting",
-		"Container prj-web-2: Started",
-	})
-}
-
-// TestStartService_PreStartRunsBeforeReplicas locks the pre_start gating: with
-// no replica running, the hooks run exactly once — executing the runner
-// container the reconciliation plan prepared — and before any service
-// container is started.
-func TestStartService_PreStartRunsBeforeReplicas(t *testing.T) {
+// TestStart_WaitTimeoutBoundsDependencyWaits pins that start() hands
+// StartOptions.WaitTimeout to the executor: --wait-timeout bounds a
+// depends_on wait even without --wait, and expiring reports the dependency
+// timeout while the dependent is never started.
+func TestStart_WaitTimeoutBoundsDependencyWaits(t *testing.T) {
 	svc, apiClient, _ := newStartTestService(t)
 
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:          "web",
-		ContainerSpec: types.ContainerSpec{Image: "alpine"},
-		PreStart:      []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
-	}
+	db := types.ServiceConfig{Name: "db", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	db.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	web.DependsOn = types.DependsOnConfig{"db": {Condition: types.ServiceConditionHealthy, Required: true}}
+	project := &types.Project{Name: "prj", Services: types.Services{"db": db, "web": web}}
 
-	replica2 := serviceContainer("web", 2, container.StateExited)
-	replica1 := serviceContainer("web", 1, container.StateExited)
-	// Listed out of order on purpose: replica 2 first.
-	containers := Containers{replica2, replica1}
+	dbCtr := stoppedServiceContainer("db", 1, container.StateRunning)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{
+			dbCtr,
+			stoppedServiceContainer("web", 1, container.StateExited),
+		}}, nil)
+	// db never becomes healthy; no ContainerStart expectation for web
+	apiClient.EXPECT().ContainerInspect(gomock.Any(), dbCtr.ID, gomock.Any()).
+		Return(client.ContainerInspectResult{Container: container.InspectResponse{
+			ID:   dbCtr.ID,
+			Name: "/prj-db-1",
+			State: &container.State{
+				Status: container.StateRunning,
+				Health: &container.Health{Status: container.Starting},
+			},
+			Config: &container.Config{Healthcheck: &container.HealthConfig{Test: []string{"CMD", "true"}}},
+		}}, nil).AnyTimes()
 
-	// runPreStart looks up the runner containers prepared by the plan.
-	runnerScan := apiClient.EXPECT().
-		ContainerList(gomock.Any(), gomock.Any()).
-		Return(client.ContainerListResult{Items: []container.Summary{runnerSummary("hook-1", 0)}}, nil)
-
-	hookWait := apiClient.EXPECT().ContainerWait(gomock.Any(), "hook-1", gomock.Any()).
-		Return(waitResultExit(0)).After(runnerScan)
-	// streamPreStartLogs always opens ContainerLogs (even with nil listener) so
-	// the tail is available for failure error messages.
-	hookLogs := apiClient.EXPECT().ContainerLogs(gomock.Any(), "hook-1", gomock.Any()).
-		Return(emptyLogs(), nil).After(hookWait)
-	hookStart := apiClient.EXPECT().ContainerStart(gomock.Any(), "hook-1", gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(hookLogs)
-	// On success the hook container is removed explicitly (AutoRemove is false).
-	hookRemove := apiClient.EXPECT().
-		ContainerRemove(gomock.Any(), "hook-1", client.ContainerRemoveOptions{RemoveVolumes: true}).
-		Return(client.ContainerRemoveResult{}, nil).After(hookStart)
-
-	// Replicas are then started sequentially, in list order, after the hook.
-	start2 := apiClient.EXPECT().ContainerStart(gomock.Any(), replica2.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(hookRemove)
-	apiClient.EXPECT().ContainerStart(gomock.Any(), replica1.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil).After(start2)
-
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
+	// the outer deadline only turns a missing wait-timeout into a prompt
+	// failure instead of a hang
+	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Second)
+	defer cancel()
+	err := svc.start(ctx, "prj", api.StartOptions{Project: project, WaitTimeout: 200 * time.Millisecond})
+	assert.Error(t, err, "timeout waiting for dependencies")
 }
 
-// A relay stands in for the service on the network but is a shell-less
-// scratch binary: pre_start has no volumes or process inside it for the hook
-// container's VolumesFrom to share. No ContainerCreate expectation is set:
-// gomock fails the test if the hook still runs against the relay.
-func TestStartService_PreStartSkippedWhenLowestIsRelay(t *testing.T) {
-	svc, apiClient, _ := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:     "db",
-		PreStart: []types.PreStartHook{{ContainerSpec: types.ContainerSpec{Command: types.ShellCommand{"init"}}}},
+// TestStart_UseAPISocketServiceGetsItsConfigFile pins that start() applies
+// use_api_socket to the project it works on: the config file the option adds is
+// injected when a container starts, from that project, so a container created
+// beforehand and only started here (`create` then `start`) would otherwise get
+// DOCKER_CONFIG pointing at a file that was never created. The caller's project
+// is left as it was, whether or not it has the maps the option writes into: the
+// project `compose start` loads has no service Environment, a programmatic one
+// no Configs.
+func TestStart_UseAPISocketServiceGetsItsConfigFile(t *testing.T) {
+	tests := []struct {
+		name    string
+		env     types.MappingWithEquals
+		configs types.Configs
+	}{
+		{name: "project without environment nor configs maps"},
+		{name: "project with empty maps", env: types.MappingWithEquals{}, configs: types.Configs{}},
 	}
-	relay := serviceContainer("db", 1, container.StateExited)
-	relay.Labels[api.RelayLabel] = "abc123"
-	containers := Containers{relay}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient, _ := newStartTestServiceWithConfig(t, hostRegistryConfig())
+			info := &countingContextInfo{}
+			svc.contextInfo = info
 
-	apiClient.EXPECT().ContainerStart(gomock.Any(), relay.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil)
+			web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine", UseAPISocket: true, Environment: tt.env}}
+			project := &types.Project{Name: "prj", Services: types.Services{"web": web}, Configs: tt.configs}
 
-	err := svc.startService(t.Context(), project, service, containers, nil, 0)
-	assert.NilError(t, err)
+			ctr := serviceContainer("web")
+			ctr.State = container.StateCreated
+			ctr.Labels[api.ProjectLabel] = "prj"
+			apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+				Return(client.ContainerListResult{Items: []container.Summary{ctr}}, nil)
+
+			var injected []string
+			copied := apiClient.EXPECT().CopyToContainer(gomock.Any(), ctr.ID, gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, opts client.CopyToContainerOptions) (client.CopyToContainerResult, error) {
+					tr := tar.NewReader(opts.Content)
+					for {
+						header, err := tr.Next()
+						if err == io.EOF {
+							break
+						}
+						assert.NilError(t, err)
+						injected = append(injected, header.Name)
+					}
+					return client.CopyToContainerResult{}, nil
+				})
+			apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
+				Return(client.ContainerStartResult{}, nil).After(copied)
+
+			err := svc.start(t.Context(), "prj", api.StartOptions{Project: project})
+
+			assert.NilError(t, err)
+			assert.DeepEqual(t, injected, []string{"/run/secrets/docker/config.json"})
+			assert.Assert(t, info.osTypeCalls.Load() > 0, "use_api_socket must have been applied")
+			assert.Equal(t, len(project.Configs), 0, "the caller's configs must not be written to")
+			assert.Equal(t, len(project.Services["web"].Environment), 0, "the caller's service environment must not be written to")
+		})
+	}
 }
 
-// TestStartServiceContainer_Order locks the per-container start sequence:
-// secret/config files are copied in before ContainerStart, post_start hooks
-// run after it, and the Started event is only emitted once the hooks are done.
-func TestStartServiceContainer_Order(t *testing.T) {
-	svc, apiClient, rec := newStartTestService(t)
+// countingContextInfo is a Linux engine's context that counts how often
+// useAPISocket got past its early return, which tells that it was applied.
+type countingContextInfo struct{ osTypeCalls atomic.Int32 }
 
-	content := "s3cret"
-	project := &types.Project{
-		Name: "prj",
-		Secrets: types.Secrets{
-			"token": types.SecretConfig{Name: "token", Content: content},
-		},
-	}
-	service := types.ServiceConfig{
-		Name: "web",
+func (*countingContextInfo) CurrentContext() string { return "default" }
+func (c *countingContextInfo) ServerOSType() string {
+	c.osTypeCalls.Add(1)
+	return "linux"
+}
+func (*countingContextInfo) BuildKitEnabled() (bool, error) { return false, nil }
 
-		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"notify"}}}, ContainerSpec: types.ContainerSpec{Secrets: []types.ServiceSecretConfig{{Source: "token"}}},
-	}
-	ctr := serviceContainer("web", 1, container.StateExited)
+// TestStart_AProjectAlreadyRewrittenIsInjectedOnce pins that start() does not
+// rewrite twice a project that already went through use_api_socket, as the one
+// `run` hands to the dependencies it starts: the config file would be injected
+// once per duplicated entry.
+func TestStart_AProjectAlreadyRewrittenIsInjectedOnce(t *testing.T) {
+	svc, apiClient, _ := newStartTestServiceWithConfig(t, hostRegistryConfig())
+	svc.contextInfo = &countingContextInfo{}
 
-	inject := apiClient.EXPECT().CopyToContainer(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.CopyToContainerResult{}, nil)
-	start := apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.ContainerStartOptions) (client.ContainerStartResult, error) {
-			assert.Assert(t, rec.contains("Container prj-web-1: Starting"))
-			assert.Assert(t, !rec.contains("Container prj-web-1: Started"))
-			return client.ContainerStartResult{}, nil
-		}).After(inject)
-
-	// post_start hook runs as an exec after the container started.
-	execCreate := apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.ExecCreateResult{ID: "exec-1"}, nil).After(start)
-	serverConn, clientConn := net.Pipe()
-	_ = serverConn.Close()
-	execAttach := apiClient.EXPECT().ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil).
-		After(execCreate)
-	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
-		DoAndReturn(func(context.Context, string, client.ExecInspectOptions) (client.ExecInspectResult, error) {
-			// Started must not be emitted before post_start completed.
-			assert.Assert(t, !rec.contains("Container prj-web-1: Started"))
-			return client.ExecInspectResult{ExitCode: 0}, nil
-		}).After(execAttach)
-
-	err := svc.startServiceContainer(t.Context(), project, service, ctr, nil)
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine", UseAPISocket: true, Environment: types.MappingWithEquals{}}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}, Configs: types.Configs{}}
+	project, err := svc.useAPISocket(project)
 	assert.NilError(t, err)
 
-	assert.DeepEqual(t, rec.summary(), []string{
-		"Container prj-web-1: Starting",
-		"Container prj-web-1: Started",
-	})
-}
-
-// TestStartServiceContainer_FailedPostStartBlocksStarted locks that a failing
-// post_start hook fails the start and leaves the Started event unemitted.
-func TestStartServiceContainer_FailedPostStart(t *testing.T) {
-	svc, apiClient, rec := newStartTestService(t)
-
-	project := &types.Project{Name: "prj"}
-	service := types.ServiceConfig{
-		Name:      "web",
-		PostStart: []types.ServiceHook{{Command: types.ShellCommand{"fail"}}},
-	}
-	ctr := serviceContainer("web", 1, container.StateExited)
-
+	ctr := serviceContainer("web")
+	ctr.State = container.StateCreated
+	ctr.Labels[api.ProjectLabel] = "prj"
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: []container.Summary{ctr}}, nil)
+	copied := apiClient.EXPECT().CopyToContainer(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.CopyToContainerResult{}, nil).Times(1)
 	apiClient.EXPECT().ContainerStart(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.ContainerStartResult{}, nil)
-	apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
-		Return(client.ExecCreateResult{ID: "exec-1"}, nil)
-	serverConn, clientConn := net.Pipe()
-	_ = serverConn.Close()
-	apiClient.EXPECT().ExecAttach(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecAttachResult{HijackedResponse: client.NewHijackedResponse(clientConn, "")}, nil)
-	apiClient.EXPECT().ExecInspect(gomock.Any(), "exec-1", gomock.Any()).
-		Return(client.ExecInspectResult{ExitCode: 3}, nil)
+		Return(client.ContainerStartResult{}, nil).After(copied)
 
-	err := svc.startServiceContainer(t.Context(), project, service, ctr, nil)
-	assert.ErrorContains(t, err, "hook exited with status 3")
-	assert.Assert(t, !rec.contains("Container prj-web-1: Started"))
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project}))
+	assert.Equal(t, len(project.Services["web"].Configs), 1, "the project handed to start was rewritten again")
 }
 
 // TestGetDependencyCondition locks the --wait condition selection: a service
@@ -408,4 +316,170 @@ func TestGetDependencyCondition(t *testing.T) {
 
 	assert.Equal(t, getDependencyCondition(oneShot, project), types.ServiceConditionCompletedSuccessfully)
 	assert.Equal(t, getDependencyCondition(web, project), ServiceConditionRunningOrHealthy)
+}
+
+// inspectResultOf builds the inspection of a container. Its healthcheck is the
+// one given, or a trivial one when it has a health state and none is given.
+func inspectResultOf(id, name string, status container.ContainerState, exitCode int, health *container.Health, healthcheck *container.HealthConfig) client.ContainerInspectResult {
+	config := &container.Config{Healthcheck: healthcheck}
+	if health != nil && healthcheck == nil {
+		config.Healthcheck = &container.HealthConfig{Test: []string{"CMD", "true"}}
+	}
+	return client.ContainerInspectResult{Container: container.InspectResponse{
+		ID:     id,
+		Name:   "/" + name,
+		Config: config,
+		State:  &container.State{Status: status, ExitCode: exitCode, Health: health},
+	}}
+}
+
+// TestStart_WaitVerifiesTheApplicationIsReady pins what --wait adds to start:
+// once the containers are started, every service has to be up (running, and
+// healthy when it has a healthcheck) before start returns, or start fails
+// naming the --wait-timeout that elapsed. Without --wait, start returns as soon
+// as the containers are started, and checks nothing.
+func TestStart_WaitVerifiesTheApplicationIsReady(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+	web.HealthCheck = &types.HealthCheckConfig{Test: []string{"CMD", "true"}}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
+	webCtr := stoppedServiceContainer("web", 1, container.StateRunning)
+
+	newService := func(t *testing.T, health container.HealthStatus) *composeService {
+		svc, apiClient, _ := newStartTestService(t)
+		apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+			Return(client.ContainerListResult{Items: []container.Summary{webCtr}}, nil).AnyTimes()
+		apiClient.EXPECT().ContainerInspect(gomock.Any(), webCtr.ID, gomock.Any()).AnyTimes().
+			Return(inspectResultOf(webCtr.ID, "prj-web-1", container.StateRunning, 0, &container.Health{Status: health}, nil), nil)
+		return svc
+	}
+
+	t.Run("a service not ready in time fails the start", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			svc := newService(t, container.Starting)
+
+			err := svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 2 * time.Second})
+
+			assert.Error(t, err, "application not healthy after 2s")
+		})
+	})
+
+	t.Run("a service that is ready lets it succeed", func(t *testing.T) {
+		synctest.Test(t, func(t *testing.T) {
+			svc := newService(t, container.Healthy)
+
+			assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 5 * time.Second}))
+		})
+	})
+
+	t.Run("without --wait nothing is verified", func(t *testing.T) {
+		svc := newService(t, container.Starting)
+
+		assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project}))
+	})
+}
+
+// TestStart_WaitSatisfiesAOneShotServiceByItsCompletion pins that the --wait
+// verification expects a service that others depend on with
+// service_completed_successfully to have exited with 0, not to be running: a
+// one-shot service is done once it has run, and would otherwise make --wait
+// fail forever. One that completes with an error code fails it, naming the
+// service and the code.
+func TestStart_WaitSatisfiesAOneShotServiceByItsCompletion(t *testing.T) {
+	for _, tt := range []struct {
+		name     string
+		exitCode int
+		err      string
+	}{
+		{name: "the one-shot service completed", exitCode: 0},
+		{name: "the one-shot service failed", exitCode: 3, err: `service "init" didn't complete successfully: exit 3`},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			synctest.Test(t, func(t *testing.T) {
+				svc, apiClient, _ := newStartTestService(t)
+
+				initService := types.ServiceConfig{Name: "init", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+				app := types.ServiceConfig{Name: "app", ContainerSpec: types.ContainerSpec{Image: "alpine"}}
+				app.DependsOn = types.DependsOnConfig{"init": {Condition: types.ServiceConditionCompletedSuccessfully, Required: true}}
+				project := &types.Project{Name: "prj", Services: types.Services{"init": initService, "app": app}}
+
+				initCtr := stoppedServiceContainer("init", 1, container.StateExited)
+				appCtr := stoppedServiceContainer("app", 1, container.StateRunning)
+				apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+					Return(client.ContainerListResult{Items: []container.Summary{initCtr, appCtr}}, nil)
+				apiClient.EXPECT().ContainerStart(gomock.Any(), gomock.Any(), gomock.Any()).AnyTimes().Return(client.ContainerStartResult{}, nil)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), initCtr.ID, gomock.Any()).AnyTimes().
+					Return(inspectResultOf(initCtr.ID, "prj-init-1", container.StateExited, tt.exitCode, nil, nil), nil)
+				apiClient.EXPECT().ContainerInspect(gomock.Any(), appCtr.ID, gomock.Any()).AnyTimes().
+					Return(inspectResultOf(appCtr.ID, "prj-app-1", container.StateRunning, 0, nil, nil), nil)
+
+				err := svc.start(t.Context(), "prj", api.StartOptions{Project: project, Wait: true, WaitTimeout: 5 * time.Second})
+
+				if tt.err == "" {
+					assert.NilError(t, err)
+				} else {
+					assert.ErrorContains(t, err, tt.err)
+				}
+			})
+		})
+	}
+}
+
+// TestStart_StartsTheReplicasOneAfterTheOther pins the order a service's
+// stopped replicas start in: by replica number, each start waiting for the
+// previous one's.
+func TestStart_StartsTheReplicasOneAfterTheOther(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	web := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{Image: "alpine"}, Scale: intPtr(3)}
+	project := &types.Project{Name: "prj", Services: types.Services{"web": web}}
+	replicas := []container.Summary{
+		stoppedServiceContainer("web", 3, container.StateExited),
+		stoppedServiceContainer("web", 1, container.StateExited),
+		stoppedServiceContainer("web", 2, container.StateExited),
+	}
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+		Return(client.ContainerListResult{Items: replicas}, nil)
+	first := apiClient.EXPECT().ContainerStart(gomock.Any(), "prj-web-1-id", gomock.Any()).Return(client.ContainerStartResult{}, nil)
+	second := apiClient.EXPECT().ContainerStart(gomock.Any(), "prj-web-2-id", gomock.Any()).Return(client.ContainerStartResult{}, nil).After(first)
+	apiClient.EXPECT().ContainerStart(gomock.Any(), "prj-web-3-id", gomock.Any()).Return(client.ContainerStartResult{}, nil).After(second)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{Project: project}))
+}
+
+// TestStart_WithoutAProjectStartsTheSelectedServicesOnly pins `compose start
+// web` run without a compose file: the project is rebuilt from the project's
+// containers, and only the services asked for (with what they depend on) are
+// started, the other containers of the project staying as they are.
+func TestStart_WithoutAProjectStartsTheSelectedServicesOnly(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	webCtr := stoppedServiceContainer("web", 1, container.StateExited)
+	jobCtr := stoppedServiceContainer("job", 1, container.StateExited)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+		Return(client.ContainerListResult{Items: []container.Summary{webCtr, jobCtr}}, nil)
+	// no expectation to start the job's container: it would fail the test
+	apiClient.EXPECT().ContainerStart(gomock.Any(), webCtr.ID, gomock.Any()).Return(client.ContainerStartResult{}, nil)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{AttachTo: []string{"web"}}))
+}
+
+// TestStart_WithoutAProjectListsTheContainersWithoutTheOneOffs pins that the
+// project `compose start` rebuilds from the containers it finds is made of the
+// project's own containers only, never of the one-off ones (the ones `compose
+// run` left behind): the listing it asks the daemon for leaves them out.
+func TestStart_WithoutAProjectListsTheContainersWithoutTheOneOffs(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	webCtr := stoppedServiceContainer("web", 1, container.StateExited)
+	var firstListing client.ContainerListOptions
+	var listings atomic.Int32
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).AnyTimes().
+		DoAndReturn(func(_ context.Context, opts client.ContainerListOptions) (client.ContainerListResult, error) {
+			if listings.Add(1) == 1 {
+				firstListing = opts
+			}
+			return client.ContainerListResult{Items: []container.Summary{webCtr}}, nil
+		})
+	apiClient.EXPECT().ContainerStart(gomock.Any(), webCtr.ID, gomock.Any()).Return(client.ContainerStartResult{}, nil)
+
+	assert.NilError(t, svc.start(t.Context(), "prj", api.StartOptions{}))
+
+	assert.Assert(t, firstListing.Filters["label"][oneOffFilter(false)], "the listing must exclude one-off containers: %v", firstListing.Filters)
 }

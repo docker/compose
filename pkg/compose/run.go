@@ -32,6 +32,7 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/moby/moby/client/pkg/stringid"
 
+	"github.com/docker/compose/v5/internal/envresolver"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -126,9 +127,21 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
+	// the whole preparation (dependencies, image pull, container creation)
+	// shares one "run" operation, so the progress display renders it as a
+	// single block instead of falling back to a plain line per event for the
+	// steps that would run once a narrower bracket has closed.
+	var result prepareRunResult
 	err = Run(ctx, func(ctx context.Context) error {
-		return s.startDependencies(ctx, project, options)
+		var err error
+		result, err = s.doPrepareRun(ctx, project, options)
+		return err
 	}, "run", s.events)
+	return result, err
+}
+
+func (s *composeService) doPrepareRun(ctx context.Context, project *types.Project, options api.RunOptions) (prepareRunResult, error) {
+	err := s.startDependencies(ctx, project, options)
 	if err != nil {
 		return prepareRunResult{}, err
 	}
@@ -138,6 +151,9 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 		return prepareRunResult{}, err
 	}
 
+	service.Tty = options.Tty
+	service.StdinOpen = options.Interactive
+	service.ContainerName = options.Name
 	applyRunOptions(project, &service, options)
 
 	if err := s.stdin().CheckTty(options.Interactive, service.Tty); err != nil {
@@ -170,7 +186,7 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	}
 
 	if !options.NoDeps {
-		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState, 0); err != nil {
+		if err := s.waitDependencies(ctx, project, service.Name, service.DependsOn, observedState); err != nil {
 			return prepareRunResult{}, err
 		}
 	}
@@ -189,6 +205,11 @@ func (s *composeService) prepareRun(ctx context.Context, project *types.Project,
 	if err != nil {
 		return prepareRunResult{}, err
 	}
+
+	// the run target is created here, not by create(), which only handles its
+	// dependencies; warn from the local copy, whose scale is forced to one: the
+	// project entry may be scaled to zero, which `run` does not honor
+	warnServiceFileReferences(project, service)
 
 	created, err := s.createContainer(ctx, project, service, service.ContainerName, -1, createOpts)
 	if err != nil {
@@ -223,11 +244,18 @@ func prepareBuildOptions(options api.RunOptions) *api.BuildOptions {
 	return &buildOptionsCopy
 }
 
+// applyRunOptions applies the CLI overrides shared by a one-off service run
+// and a job run — Command, User, CapAdd/CapDrop, WorkingDir, Entrypoint,
+// Environment, Labels, exactly the set RunJob's own doc comment on
+// api.Compose documents as supported. Tty/StdinOpen/ContainerName are
+// deliberately not here: prepareRun (RunOneOffContainer's caller) sets them
+// itself for its own container-naming/attach needs, and a job has neither
+// (no interactive attach, and the jobs API assigns the run container's
+// identity itself) — RunJob restores the job's own declared values right
+// after calling this, since CLI-layer code upstream of both (cmd/compose's
+// runOptions.apply) already stamped the service with terminal-context
+// defaults meant for a one-off container, not a job.
 func applyRunOptions(project *types.Project, service *types.ServiceConfig, options api.RunOptions) {
-	service.Tty = options.Tty
-	service.StdinOpen = options.Interactive
-	service.ContainerName = options.Name
-
 	if len(options.Command) > 0 {
 		service.Command = options.Command
 	}
@@ -255,7 +283,7 @@ func applyRunOptions(project *types.Project, service *types.ServiceConfig, optio
 	if len(options.Environment) > 0 {
 		cmdEnv := types.NewMappingWithEquals(options.Environment)
 		serviceOverrideEnv := cmdEnv.Resolve(func(s string) (string, bool) {
-			v, ok := envResolver(project.Environment)(s)
+			v, ok := envresolver.New(project.Environment)(s)
 			return v, ok
 		}).RemoveEmpty()
 		if service.Environment == nil {
@@ -288,6 +316,13 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 		IgnoreOrphans: options.IgnoreOrphans,
 		RemoveOrphans: options.RemoveOrphans,
 		QuietPull:     options.QuietPull,
+		// empty means the default "diverged" policy; `run --no-recreate`
+		// passes "never" so an existing dependency is reused as-is
+		Recreate:             options.Recreate,
+		RecreateDependencies: options.RecreateDependencies,
+		// a recreated dependency keeps its anonymous volumes, as with `up`:
+		// run has no --renew-anon-volumes to opt out
+		Inherit: true,
 	})
 	if err != nil {
 		return err
@@ -296,7 +331,7 @@ func (s *composeService) startDependencies(ctx context.Context, project *types.P
 	if len(project.Services) > 0 {
 		return s.start(ctx, project.Name, api.StartOptions{
 			Project: project,
-		}, nil)
+		})
 	}
 	return nil
 }

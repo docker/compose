@@ -1,5 +1,5 @@
 /*
-   Copyright 2020 Docker Compose CLI authors
+   Copyright 2026 Docker Compose CLI authors
 
    Licensed under the Apache License, Version 2.0 (the "License");
    you may not use this file except in compliance with the License.
@@ -17,110 +17,23 @@
 package compose
 
 import (
-	"encoding/json"
 	"testing"
 
 	"gotest.tools/v3/assert"
 )
 
-func TestProviderMetadata_IsEmpty(t *testing.T) {
-	param := []ParameterMetadata{{Name: "x"}}
+// TestProviderBackendWiring pins the adapter between a composeService and
+// internal/provider: the provider tests run against their own fake backend,
+// so a DryRun that stopped following the service's dry-run flag (providers
+// executed for real under --dry-run) or a ProjectLock detached from
+// pluginMu (concurrent provider runs no longer serialized) would otherwise
+// go unnoticed.
+func TestProviderBackendWiring(t *testing.T) {
+	s := &composeService{dryRun: true}
+	b := providerBackend{relayBackend{s}}
+	assert.Assert(t, b.DryRun())
+	assert.Assert(t, b.ProjectLock() == &s.pluginMu)
 
-	tests := []struct {
-		name     string
-		metadata ProviderMetadata
-		want     bool
-	}{
-		{
-			name:     "empty metadata",
-			metadata: ProviderMetadata{},
-			want:     true,
-		},
-		{
-			name:     "only Description set",
-			metadata: ProviderMetadata{Description: "something"},
-			want:     false,
-		},
-		{
-			name:     "only Up.Parameters set",
-			metadata: ProviderMetadata{Up: CommandMetadata{Parameters: param}},
-			want:     false,
-		},
-		{
-			name:     "only Down.Parameters set",
-			metadata: ProviderMetadata{Down: CommandMetadata{Parameters: param}},
-			want:     false,
-		},
-		{
-			name:     "only Stop set is empty",
-			metadata: ProviderMetadata{Stop: &CommandMetadata{}},
-			want:     true,
-		},
-		{
-			name: "all fields set",
-			metadata: ProviderMetadata{
-				Description: "full",
-				Up:          CommandMetadata{Parameters: param},
-				Down:        CommandMetadata{Parameters: param},
-				Stop:        &CommandMetadata{Parameters: param},
-			},
-			want: false,
-		},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.metadata.IsEmpty(), tc.want)
-		})
-	}
-}
-
-func TestProviderMetadata_JSONUnmarshal(t *testing.T) {
-	raw := `{"description":"x","up":{"parameters":[{"name":"a"}]},"down":{"parameters":[{"name":"b"}]},"stop":{"parameters":[{"name":"c"}]}}`
-
-	var metadata ProviderMetadata
-	err := json.Unmarshal([]byte(raw), &metadata)
-	assert.NilError(t, err)
-	assert.Equal(t, metadata.Description, "x")
-	assert.Equal(t, metadata.Up.Parameters[0].Name, "a")
-	assert.Equal(t, metadata.Down.Parameters[0].Name, "b")
-	assert.Assert(t, metadata.Stop != nil, "Stop should be non-nil when present in JSON")
-	assert.Equal(t, metadata.Stop.Parameters[0].Name, "c")
-}
-
-func TestProviderMetadata_StopAbsent(t *testing.T) {
-	raw := `{"description":"x","up":{"parameters":[]},"down":{"parameters":[]}}`
-
-	var metadata ProviderMetadata
-	err := json.Unmarshal([]byte(raw), &metadata)
-	assert.NilError(t, err)
-	assert.Assert(t, metadata.Stop == nil, "Stop should be nil when absent from JSON")
-}
-
-func TestProviderMetadata_PullAbsent(t *testing.T) {
-	raw := `{"description":"x","up":{"parameters":[]},"down":{"parameters":[]}}`
-
-	var metadata ProviderMetadata
-	err := json.Unmarshal([]byte(raw), &metadata)
-	assert.NilError(t, err)
-	assert.Assert(t, metadata.Pull == nil, "Pull should be nil when absent from JSON")
-}
-
-func TestProviderMetadata_PullPresent(t *testing.T) {
-	raw := `{"pull":{"parameters":[{"name":"registry"}]}}`
-
-	var metadata ProviderMetadata
-	err := json.Unmarshal([]byte(raw), &metadata)
-	assert.NilError(t, err)
-	assert.Assert(t, metadata.Pull != nil, "Pull should be non-nil when key present")
-	assert.Equal(t, metadata.Pull.Parameters[0].Name, "registry")
-}
-
-func TestProviderMetadata_StopAdvertisedWithoutParameters(t *testing.T) {
-	raw := `{"stop":{"parameters":null}}`
-
-	var metadata ProviderMetadata
-	err := json.Unmarshal([]byte(raw), &metadata)
-	assert.NilError(t, err)
-	assert.Assert(t, metadata.Stop != nil, "Stop should be non-nil when key present even with null parameters")
+	s.dryRun = false
+	assert.Assert(t, !b.DryRun())
 }

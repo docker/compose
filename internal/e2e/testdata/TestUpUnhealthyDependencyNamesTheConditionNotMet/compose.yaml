@@ -1,0 +1,16 @@
+services:
+  # becomes unhealthy: api, which waits for it, can never start
+  db:
+    image: alpine
+    command: sleep infinity
+    healthcheck:
+      test: ["CMD", "false"]
+      interval: 1s
+      retries: 1
+
+  api:
+    image: alpine
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy

@@ -26,6 +26,8 @@ import (
 	"github.com/moby/go-archive"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/client"
+
+	"github.com/docker/compose/v5/internal/naming"
 )
 
 const (
@@ -115,7 +117,7 @@ COPY templates /templates
 
 func ListTransformers(ctx context.Context, dockerCli command.Cli) ([]image.Summary, error) {
 	res, err := dockerCli.Client().ImageList(ctx, client.ImageListOptions{
-		Filters: make(client.Filters).Add("label", fmt.Sprintf("%s=%s", TransformerLabel, "transformation")),
+		Filters: make(client.Filters).Add("label", naming.LabelFilter(TransformerLabel, "transformation")),
 	})
 	if err != nil {
 		return nil, err

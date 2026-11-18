@@ -1,0 +1,262 @@
+/*
+   Copyright 2023 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package projectloader
+
+import (
+	"context"
+	"fmt"
+	"maps"
+	"slices"
+	"strings"
+
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/mount"
+	"github.com/moby/moby/api/types/network"
+	"github.com/moby/moby/client"
+
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/pkg/api"
+)
+
+func (s *Service) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
+	res, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: make(client.Filters).Add("name", options.Containers...),
+		All:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	containers := res.Items
+
+	containersByIds, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: make(client.Filters).Add("id", options.Containers...),
+		All:     true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, ctr := range containersByIds.Items {
+		if !slices.ContainsFunc(containers, func(summary container.Summary) bool {
+			return summary.ID == ctr.ID
+		}) {
+			containers = append(containers, ctr)
+		}
+	}
+
+	if len(containers) == 0 {
+		return nil, fmt.Errorf("no container(s) found with the following name(s): %s", strings.Join(options.Containers, ","))
+	}
+
+	return s.createProjectFromContainers(containers, options.ProjectName)
+}
+
+// ServiceOfContainer returns the name and the definition of the service a container
+// belongs to, within the services collected so far, with the container counted in
+// its scale. A container which is not from a Compose application is a service of its own.
+func ServiceOfContainer(services types.Services, ctr container.Summary) (string, types.ServiceConfig) {
+	// if the container is from a previous Compose application, use the existing service name
+	serviceLabel, ok := ctr.Labels[api.ServiceLabel]
+	if !ok {
+		serviceLabel = naming.CanonicalContainerName(ctr)
+	}
+	service, ok := services[serviceLabel]
+	if !ok {
+		service = types.ServiceConfig{
+			Name: serviceLabel,
+			ContainerSpec: types.ContainerSpec{
+				Image:  ctr.Image,
+				Labels: ctr.Labels,
+			},
+		}
+	}
+	service.Scale = increment(service.Scale)
+	return serviceLabel, service
+}
+
+func (s *Service) createProjectFromContainers(containers []container.Summary, projectName string) (*types.Project, error) {
+	project := &types.Project{}
+	services := types.Services{}
+	networks := types.Networks{}
+	volumes := types.Volumes{}
+	secrets := types.Secrets{}
+
+	if projectName != "" {
+		project.Name = projectName
+	}
+
+	for _, ctr := range containers {
+		serviceLabel, service := ServiceOfContainer(services, ctr)
+
+		inspect, err := s.backend.APIClient().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
+		if err != nil {
+			services[serviceLabel] = service
+			continue
+		}
+		s.extractComposeConfiguration(&service, inspect.Container, volumes, secrets, networks)
+		service.Labels = cleanDockerPreviousLabels(service.Labels)
+		services[serviceLabel] = service
+	}
+
+	project.Services = services
+	project.Networks = networks
+	project.Volumes = volumes
+	project.Secrets = secrets
+	return project, nil
+}
+
+func (s *Service) extractComposeConfiguration(service *types.ServiceConfig, inspect container.InspectResponse, volumes types.Volumes, secrets types.Secrets, networks types.Networks) {
+	service.Environment = types.NewMappingWithEquals(inspect.Config.Env)
+	if inspect.Config.Healthcheck != nil {
+		healthConfig := inspect.Config.Healthcheck
+		service.HealthCheck = s.toComposeHealthCheck(healthConfig)
+	}
+	if len(inspect.Mounts) > 0 {
+		detectedVolumes, volumeConfigs, detectedSecrets, secretsConfigs := s.toComposeVolumes(inspect.Mounts)
+		service.Volumes = append(service.Volumes, volumeConfigs...)
+		service.Secrets = append(service.Secrets, secretsConfigs...)
+		maps.Copy(volumes, detectedVolumes)
+		maps.Copy(secrets, detectedSecrets)
+	}
+	if len(inspect.NetworkSettings.Networks) > 0 {
+		detectedNetworks, networkConfigs := s.toComposeNetwork(inspect.NetworkSettings.Networks)
+		service.Networks = networkConfigs
+		maps.Copy(networks, detectedNetworks)
+	}
+	if len(inspect.HostConfig.PortBindings) > 0 {
+		for key, portBindings := range inspect.HostConfig.PortBindings {
+			for _, portBinding := range portBindings {
+				service.Ports = append(service.Ports, types.ServicePortConfig{
+					Target:    uint32(key.Num()),
+					Published: portBinding.HostPort,
+					Protocol:  string(key.Proto()),
+					HostIP:    portBinding.HostIP.String(),
+				})
+			}
+		}
+	}
+}
+
+func (s *Service) toComposeHealthCheck(healthConfig *container.HealthConfig) *types.HealthCheckConfig {
+	var healthCheck types.HealthCheckConfig
+	healthCheck.Test = healthConfig.Test
+	if healthConfig.Timeout != 0 {
+		timeout := types.Duration(healthConfig.Timeout)
+		healthCheck.Timeout = &timeout
+	}
+	if healthConfig.Interval != 0 {
+		interval := types.Duration(healthConfig.Interval)
+		healthCheck.Interval = &interval
+	}
+	if healthConfig.StartPeriod != 0 {
+		startPeriod := types.Duration(healthConfig.StartPeriod)
+		healthCheck.StartPeriod = &startPeriod
+	}
+	if healthConfig.StartInterval != 0 {
+		startInterval := types.Duration(healthConfig.StartInterval)
+		healthCheck.StartInterval = &startInterval
+	}
+	if healthConfig.Retries != 0 {
+		retries := uint64(healthConfig.Retries)
+		healthCheck.Retries = &retries
+	}
+	return &healthCheck
+}
+
+func (s *Service) toComposeVolumes(volumes []container.MountPoint) (map[string]types.VolumeConfig,
+	[]types.ServiceVolumeConfig, map[string]types.SecretConfig, []types.ServiceSecretConfig,
+) {
+	volumeConfigs := make(map[string]types.VolumeConfig)
+	secretConfigs := make(map[string]types.SecretConfig)
+	var serviceVolumeConfigs []types.ServiceVolumeConfig
+	var serviceSecretConfigs []types.ServiceSecretConfig
+
+	for _, volume := range volumes {
+		serviceVC := types.ServiceVolumeConfig{
+			Type:     string(volume.Type),
+			Source:   volume.Source,
+			Target:   volume.Destination,
+			ReadOnly: !volume.RW,
+		}
+		switch volume.Type {
+		case mount.TypeVolume:
+			serviceVC.Source = volume.Name
+			vol := types.VolumeConfig{}
+			if volume.Driver != "local" {
+				vol.Driver = volume.Driver
+				vol.Name = volume.Name
+			}
+			volumeConfigs[volume.Name] = vol
+			serviceVolumeConfigs = append(serviceVolumeConfigs, serviceVC)
+		case mount.TypeBind:
+			if strings.HasPrefix(volume.Destination, "/run/secrets") {
+				destination := strings.Split(volume.Destination, "/")
+				secret := types.SecretConfig{
+					Name: destination[len(destination)-1],
+					File: strings.TrimPrefix(volume.Source, "/host_mnt"),
+				}
+				secretConfigs[secret.Name] = secret
+				serviceSecretConfigs = append(serviceSecretConfigs, types.ServiceSecretConfig{
+					Source: secret.Name,
+					Target: volume.Destination,
+				})
+			} else {
+				serviceVolumeConfigs = append(serviceVolumeConfigs, serviceVC)
+			}
+		}
+	}
+	return volumeConfigs, serviceVolumeConfigs, secretConfigs, serviceSecretConfigs
+}
+
+func (s *Service) toComposeNetwork(networks map[string]*network.EndpointSettings) (map[string]types.NetworkConfig, map[string]*types.ServiceNetworkConfig) {
+	networkConfigs := make(map[string]types.NetworkConfig)
+	serviceNetworkConfigs := make(map[string]*types.ServiceNetworkConfig)
+
+	for name, net := range networks {
+		inspect, err := s.backend.APIClient().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
+		if err != nil {
+			networkConfigs[name] = types.NetworkConfig{}
+		} else {
+			networkConfigs[name] = types.NetworkConfig{
+				Internal: inspect.Network.Internal,
+			}
+		}
+		serviceNetworkConfigs[name] = &types.ServiceNetworkConfig{
+			Aliases: net.Aliases,
+		}
+	}
+	return networkConfigs, serviceNetworkConfigs
+}
+
+func cleanDockerPreviousLabels(labels types.Labels) types.Labels {
+	cleanedLabels := types.Labels{}
+	for key, value := range labels {
+		if !strings.HasPrefix(key, "com.docker.compose.") && !strings.HasPrefix(key, "desktop.docker.io") {
+			cleanedLabels[key] = value
+		}
+	}
+	return cleanedLabels
+}
+
+func increment(scale *int) *int {
+	i := 1
+	if scale != nil {
+		i = *scale + 1
+	}
+	return &i
+}

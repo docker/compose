@@ -1,0 +1,8 @@
+services:
+  app:
+    image: alpine
+    init: true
+    use_api_socket: true
+    environment:
+      DOCKER_CONFIG: /elsewhere
+    command: sleep infinity

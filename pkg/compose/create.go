@@ -42,6 +42,9 @@ import (
 	"github.com/sirupsen/logrus"
 	cdi "tags.cncf.io/container-device-interface/pkg/parser"
 
+	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -65,12 +68,61 @@ type createConfigs struct {
 }
 
 func (s *composeService) Create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	if err := options.Validate(); err != nil {
+		return err
+	}
 	return Run(ctx, func(ctx context.Context) error {
-		return s.create(ctx, project, options)
+		if err := s.rejectUnsupportedScheduledJobs(ctx, project); err != nil {
+			return err
+		}
+		if err := s.create(ctx, project, options); err != nil {
+			return err
+		}
+		if err := s.registerScheduledJobs(ctx, project); err != nil {
+			return err
+		}
+		return s.handleOrphanJobs(ctx, project, options.RemoveOrphans, options.IgnoreOrphans)
 	}, "create", s.events)
 }
 
 func (s *composeService) create(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	return s.planAndExecute(ctx, project, options, ScopeCreate)
+}
+
+// createAndStart runs project's Create and Start phases as a single plan --
+// the same ScopeCreateStart switchover upDetached performs for `up -d`,
+// reused by every other caller that ran create() then start() back to back
+// with no further wiring in between (Scale; watch's rebuild). Callers that
+// need --wait's post-plan verification (only up -d does) use upDetached
+// instead, not this.
+func (s *composeService) createAndStart(ctx context.Context, project *types.Project, options api.CreateOptions) error {
+	return s.planAndExecute(ctx, project, options, ScopeCreateStart)
+}
+
+// planAndExecute prepares the plan of the given scope and executes it.
+func (s *composeService) planAndExecute(ctx context.Context, project *types.Project, options api.CreateOptions, scope ReconcileScope) error {
+	project, observed, plan, err := s.preparePlan(ctx, project, options, scope)
+	if err != nil {
+		return err
+	}
+
+	// Emit "Running" events for containers that are already up-to-date, so
+	// the progress display accounts for containers the plan will not touch.
+	emitRunningEvents(project, observed, plan, s.events)
+
+	return s.executePlan(ctx, project, observed, plan)
+}
+
+// preparePlan resolves the project model, ensures the resources the plan
+// itself doesn't own (images, models, external networks/volumes), observes
+// the daemon, and reconciles all of it into a Plan — without creating,
+// starting, or otherwise touching a single container, network, or volume.
+// create's split from this is pure extraction: callers that need the
+// canonical project, the daemon snapshot, or the plan itself before deciding
+// how to run it (detached up's single-plan Create+Start, interactive up's
+// phase boundary, #14081) call this directly instead of create with a wider
+// scope; create itself still just chains ScopeCreate with executePlan.
+func (s *composeService) preparePlan(ctx context.Context, project *types.Project, options api.CreateOptions, scope ReconcileScope) (*types.Project, *ObservedState, *planning.Plan, error) {
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
@@ -82,63 +134,75 @@ func (s *composeService) create(ctx context.Context, project *types.Project, opt
 
 	err := project.CheckContainerNameUnicity()
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	err = s.ensureImagesExists(ctx, project, options.Build, options.QuietPull, options.SkipProviders)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	err = s.ensureModels(ctx, project, options.QuietPull)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	prepareNetworks(project)
 	externalNetworks, err := s.checkExternalNetworks(ctx, project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	prepareVolumes(project)
 	externalVolumes, err := s.checkExternalVolumes(ctx, project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
 	// Temporary implementation of use_api_socket until we get actual support inside docker engine
 	project, err = s.useAPISocket(project)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
-	observed, err := s.collectObservedState(ctx, project)
+	observed, err := s.collectObservedState(ctx, project, scope)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 	observed.setResolvedNetworks(externalNetworks, project)
 	observed.setResolvedVolumes(externalVolumes)
 	warnUnmanagedNetworks(project, observed)
 	warnUnmanagedVolumes(project, observed)
+	// every enabled service, not just options.Services: dependencies of the
+	// requested services get created too
+	warnIgnoredFileReferences(project, project.ServiceNames())
 
-	if len(observed.Orphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
+	// A kept job run container (RemoveOnFailure: false) has no matching
+	// service by design — it's not something the user forgot to clean up, so
+	// it shouldn't trigger this warning. It's still a real orphan for
+	// reconcileOrphans (down/up --remove-orphans can sweep it), so the
+	// exclusion is scoped to this warning's own name list, not observed.Orphans.
+	var nonJobOrphans []string
+	for _, o := range observed.Orphans {
+		if !isJobRun(o.Summary) {
+			nonJobOrphans = append(nonJobOrphans, o.Name)
+		}
+	}
+	if len(nonJobOrphans) > 0 && !options.IgnoreOrphans && !options.RemoveOrphans {
 		logrus.Warnf("Found orphan containers (%s) for this project. If "+
 			"you removed or renamed this service in your compose "+
 			"file, you can run this command with the "+
-			"--remove-orphans flag to clean it up.", observed.orphanNames())
+			"--remove-orphans flag to clean it up.", strings.Join(nonJobOrphans, ", "))
 	}
 
-	plan, err := reconcile(ctx, project, observed, toReconcileOptions(options), s.prompt)
+	reconcileOptions := toReconcileOptions(options)
+	reconcileOptions.Scope = scope
+	plan, err := reconcile(ctx, project, observed, reconcileOptions, s.prompt)
 	if err != nil {
-		return err
+		return nil, nil, nil, err
 	}
 
-	// Emit "Running" events for containers that are already up-to-date, so
-	// the progress display accounts for containers the plan will not touch.
-	emitRunningEvents(project, observed, plan, s.events)
-
-	return s.executePlan(ctx, project, observed, plan)
+	return project, observed, plan, nil
 }
 
 func prepareNetworks(project *types.Project) {
@@ -268,7 +332,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 ) (createConfigs, error) {
 	labels := options.Labels
 	if !options.NoConfigHash {
-		hash, err := ServiceHash(service)
+		hash, err := confighash.ServiceHash(service)
 		if err != nil {
 			return createConfigs{}, err
 		}
@@ -278,11 +342,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		// One-off containers are not indexed
 		labels[api.ContainerNumberLabel] = strconv.Itoa(number)
 	}
-	var dependencies []string
-	for dep, d := range service.DependsOn {
-		dependencies = append(dependencies, fmt.Sprintf("%s:%s:%t", dep, d.Condition, d.Restart))
-	}
-	labels[api.DependenciesLabel] = strings.Join(dependencies, ",")
+	labels[api.DependenciesLabel] = encodeDependsOnLabel(service.DependsOn)
 
 	var runCmd, entrypoint []string
 	if service.Command != nil {
@@ -366,6 +426,10 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 	if err != nil {
 		return createConfigs{}, err
 	}
+	umask, err := umaskOption(service, apiVersion)
+	if err != nil {
+		return createConfigs{}, err
+	}
 	portBindings, err := buildContainerPortBindingOptions(service)
 	if err != nil {
 		return createConfigs{}, err
@@ -394,6 +458,11 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		dnsIPs = append(dnsIPs, dnsIP)
 	}
 
+	// Same ordering requirement as ToMobyEnv: AsList's map iteration order
+	// is random, and this ends up in the job spec hash.
+	extraHosts := service.ExtraHosts.AsList(":")
+	slices.Sort(extraHosts)
+
 	hostConfig := container.HostConfig{
 		AutoRemove:     options.AutoRemove,
 		Annotations:    service.Annotations,
@@ -416,7 +485,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		DNS:            dnsIPs,
 		DNSSearch:      service.DNSSearch,
 		DNSOptions:     service.DNSOpts,
-		ExtraHosts:     service.ExtraHosts.AsList(":"),
+		ExtraHosts:     extraHosts,
 		SecurityOpt:    securityOpts,
 		StorageOpt:     service.StorageOpt,
 		UsernsMode:     container.UsernsMode(service.UserNSMode),
@@ -430,6 +499,7 @@ func (s *composeService) getCreateConfigs(ctx context.Context,
 		GroupAdd:       service.GroupAdd,
 		Links:          links,
 		OomScoreAdj:    int(service.OomScoreAdj),
+		Umask:          umask,
 	}
 
 	if unconfined {
@@ -475,9 +545,11 @@ func (s *composeService) prepareContainerMACAddress(service types.ServiceConfig,
 }
 
 func getAliases(project *types.Project, service types.ServiceConfig, serviceIndex int, cfg *types.ServiceNetworkConfig, useNetworkAliases bool) []string {
-	aliases := []string{getContainerName(project.Name, service, serviceIndex)}
+	aliases := []string{naming.ContainerName(project.Name, service, serviceIndex)}
 	if useNetworkAliases {
-		aliases = append(aliases, service.Name)
+		if cfg.ServiceNameAliasEnabled() {
+			aliases = append(aliases, service.Name)
+		}
 		if cfg != nil {
 			aliases = append(aliases, cfg.Aliases...)
 		}
@@ -693,6 +765,20 @@ func defaultNetworkSettings(project *types.Project,
 	return container.NetworkMode(primaryNetworkMobyNetworkName), networkConfig, nil
 }
 
+// umaskOption returns the umask to set on the container, if any. An engine
+// older than API 1.56 ignores HostConfig.Umask without any error: running the
+// container with the runtime's default mask instead of the requested one would
+// go unnoticed, so the unsupported case is reported.
+func umaskOption(service types.ServiceConfig, version string) (*uint32, error) {
+	if service.Umask == nil {
+		return nil, nil
+	}
+	if versions.LessThan(version, apiVersion156) {
+		return nil, fmt.Errorf("umask requires Docker Engine %s or later", dockerEngineV29_8)
+	}
+	return service.Umask, nil
+}
+
 func getRestartPolicy(service types.ServiceConfig) container.RestartPolicy {
 	var restart container.RestartPolicy
 	if service.Restart != "" {
@@ -826,6 +912,11 @@ func toUlimits(m map[string]*types.UlimitsConfig) []*container.Ulimit {
 			Soft: int64(soft),
 		})
 	}
+	// Same ordering requirement as ToMobyEnv: m is a map, so iteration
+	// order is random, and this ends up in the job spec hash.
+	slices.SortFunc(ulimits, func(a, b *container.Ulimit) int {
+		return strings.Compare(a.Name, b.Name)
+	})
 	return ulimits
 }
 
@@ -876,30 +967,21 @@ func setBlkio(blkio *types.BlkioConfig, resources *container.Resources) {
 			Weight: b.Weight,
 		})
 	}
-	for _, b := range blkio.DeviceReadBps {
-		resources.BlkioDeviceReadBps = append(resources.BlkioDeviceReadBps, &blkiodev.ThrottleDevice{
+	resources.BlkioDeviceReadBps = append(resources.BlkioDeviceReadBps, toThrottleDevices(blkio.DeviceReadBps)...)
+	resources.BlkioDeviceReadIOps = append(resources.BlkioDeviceReadIOps, toThrottleDevices(blkio.DeviceReadIOps)...)
+	resources.BlkioDeviceWriteBps = append(resources.BlkioDeviceWriteBps, toThrottleDevices(blkio.DeviceWriteBps)...)
+	resources.BlkioDeviceWriteIOps = append(resources.BlkioDeviceWriteIOps, toThrottleDevices(blkio.DeviceWriteIOps)...)
+}
+
+func toThrottleDevices(devices []types.ThrottleDevice) []*blkiodev.ThrottleDevice {
+	var out []*blkiodev.ThrottleDevice
+	for _, b := range devices {
+		out = append(out, &blkiodev.ThrottleDevice{
 			Path: b.Path,
 			Rate: uint64(b.Rate),
 		})
 	}
-	for _, b := range blkio.DeviceReadIOps {
-		resources.BlkioDeviceReadIOps = append(resources.BlkioDeviceReadIOps, &blkiodev.ThrottleDevice{
-			Path: b.Path,
-			Rate: uint64(b.Rate),
-		})
-	}
-	for _, b := range blkio.DeviceWriteBps {
-		resources.BlkioDeviceWriteBps = append(resources.BlkioDeviceWriteBps, &blkiodev.ThrottleDevice{
-			Path: b.Path,
-			Rate: uint64(b.Rate),
-		})
-	}
-	for _, b := range blkio.DeviceWriteIOps {
-		resources.BlkioDeviceWriteIOps = append(resources.BlkioDeviceWriteIOps, &blkiodev.ThrottleDevice{
-			Path: b.Path,
-			Rate: uint64(b.Rate),
-		})
-	}
+	return out
 }
 
 func buildContainerPorts(s types.ServiceConfig) (network.PortSet, error) {
@@ -1172,6 +1254,12 @@ func (s *composeService) buildContainerMountOptions(ctx context.Context, p types
 	for _, v := range mounts {
 		values = append(values, v)
 	}
+	// Same ordering requirement as ToMobyEnv: mounts is keyed by target
+	// path, so iteration order is random, and this ends up in the job
+	// spec hash.
+	slices.SortFunc(values, func(a, b mount.Mount) int {
+		return strings.Compare(a.Target, b.Target)
+	})
 	return values, nil
 }
 
@@ -1426,6 +1514,7 @@ func buildBindOption(bind *types.ServiceVolumeBind) *mount.BindOptions {
 // config-hash. It is executed as a plan operation (OpCreateNetwork); resolution
 // of external networks lives in resolveExternalNetwork, and reuse of legacy
 // name-matched networks is decided by the reconciler from the observed state.
+// It reports no progress: the plan executor does, on the row of the network.
 func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConfig) error {
 	var ipam *network.IPAM
 	if n.Ipam.Driver != "" || len(n.Ipam.Config) > 0 || len(n.Ipam.Options) > 0 {
@@ -1443,7 +1532,7 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 			Options: n.Ipam.Options,
 		}
 	}
-	hash, err := NetworkHash(n)
+	hash, err := confighash.NetworkHash(n)
 	if err != nil {
 		return err
 	}
@@ -1459,22 +1548,16 @@ func (s *composeService) createNetwork(ctx context.Context, n *types.NetworkConf
 		EnableIPv4: n.EnableIPv4,
 	}
 
-	networkEventName := "Network " + n.Name
-	s.events.On(creatingEvent(networkEventName))
-
 	if _, err := s.apiClient().NetworkCreate(ctx, n.Name, networkCreateOptions); err != nil {
 		// A concurrent `docker compose up|run` may have created the same network
 		// between the observed-state snapshot and now. Treat the resulting
 		// conflict as success rather than failing hard: the network we wanted
 		// exists.
 		if errdefs.IsConflict(err) {
-			s.events.On(createdEvent(networkEventName))
 			return nil
 		}
-		s.events.On(errorEvent(networkEventName, err.Error()))
 		return fmt.Errorf("failed to create network %s: %w", n.Name, err)
 	}
-	s.events.On(createdEvent(networkEventName))
 	return nil
 }
 
@@ -1529,10 +1612,10 @@ func (s *composeService) resolveExternalNetwork(ctx context.Context, n *types.Ne
 	}
 }
 
+// createVolume creates the given volume with its compose labels and config-hash.
+// Like createNetwork it reports no progress: the plan executor does.
 func (s *composeService) createVolume(ctx context.Context, volume types.VolumeConfig) error {
-	eventName := "Volume " + volume.Name
-	s.events.On(creatingEvent(eventName))
-	hash, err := VolumeHash(volume)
+	hash, err := confighash.VolumeHash(volume)
 	if err != nil {
 		return err
 	}
@@ -1543,12 +1626,7 @@ func (s *composeService) createVolume(ctx context.Context, volume types.VolumeCo
 		Driver:     volume.Driver,
 		DriverOpts: volume.DriverOpts,
 	})
-	if err != nil {
-		s.events.On(errorEvent(eventName, err.Error()))
-		return err
-	}
-	s.events.On(createdEvent(eventName))
-	return nil
+	return err
 }
 
 func parseIPAMPool(pool *types.IPAMPool) (network.IPAMConfig, error) {

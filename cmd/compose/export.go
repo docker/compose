@@ -38,6 +38,7 @@ func exportCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 	options := exportOptions{
 		ProjectOptions: p,
 	}
+	//nolint:dupl // declarative cobra command: its flags and wiring look like its siblings' by design
 	cmd := &cobra.Command{
 		Use:   "export [OPTIONS] SERVICE",
 		Short: "Export a service container's filesystem as a tar archive",

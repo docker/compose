@@ -24,6 +24,9 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/depgraph"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -51,16 +54,16 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 	// post_start hook) — a per-service bound alone allows as many
 	// independent services to run at once as the graph permits, each with
 	// its own maxConcurrency budget
-	limiter := newOptionalLimiter(s.maxConcurrency)
+	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
-	return InDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return depgraph.InDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		config := project.Services[service]
-		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers, 0)
+		err := s.waitDependencies(ctx, project, service, config.DependsOn, containers)
 		if err != nil {
 			return err
 		}
 
-		return forEachWithLimiter(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
+		return concurrency.ForEach(ctx, limiter, containers.filter(isService(service)), func(ctx context.Context, ctr container.Summary) error {
 			return s.restartContainer(ctx, project.Services[service], ctr, options)
 		})
 	})
@@ -69,13 +72,9 @@ func (s *composeService) restart(ctx context.Context, projectName string, option
 // prepareRestartProject resolves the project restart applies to, restricted
 // to the requested services and the depends_on relations with restart: true
 func (s *composeService) prepareRestartProject(ctx context.Context, containers Containers, projectName string, options api.RestartOptions) (*types.Project, error) {
-	project := options.Project
-	var err error
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return nil, err
-		}
+	project, err := s.projectOrFromResources(ctx, options.Project, containers, projectName)
+	if err != nil {
+		return nil, err
 	}
 
 	if options.NoDeps {
@@ -121,14 +120,14 @@ func (s *composeService) restartContainer(ctx context.Context, def types.Service
 		}
 	}
 	eventName := getContainerProgressName(ctr)
-	s.events.On(newEvent(eventName, api.Working, api.StatusRestarting))
+	s.events.On(progress.New(eventName, api.Working, api.StatusRestarting))
 	_, err := s.apiClient().ContainerRestart(ctx, ctr.ID, client.ContainerRestartOptions{
 		Timeout: utils.DurationSecondToInt(options.Timeout),
 	})
 	if err != nil {
 		return err
 	}
-	s.events.On(newEvent(eventName, api.Done, api.StatusStarted))
+	s.events.On(progress.New(eventName, api.Done, api.StatusStarted))
 	if !relay {
 		for _, hook := range def.PostStart {
 			err := s.runHook(ctx, ctr, def, hook, nil)

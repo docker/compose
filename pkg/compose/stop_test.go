@@ -27,6 +27,7 @@ import (
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/naming"
 	compose "github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
@@ -50,10 +51,10 @@ func TestStopTimeout(t *testing.T) {
 	api.EXPECT().VolumeList(
 		gomock.Any(),
 		client.VolumeListOptions{
-			Filters: projectFilter(strings.ToLower(testProject)),
+			Filters: naming.ProjectFilter(strings.ToLower(testProject)),
 		}).
 		Return(client.VolumeListResult{}, nil)
-	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: projectFilter(strings.ToLower(testProject))}).
+	api.EXPECT().NetworkList(gomock.Any(), client.NetworkListOptions{Filters: naming.ProjectFilter(strings.ToLower(testProject))}).
 		Return(client.NetworkListResult{}, nil)
 
 	timeout := 2 * time.Second

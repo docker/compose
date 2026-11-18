@@ -31,6 +31,7 @@ import (
 	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/moby/buildkit/util/contentutil"
+	"github.com/opencontainers/go-digest"
 	spec "github.com/opencontainers/image-spec/specs-go/v1"
 
 	"github.com/docker/compose/v5/internal/registry"
@@ -73,7 +74,11 @@ func NewResolver(credentials registry.AuthProvider, transport http.RoundTripper,
 	})
 }
 
-// Get retrieves a Named OCI resource and returns OCI Descriptor and Manifest
+// Get retrieves a Named OCI resource and returns OCI Descriptor and Manifest.
+// The manifest is verified against the digest of the descriptor: for a tag the
+// registry says which digest the tag resolves to, for a digested reference the
+// digest is the reference's own, and either way the registry is not trusted to
+// serve the content that digest identifies.
 func Get(ctx context.Context, resolver remotes.Resolver, ref reference.Named) (spec.Descriptor, []byte, error) {
 	_, descriptor, err := resolver.Resolve(ctx, ref.String())
 	if err != nil {
@@ -88,11 +93,32 @@ func Get(ctx context.Context, resolver remotes.Resolver, ref reference.Named) (s
 	if err != nil {
 		return spec.Descriptor{}, nil, err
 	}
+	defer func() { _ = fetch.Close() }()
+	// the reader returns no more than the size of the descriptor, which the resolver
+	// keeps within what it accepts for a manifest
 	content, err := io.ReadAll(fetch)
 	if err != nil {
+		return spec.Descriptor{}, nil, fmt.Errorf("reading manifest %s: %w", descriptor.Digest, err)
+	}
+	if err := verifyDigest("manifest", descriptor.Digest, content); err != nil {
 		return spec.Descriptor{}, nil, err
 	}
 	return descriptor, content, nil
+}
+
+// verifyDigest checks content, which is what, against the digest it is supposed
+// to have. The content is fetched without going through containerd's content
+// store, which is what would otherwise check it, and callers use the digest to
+// identify the content (as a cache key, or to tell it is the one a reference
+// pins).
+func verifyDigest(what string, expected digest.Digest, content []byte) error {
+	if err := expected.Validate(); err != nil {
+		return fmt.Errorf("invalid digest %s: %w", expected, err)
+	}
+	if actual := expected.Algorithm().FromBytes(content); actual != expected {
+		return fmt.Errorf("%s digest mismatch: expected %s, got %s", what, expected, actual)
+	}
+	return nil
 }
 
 // GetBlob retrieves the content of a blob descriptor (e.g. an artifact layer)
@@ -120,11 +146,8 @@ func GetBlob(ctx context.Context, resolver remotes.Resolver, ref reference.Named
 	}
 	// GetBlob bypasses containerd's content store, so integrity must be
 	// checked here before callers write the bytes to disk.
-	if err := descriptor.Digest.Validate(); err != nil {
-		return nil, fmt.Errorf("invalid digest %s: %w", descriptor.Digest, err)
-	}
-	if actual := descriptor.Digest.Algorithm().FromBytes(content); actual != descriptor.Digest {
-		return nil, fmt.Errorf("blob digest mismatch: expected %s, got %s", descriptor.Digest, actual)
+	if err := verifyDigest("blob", descriptor.Digest, content); err != nil {
+		return nil, err
 	}
 	return content, nil
 }

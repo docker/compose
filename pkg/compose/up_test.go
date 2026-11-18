@@ -21,17 +21,22 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/compose-spec/compose-go/v2/types"
 	containerType "github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
 	"golang.org/x/sync/errgroup"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/logstream"
 	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
 )
 
 func TestShouldFollowStartEvent(t *testing.T) {
@@ -187,6 +192,42 @@ func TestAppendErrKeepsCancellationBeforeShutdown(t *testing.T) {
 	assert.Equal(t, len(u.errs), 1)
 }
 
+// TestUpSessionStopsWithUpTimeout locks that the stops an attached up issues
+// itself carry -t (#14394).
+func TestUpSessionStopsWithUpTimeout(t *testing.T) {
+	timeout := 2 * time.Second
+	stops := map[string]func(*upSession){
+		"stopApplication": (*upSession).stopApplication,
+		"stopLateStarter": func(u *upSession) { u.stopLateStarter("svc0") },
+	}
+	for name, stop := range stops {
+		t.Run(name, func(t *testing.T) {
+			svc, apiClient := newTestService(t)
+			project, containers := nIndependentServiceContainers(1)
+			apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+				Return(client.ContainerListResult{Items: containers}, nil)
+			var got client.ContainerStopOptions
+			apiClient.EXPECT().ContainerStop(gomock.Any(), "c0", gomock.Any()).
+				DoAndReturn(func(_ context.Context, _ string, opts client.ContainerStopOptions) (client.ContainerStopResult, error) {
+					got = opts
+					return client.ContainerStopResult{}, nil
+				})
+
+			u := &upSession{
+				composeService: svc,
+				project:        project,
+				globalCtx:      t.Context(),
+				printer:        newLogPrinter(&testLogConsumer{}),
+				options:        api.UpOptions{Create: api.CreateOptions{Timeout: &timeout}},
+			}
+			stop(u)
+			assert.NilError(t, u.eg.Wait())
+			assert.Equal(t, len(u.errs), 0, "%v", u.errs)
+			assert.DeepEqual(t, got, client.ContainerStopOptions{Timeout: utils.DurationSecondToInt(&timeout)})
+		})
+	}
+}
+
 // TestStreamContainerLogs_ConcurrencyIsBounded guards a regression flagged
 // in review: streamContainerLogs (attaches logs for containers that start
 // after up's initial attach, e.g. via depends_on/restart/watch rebuilds)
@@ -218,17 +259,93 @@ func TestStreamContainerLogs_ConcurrencyIsBounded(t *testing.T) {
 	u := &upSession{
 		composeService: svc,
 		globalCtx:      t.Context(),
-		logOpenLimiter: newOptionalLimiter(1),
+		logOpenLimiter: concurrency.NewLimiter(1),
 		options:        api.UpOptions{Start: api.StartOptions{Attach: &testLogConsumer{}}},
 	}
 
 	var eg errgroup.Group
 	eg.Go(func() error {
-		return u.streamContainerLogs(newLogCursors().enter("c1"), api.ContainerEvent{ID: "c1", Service: "web"}, "")
+		return u.streamContainerLogs(logstream.NewCursors().Enter("c1"), api.ContainerEvent{ID: "c1", Service: "web"}, "")
 	})
 	eg.Go(func() error {
-		return u.streamContainerLogs(newLogCursors().enter("c2"), api.ContainerEvent{ID: "c2", Service: "web"}, "")
+		return u.streamContainerLogs(logstream.NewCursors().Enter("c2"), api.ContainerEvent{ID: "c2", Service: "web"}, "")
 	})
 	assert.NilError(t, eg.Wait())
 	assert.Equal(t, tracker.Peak(), 1, "streamContainerLogs must share --parallel's budget for concurrent log-attach opens")
+}
+
+func TestSetupNavigationMenuWithoutImplementation(t *testing.T) {
+	s := &composeService{}
+	options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true}}
+
+	menu, err := s.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+	assert.NilError(t, err)
+	assert.Assert(t, menu == nil)
+	assert.Assert(t, !options.Start.NavigationMenu)
+}
+
+// fakeMenu records how the session drives a NavigationMenu.
+type fakeMenu struct {
+	openErr error
+	opened  bool
+}
+
+func (m *fakeMenu) Decorate(l api.LogConsumer) api.LogConsumer         { return l }
+func (m *fakeMenu) EnableWatch(bool, api.Feature)                      {}
+func (m *fakeMenu) EnableDetach(func())                                {}
+func (m *fakeMenu) Run(context.Context, *types.Project, api.UpOptions) {}
+func (m *fakeMenu) Close() error                                       { return nil }
+func (m *fakeMenu) Open() error {
+	m.opened = true
+	return m.openErr
+}
+
+func TestSetupNavigationMenu(t *testing.T) {
+	tests := []struct {
+		name     string
+		menu     NavigationMenu
+		wantMenu bool
+	}{
+		{name: "usable", menu: &fakeMenu{}, wantMenu: true},
+		{name: "keyboard can't be grabbed", menu: &fakeMenu{openErr: errors.New("no tty")}},
+		{name: "factory without menu"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, apiClient := newTestService(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu {
+				return tt.menu
+			}))
+			apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, nil).AnyTimes()
+			options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true}}
+
+			menu, err := svc.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+			assert.NilError(t, err)
+			assert.Equal(t, menu != nil, tt.wantMenu)
+			assert.Equal(t, options.Start.NavigationMenu, tt.wantMenu, "the option must be disabled when there is no usable menu")
+			if fm, ok := tt.menu.(*fakeMenu); ok {
+				assert.Assert(t, fm.opened, "the keyboard must be grabbed through the menu")
+			}
+		})
+	}
+}
+
+func TestWithNavigationMenu(t *testing.T) {
+	s := &composeService{}
+	assert.NilError(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu { return nil })(s))
+	assert.Assert(t, s.navigationMenu != nil)
+}
+
+func TestSetupNavigationMenuDisabledByWait(t *testing.T) {
+	fm := &fakeMenu{}
+	svc, _ := newTestService(t, WithNavigationMenu(func(bool, bool, chan<- os.Signal) NavigationMenu { return fm }))
+	options := api.UpOptions{Start: api.StartOptions{NavigationMenu: true, Wait: true}}
+
+	menu, err := svc.setupNavigationMenu(t.Context(), &options, make(chan os.Signal, 1))
+
+	assert.NilError(t, err)
+	assert.Assert(t, menu == nil)
+	assert.Assert(t, !fm.opened, "a session ending once the services are up must not grab the keyboard")
+	assert.Assert(t, !options.Start.NavigationMenu)
 }

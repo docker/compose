@@ -262,7 +262,7 @@ type relay struct {
 var relays = []relay{
 	{"logs --follow", func(t *testing.T, svc *composeService, consumer api.LogConsumer, opts api.LogOptions) (api.ContainerEventListener, func() error) {
 		var eg errgroup.Group
-		return svc.followStartedContainersLogs(t.Context(), &eg, nil, consumer, opts), eg.Wait
+		return svc.logStream().FollowStartedContainersLogs(t.Context(), &eg, nil, consumer, opts), eg.Wait
 	}},
 	{"up", func(t *testing.T, svc *composeService, consumer api.LogConsumer, _ api.LogOptions) (api.ContainerEventListener, func() error) {
 		u := &upSession{
@@ -461,51 +461,4 @@ func TestRestartedContainerLogs_FailedStream(t *testing.T) {
 			assert.DeepEqual(t, consumer.LogsForContainer("failing-1"), []string{"3"})
 		})
 	}
-}
-
-// TestLogCursors_Turns checks the hand-over between the streams of a
-// container: in the order they were queued, whichever goroutine gets there
-// first; and a stream that gives up (canceled context, error, panic) never
-// holds the others back.
-func TestLogCursors_Turns(t *testing.T) {
-	cursors := newLogCursors()
-	first, second, third := cursors.enter("c1"), cursors.enter("c1"), cursors.enter("c1")
-	other := cursors.enter("c2")
-
-	granted := make(chan string, 3)
-	var wg sync.WaitGroup
-	for name, turn := range map[string]*logTurn{"third": third, "second": second} { // later turns ask first
-		wg.Go(func() {
-			assert.NilError(t, turn.wait(t.Context()))
-			granted <- name
-			turn.end()
-		})
-	}
-
-	assert.NilError(t, other.wait(t.Context()), "another container's streams are independent")
-	select {
-	case name := <-granted:
-		t.Fatalf("%s got its turn before the first stream ended", name)
-	case <-time.After(50 * time.Millisecond):
-	}
-
-	assert.NilError(t, first.wait(t.Context()))
-	first.end()
-	first.end() // harmless
-	wg.Wait()
-	assert.Equal(t, <-granted, "second")
-	assert.Equal(t, <-granted, "third")
-}
-
-func TestLogCursors_CanceledWaiterReleasesNext(t *testing.T) {
-	cursors := newLogCursors()
-	first, second, third := cursors.enter("c1"), cursors.enter("c1"), cursors.enter("c1")
-
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
-	assert.ErrorIs(t, second.wait(ctx), context.Canceled)
-	second.end() // what the stream's defer does
-
-	first.end()
-	assert.NilError(t, third.wait(t.Context()))
 }

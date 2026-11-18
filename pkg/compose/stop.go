@@ -21,6 +21,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/depgraph"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -36,23 +38,20 @@ func (s *composeService) stop(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	project := options.Project
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return err
-		}
+	project, err := s.projectOrFromResources(ctx, options.Project, containers, projectName)
+	if err != nil {
+		return err
 	}
 
 	if len(options.Services) == 0 {
 		options.Services = project.ServiceNames()
 	}
 
-	// shared across services — see restart.go's newOptionalLimiter comment
+	// shared across services — see restart.go's concurrency.NewLimiter comment
 	// for why a per-service limiter alone isn't enough.
-	limiter := newOptionalLimiter(s.maxConcurrency)
+	limiter := concurrency.NewLimiter(s.maxConcurrency)
 
-	return InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
+	return depgraph.InReverseDependencyOrder(ctx, project, func(c context.Context, service string) error {
 		if !slices.Contains(options.Services, service) {
 			return nil
 		}

@@ -1,0 +1,67 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// Package envresolver resolves environment variables the way the platform does:
+// case-sensitively, except on Windows.
+package envresolver
+
+import (
+	"runtime"
+	"strings"
+)
+
+// isCaseInsensitiveEnvVars is true on platforms where environment variable names are treated case-insensitively.
+var isCaseInsensitiveEnvVars = (runtime.GOOS == "windows")
+
+// New returns resolver for environment variables suitable for the current platform.
+// Expected to be used with `MappingWithEquals.Resolve`.
+// Updates in `environment` may not be reflected.
+func New(environment map[string]string) func(string) (string, bool) {
+	return NewWithCase(environment, isCaseInsensitiveEnvVars)
+}
+
+// NewWithCase returns resolver for environment variables with the specified case-sensitive condition.
+// Expected to be used with `MappingWithEquals.Resolve`.
+// Updates in `environment` may not be reflected.
+func NewWithCase(environment map[string]string, caseInsensitive bool) func(string) (string, bool) {
+	if environment == nil {
+		return func(s string) (string, bool) {
+			return "", false
+		}
+	}
+	if !caseInsensitive {
+		return func(s string) (string, bool) {
+			v, ok := environment[s]
+			return v, ok
+		}
+	}
+	// variable names must be treated case-insensitively.
+	// Resolves in this way:
+	// * Return the value if its name matches with the passed name case-sensitively.
+	// * Otherwise, return the value if its name case-insensitively matches the passed name.
+	//     * The value is indefinite if multiple variable matches.
+	return func(s string) (string, bool) {
+		if v, ok := environment[s]; ok {
+			return v, ok
+		}
+		for k, v := range environment {
+			if strings.EqualFold(k, s) {
+				return v, true
+			}
+		}
+		return "", false
+	}
+}

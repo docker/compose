@@ -32,6 +32,7 @@ type pushOptions struct {
 	composeOptions
 	IncludeDeps    bool
 	Ignorefailures bool
+	IgnoreMissing  bool
 	Quiet          bool
 }
 
@@ -48,8 +49,11 @@ func pushCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Backe
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	pushCmd.Flags().BoolVar(&opts.Ignorefailures, "ignore-push-failures", false, "Push what it can and ignores images with push failures")
+	pushCmd.Flags().BoolVar(&opts.IgnoreMissing, "ignore-missing", false, "Skip images that are not available locally instead of failing to push them")
 	pushCmd.Flags().BoolVar(&opts.IncludeDeps, "include-deps", false, "Also push images of services declared as dependencies")
 	pushCmd.Flags().BoolVarP(&opts.Quiet, "quiet", "q", false, "Push without printing progress information")
+	pushCmd.Flags().MarkDeprecated("ignore-push-failures", "use --ignore-missing to skip images that are not available locally") //nolint:errcheck
+	pushCmd.MarkFlagsMutuallyExclusive("ignore-push-failures", "ignore-missing")
 
 	return pushCmd
 }
@@ -62,7 +66,7 @@ func runPush(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 
 	project, _, err := opts.ToProject(ctx, dockerCli, backend, services, warnUnsupportedAttributes)
 	if err != nil {
-		return err
+		return jobTargetErrOr(ctx, dockerCli, opts.ProjectOptions, services, err)
 	}
 
 	if !opts.IncludeDeps {
@@ -74,6 +78,7 @@ func runPush(ctx context.Context, dockerCli command.Cli, backendOptions *Backend
 
 	return backend.Push(ctx, project, api.PushOptions{
 		IgnoreFailures: opts.Ignorefailures,
+		IgnoreMissing:  opts.IgnoreMissing,
 		Quiet:          opts.Quiet,
 	})
 }

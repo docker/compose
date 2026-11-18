@@ -1,0 +1,461 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package logstream
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"strconv"
+	"time"
+
+	"github.com/containerd/errdefs"
+	"github.com/moby/moby/api/types/events"
+	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+
+	"github.com/docker/compose/v5/internal/naming"
+	relaymgr "github.com/docker/compose/v5/internal/relay"
+	"github.com/docker/compose/v5/pkg/api"
+	"github.com/docker/compose/v5/pkg/utils"
+)
+
+// Monitor follows the events of the containers of a project and reports them to
+// its listeners, see Start.
+type Monitor struct {
+	apiClient client.APIClient
+	project   string
+	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
+	services  map[string]bool
+	listeners []api.ContainerEventListener
+	// since is the point from which Start subscribes to events, as the events
+	// API's "<seconds>.<nanoseconds>" timestamp, once ReadDaemonTime got it
+	since string
+	// sinceRead tells ReadDaemonTime has been through, whether it found a
+	// point or had to do without one (since is then empty)
+	sinceRead bool
+}
+
+// NewMonitor creates a Monitor of the containers of a project.
+func NewMonitor(apiClient client.APIClient, project string) *Monitor {
+	return &Monitor{
+		apiClient: apiClient,
+		project:   project,
+		services:  map[string]bool{},
+	}
+}
+
+// WithServices restricts the monitor to the given services, all of them when
+// none is given.
+func (c *Monitor) WithServices(services []string) {
+	for _, name := range services {
+		c.services[name] = true
+	}
+}
+
+// Start runs monitor to detect application events and return after termination
+//
+// The monitor consumes the engine's event stream, filtered on this project's
+// containers, and has to interpret event sequences that depend on how a
+// container terminates or comes back. The sequences below were mapped from
+// moby's daemon sources and verified against a live engine (v29.x);
+// meaningful event attributes are in parentheses:
+//
+//	container process exits on its own, whatever the exit code:
+//	    die (exitCode) — and nothing else: no stop event is emitted
+//
+//	restart policy in action, the daemon restarts the container after exit:
+//	    die (exitCode) → start → die → start → ...
+//	    No restart event is ever emitted for policy-driven restarts, and no
+//	    event at all while the container waits in restart backoff (status
+//	    "restarting", no process running); ContainerInspect reports
+//	    State.Restarting=true in that window.
+//
+//	docker stop (or compose stop) on a running container:
+//	    kill (signal=stop signal, SIGTERM by default)
+//	    [→ kill (signal=9, i.e. SIGKILL) when the grace period expires]
+//	    → stop + die (exitCode)
+//	    The relative order of stop and die is not guaranteed: stop is emitted
+//	    by the ContainerStop call completing, die by the asynchronous exit
+//	    notification from containerd. A manual stop cancels the restart policy.
+//
+//	docker stop on a container in restart backoff (see #13985):
+//	    stop — and nothing else: with no process to signal, the daemon skips
+//	    the kill event, no die is ever produced, and the pending restart is
+//	    cancelled.
+//
+//	docker restart, and the ContainerRestart API in general (also used by
+//	compose watch sync+restart, see #13161):
+//	    kill → stop + die → start → restart
+//	    A transient stop/die pair is emitted even though the container is
+//	    coming back. State.Restarting is never set on this path — the only
+//	    daemon code setting it is the restart-policy one — so the container is
+//	    briefly reported as "exited" between die and start, then "running"
+//	    again (https://github.com/moby/moby/issues/45538); an inspection
+//	    triggered by the die event usually, but not reliably, lands after the
+//	    new start. The restart action fires last, after start.
+//
+//	docker kill:
+//	    kill (signal=9, i.e. SIGKILL) → die (exitCode) — no stop event
+//	    A non-fatal signal (docker kill -s HUP) emits kill alone, with no die
+//	    unless the process exits.
+//
+//	OOM-killed container:
+//	    oom → die (exitCode, typically 137)
+//	    The die event carries no OOM-specific attribute, and a restart policy
+//	    applies as for any other exit (start follows). An oom can also occur
+//	    with no die at all, when the kernel kills a child process and the
+//	    container's main process survives.
+//
+//	docker rm -f on a running container:
+//	    kill → die → destroy
+//
+//	docker rm on a stopped container, docker rm -f on a restarting one:
+//	    destroy — and nothing else
+//
+// Other actions (pause, unpause, attach, exec_*, health_status: *, ...) may
+// show up in the stream but don't affect container tracking. Note that
+// exec_create, exec_start and health_status actions embed variable data in
+// the action name itself (e.g. "health_status: healthy"), which would break
+// exact matching. On daemon shutdown containers are stopped (kill/die/stop)
+// and the event stream usually delivers those events before it breaks, so a
+// daemon restart is typically observed as a per-container kill/die/stop
+// sequence followed by Events returning an error. A container that dies
+// while the daemon itself is down never gets a die event at all: on daemon
+// restore it is just recorded as exited, and containers the restore restarts
+// per policy only emit start.
+//
+// Events are requested since a point taken BEFORE the initial listing. Both
+// the listing and the subscription are round trips, and a container may start
+// and terminate in between (the first container of an `up` that starts right
+// as the monitor attaches, running something like `echo hi`): its die would
+// be emitted to nobody, and the monitor would track the container forever.
+// Replaying the events from before the listing closes that window. Events
+// already reflected in the listing are harmless: the listing notifies
+// nothing, so each replayed event is reported once, and the tracked set only
+// ever gets an ID added again or removed again.
+//
+// The point is the DAEMON's clock, read from its system info (one more round
+// trip before the listing): events are stamped by the daemon, and a client
+// clock that differs from it (a remote daemon) would either miss the start of
+// the window or replay events from before the monitor was started. There is
+// no falling back on the client's clock. A daemon that refuses or can't
+// answer the request (a read-only socket proxy that doesn't expose the info
+// endpoint) doesn't fail the command, which worked without it: the monitor
+// subscribes to live events, as it did before the replay, and warns that the
+// window can't be closed. A daemon that answers with a time that can't be
+// used is another matter and makes Start fail. A caller needing to know that
+// before it goes on (before it starts the containers the monitor is to
+// follow) calls ReadDaemonTime itself first; Start then doesn't ask again.
+func (c *Monitor) Start(ctx context.Context) error {
+	if err := c.ReadDaemonTime(ctx); err != nil {
+		if ctx.Err() != nil {
+			// interrupted, not failed: the same quiet end as a canceled
+			// monitor below
+			return nil
+		}
+		return err
+	}
+	// containers is the set of container IDs the application is based on
+	containers, err := c.initialContainers(ctx)
+	if err != nil {
+		return err
+	}
+	// restarting tracks containers which exited but are configured to restart on exit
+	restarting := utils.Set[string]{}
+
+	res := c.apiClient.Events(ctx, client.EventsListOptions{
+		Since:   c.since,
+		Filters: naming.ProjectFilter(c.project).Add("type", "container").Add("label", oneOffFilter(false)),
+	})
+	for {
+		if len(containers) == 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil
+		case err := <-res.Err:
+			return err
+		case event := <-res.Messages:
+			if !c.watched(event.Actor.Attributes[api.ServiceLabel]) {
+				continue
+			}
+			ctr, err := c.getContainerSummary(event)
+			if err != nil {
+				return err
+			}
+
+			switch event.Action {
+			case events.ActionCreate:
+				c.onContainerCreate(event, ctr, containers)
+			case events.ActionStart:
+				c.onContainerStart(event, ctr, containers, restarting)
+			case events.ActionRestart:
+				c.onContainerRestart(event, ctr)
+			case events.ActionStop:
+				err := c.onContainerStop(ctx, event, ctr, containers, restarting)
+				if err != nil {
+					return err
+				}
+			case events.ActionDestroy:
+				c.onContainerDestroy(ctr, containers, restarting)
+			case events.ActionDie:
+				err := c.onContainerDie(ctx, event, ctr, containers, restarting)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+}
+
+// ReadDaemonTime takes, as the point from which to subscribe to events, the
+// daemon's current time, in the "<seconds>.<nanoseconds>" form the events API
+// takes as since. It does so once. A daemon that can't be asked (the request
+// is refused or fails) leaves since empty, so that events are subscribed live
+// as they were before the replay existed, with a warning: this is a missing
+// capability, not a reason to fail. A daemon that answers with no time or one
+// that can't be parsed is an error: the replay would have no sound starting
+// point, and nothing explains the answer. An interruption is an error too, the
+// client's, which carries the context's: callers decide how to report it (Start
+// ends quietly, an interactive up returns it).
+func (c *Monitor) ReadDaemonTime(ctx context.Context) error {
+	if c.sinceRead {
+		return nil
+	}
+	res, err := c.apiClient.Info(ctx, client.InfoOptions{})
+	if err != nil {
+		if ctx.Err() != nil {
+			return fmt.Errorf("reading the daemon time to subscribe to container events: %w", err)
+		}
+		logrus.Warnf("reading the daemon time to subscribe to container events: %v; "+
+			"events emitted while the monitor attaches may be missed", err)
+		c.sinceRead = true
+		return nil
+	}
+	if res.Info.SystemTime == "" {
+		return errors.New("reading the daemon time to subscribe to container events: the daemon reports no system time")
+	}
+	t, err := time.Parse(time.RFC3339Nano, res.Info.SystemTime)
+	if err != nil {
+		return fmt.Errorf("reading the daemon time to subscribe to container events: %w", err)
+	}
+	c.since = fmt.Sprintf("%d.%09d", t.Unix(), t.Nanosecond())
+	c.sinceRead = true
+	return nil
+}
+
+// initialContainers collects the application's containers at startup,
+// restricted to the services this monitor watches
+func (c *Monitor) initialContainers(ctx context.Context) (utils.Set[string], error) {
+	initialState, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{
+		All: true,
+		Filters: naming.ProjectFilter(c.project).Add("label",
+			oneOffFilter(false),
+			api.ConfigHashLabel,
+		),
+	})
+	if err != nil {
+		return nil, err
+	}
+	containers := utils.Set[string]{}
+	for _, ctr := range initialState.Items {
+		if c.watched(ctr.Labels[api.ServiceLabel]) && !relaymgr.IsRelay(ctr.Labels) {
+			containers.Add(ctr.ID)
+		}
+	}
+	return containers, nil
+}
+
+// watched tells whether a service's containers are watched by this monitor.
+// An empty service set means "the whole application".
+func (c *Monitor) watched(service string) bool {
+	return len(c.services) == 0 || c.services[service]
+}
+
+// notify broadcasts a container event to the registered listeners
+func (c *Monitor) notify(event api.ContainerEvent) {
+	for _, listener := range c.listeners {
+		listener(event)
+	}
+}
+
+func (c *Monitor) onContainerCreate(event events.Message, ctr *api.ContainerSummary, containers utils.Set[string]) {
+	if c.watched(ctr.Labels[api.ServiceLabel]) && !relaymgr.IsRelay(ctr.Labels) {
+		containers.Add(ctr.ID)
+	}
+	evtType := api.ContainerEventCreated
+	if _, ok := ctr.Labels[api.ContainerReplaceLabel]; ok {
+		evtType = api.ContainerEventRecreated
+	}
+	c.notify(newContainerEvent(event.TimeNano, ctr, evtType))
+	logrus.Debugf("container %s created", ctr.Name)
+}
+
+func (c *Monitor) onContainerStart(event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
+	if restarting.Has(ctr.ID) {
+		logrus.Debugf("container %s restarted", ctr.Name)
+		c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted, func(e *api.ContainerEvent) {
+			e.Restarting = true
+		}))
+	} else {
+		logrus.Debugf("container %s started", ctr.Name)
+		c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventStarted))
+	}
+	if c.watched(ctr.Labels[api.ServiceLabel]) && !relaymgr.IsRelay(ctr.Labels) {
+		containers.Add(ctr.ID)
+	}
+}
+
+func (c *Monitor) onContainerRestart(event events.Message, ctr *api.ContainerSummary) {
+	c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventRestarted))
+	logrus.Debugf("container %s restarted", ctr.Name)
+}
+
+func (c *Monitor) onContainerDie(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
+	logrus.Debugf("container %s exited with code %d", ctr.Name, ctr.ExitCode)
+	willRestart, _, _, err := c.isRestarting(ctx, ctr.ID)
+	if err != nil {
+		return err
+	}
+	if willRestart {
+		logrus.Debugf("container %s is restarting", ctr.Name)
+		restarting.Add(ctr.ID)
+		c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited, func(e *api.ContainerEvent) {
+			e.Restarting = true
+		}))
+		return nil
+	}
+
+	c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited))
+	restarting.Remove(ctr.ID)
+	containers.Remove(ctr.ID)
+	return nil
+}
+
+// onContainerStop handles a stop event with no following start: the container won't
+// come back, either because it has no restart policy, or because an external
+// `stop`/`down` canceled the restart loop of a container in backoff
+// (https://github.com/docker/compose/issues/13985). The event alone can't tell us:
+// during a ContainerRestart (watch sync+restart, https://github.com/docker/compose/issues/13161)
+// the engine also emits `stop` before `start`. For a plain stop on a running
+// container, stop and die are not ordered relative to each other (see the
+// Start doc): evicting here on a still-pending die would let the loop
+// terminate before that die is drained, losing the exit code it carries. A
+// container reaching a stop event has necessarily run, so it always gets a
+// die (see the Start doc's event catalogue); only restarting.Has(ctr.ID)
+// proves that die was already processed here, so it's the sole eviction
+// signal — even a NotFound inspect (the container's removal outran this
+// inspect, racing the still-unread die right behind this stop) defers to
+// that pending die rather than evicting on `!found` alone.
+func (c *Monitor) onContainerStop(ctx context.Context, event events.Message, ctr *api.ContainerSummary, containers, restarting utils.Set[string]) error {
+	willRestart, found, exitCode, err := c.isRestarting(ctx, ctr.ID)
+	if err != nil {
+		return err
+	}
+	switch {
+	case willRestart:
+		logrus.Debugf("container %s stopped, restart in progress", ctr.Name)
+		restarting.Add(ctr.ID)
+	case restarting.Has(ctr.ID):
+		// definitive stop, cancelling a restart backoff: correct the
+		// optimistic Restarting: true the earlier die reported, an external
+		// stop just cancelled that restart for good. Skip the correction
+		// when the container is also already gone (found is false): there's
+		// no exit code left to report.
+		logrus.Debugf("container %s stopped", ctr.Name)
+		if found {
+			ctr.ExitCode = exitCode
+			c.notify(newContainerEvent(event.TimeNano, ctr, api.ContainerEventExited))
+		}
+		restarting.Remove(ctr.ID)
+		containers.Remove(ctr.ID)
+	}
+	// otherwise, a die for this stop is still pending: let onContainerDie
+	// report the exit and evict the container itself
+	return nil
+}
+
+// onContainerDestroy handles a container removed by an external `docker compose down`:
+// terminal state, there is nothing left to inspect.
+func (c *Monitor) onContainerDestroy(ctr *api.ContainerSummary, containers, restarting utils.Set[string]) {
+	logrus.Debugf("container %s destroyed", ctr.Name)
+	restarting.Remove(ctr.ID)
+	containers.Remove(ctr.ID)
+}
+
+// isRestarting tells whether a container which just stopped is expected to come back.
+// State.Restarting is set by the engine when the container is configured to restart on
+// exit, but not on a ContainerRestart, where state still is reported as "running"
+// (see https://github.com/moby/moby/issues/45538). A container already removed won't
+// come back, which found reports; exitCode is only meaningful when found is true.
+func (c *Monitor) isRestarting(ctx context.Context, containerID string) (willRestart, found bool, exitCode int, err error) {
+	inspect, err := c.apiClient.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	if errdefs.IsNotFound(err) {
+		return false, false, 0, nil
+	}
+	if err != nil {
+		return false, false, 0, err
+	}
+	state := inspect.Container.State
+	if state == nil {
+		return false, true, 0, nil
+	}
+	return state.Restarting || state.Running, true, state.ExitCode, nil
+}
+
+func newContainerEvent(timeNano int64, ctr *api.ContainerSummary, eventType int, opts ...func(e *api.ContainerEvent)) api.ContainerEvent {
+	name := naming.WithoutProjectPrefix(ctr.Name, ctr.Project, ctr.Labels[api.ServiceLabel], ctr.Labels[api.ContainerNumberLabel])
+
+	event := api.ContainerEvent{
+		Type:      eventType,
+		Container: ctr,
+		Time:      timeNano,
+		Source:    name,
+		ID:        ctr.ID,
+		Service:   ctr.Service,
+		ExitCode:  ctr.ExitCode,
+	}
+	for _, opt := range opts {
+		opt(&event)
+	}
+	return event
+}
+
+func (c *Monitor) getContainerSummary(event events.Message) (*api.ContainerSummary, error) {
+	ctr := &api.ContainerSummary{
+		ID:      event.Actor.ID,
+		Name:    event.Actor.Attributes["name"],
+		Project: c.project,
+		Service: event.Actor.Attributes[api.ServiceLabel],
+		Labels:  event.Actor.Attributes, // More than just labels, but that'c the closest the API gives us
+	}
+	if ec, ok := event.Actor.Attributes["exitCode"]; ok {
+		exitCode, err := strconv.Atoi(ec)
+		if err != nil {
+			return nil, err
+		}
+		ctr.ExitCode = exitCode
+	}
+	return ctr, nil
+}
+
+// WithListener registers a listener of the events of the monitored containers.
+func (c *Monitor) WithListener(listener api.ContainerEventListener) {
+	c.listeners = append(c.listeners, listener)
+}

@@ -18,6 +18,7 @@ package compose
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -27,17 +28,19 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
+	"github.com/docker/compose/v5/internal/planning"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/utils"
 )
 
 // --- Network operations ---
 
-func (exec *planExecutor) execCreateNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execCreateNetwork(ctx context.Context, op planning.Operation) error {
 	return exec.compose.createNetwork(ctx, op.Network)
 }
 
-func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().NetworkRemove(ctx, op.Name, client.NetworkRemoveOptions{})
 	// A best-effort removal (old network on a rename) tolerates the network
 	// still being in use — Docker reports that as a conflict. Any other error
@@ -49,7 +52,7 @@ func (exec *planExecutor) execRemoveNetwork(ctx context.Context, op Operation) e
 	return err
 }
 
-func (exec *planExecutor) execDisconnectNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execDisconnectNetwork(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().NetworkDisconnect(ctx, op.Name, client.NetworkDisconnectOptions{
 		Container: op.Container.ID,
 		Force:     true,
@@ -57,7 +60,7 @@ func (exec *planExecutor) execDisconnectNetwork(ctx context.Context, op Operatio
 	return err
 }
 
-func (exec *planExecutor) execConnectNetwork(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execConnectNetwork(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().NetworkConnect(ctx, op.Name, client.NetworkConnectOptions{
 		Container: op.Container.ID,
 	})
@@ -66,18 +69,18 @@ func (exec *planExecutor) execConnectNetwork(ctx context.Context, op Operation) 
 
 // --- Volume operations ---
 
-func (exec *planExecutor) execCreateVolume(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execCreateVolume(ctx context.Context, op planning.Operation) error {
 	return exec.compose.createVolume(ctx, *op.Volume)
 }
 
-func (exec *planExecutor) execRemoveVolume(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRemoveVolume(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().VolumeRemove(ctx, op.Name, client.VolumeRemoveOptions{Force: true})
 	return err
 }
 
 // --- Container operations ---
 
-func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) execCreateContainer(ctx context.Context, node *planning.PlanNode) error {
 	op := node.Operation
 	service := *op.Service
 	// Detach VolumesFrom from the source slice: resolveServiceReferences mutates
@@ -132,11 +135,11 @@ func (exec *planExecutor) execCreateContainer(ctx context.Context, node *PlanNod
 // today only the create phase's exceptional-state restart of a paused/dead
 // container) is a plain ContainerStart. A start-phase operation (Service set)
 // performs the full service start — secret/config injection right before
-// ContainerStart — mirroring startServiceContainer; its target resolves
+// ContainerStart; its target resolves
 // either from the observed container or, for a replica the plan itself
 // creates, from the CreateContainer node's result (the same mechanism
 // OpRenameContainer already uses).
-func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execStartContainer(ctx context.Context, op planning.Operation) error {
 	if op.Service == nil {
 		startMx.Lock()
 		defer startMx.Unlock()
@@ -175,7 +178,7 @@ func (exec *planExecutor) execStartContainer(ctx context.Context, op Operation) 
 // resolveContainerID returns the ID of the container an operation targets:
 // the observed container when the reconciler already had one, otherwise the
 // result of the CreateContainer node it references.
-func (exec *planExecutor) resolveContainerID(op Operation) (string, error) {
+func (exec *planExecutor) resolveContainerID(op planning.Operation) (string, error) {
 	if op.Container != nil {
 		return op.Container.ID, nil
 	}
@@ -191,7 +194,7 @@ func (exec *planExecutor) resolveContainerID(op Operation) (string, error) {
 // observed container, falling back to the live view populated by the create
 // node execCreateContainer already ran (a dependency of every start-phase
 // node targeting that replica).
-func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summary, error) {
+func (exec *planExecutor) resolveContainerSummary(op planning.Operation) (container.Summary, error) {
 	if op.Container != nil {
 		return *op.Container, nil
 	}
@@ -212,20 +215,22 @@ func (exec *planExecutor) resolveContainerSummary(op Operation) (container.Summa
 // execWaitCondition polls the dependency service named by the operation
 // until it satisfies the declared depends_on condition or the context ends —
 // the plan-side equivalent of one waitDependencies edge, reusing the exact
-// same polling primitive (waitDependency) and per-condition checks the
-// imperative engine uses, so events and error messages cannot drift between
-// the two. required: false dependencies are marked BestEffort by the
+// same polling primitive (waitDependency) and per-condition checks as
+// waitDependencies, so events and error messages cannot drift between the
+// two. required: false dependencies are marked BestEffort by the
 // reconciler: a missing dependency or a failed/timed-out condition is then a
 // warning, not a plan failure — matching waitDependencies' own
 // optional-dependency handling.
 //
-// Unlike waitDependencies, this applies no deadline of its own: nothing
-// produces one yet (no ReconcileOptions field feeds a per-wait timeout the
-// way api.CreateOptions.WaitTimeout does today). A future caller needing that
-// — e.g. `up --wait` once it runs on the plan — wraps ctx before executing
-// the plan, or adds a Timeout to the operation for execWaitCondition to wrap
-// here.
-func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) error {
+// This applies no timeout of its own -- ctx is used exactly as given,
+// already wrapped (or not) by executeNode's OpWaitCondition dispatch in
+// executor.go. origCtx is ctx as it stood right before that wrap, passed
+// through unchanged to waitDependency, which needs it to tell its own wait
+// timeout apart from an inherited deadline (see its doc comment).
+// planExecutor.waitTimeout (set by upDetached and start) is what gives this
+// node its own fresh per-wait window, without also bounding unrelated Create
+// or Start work the way wrapping the whole plan's ctx would.
+func (exec *planExecutor) execWaitCondition(ctx, origCtx context.Context, op planning.Operation) error {
 	s := exec.compose
 	exec.containersMu.Lock()
 	waitingFor := exec.containersByService[op.Name].filter(isNotOneOff, isNotHookContainer)
@@ -241,14 +246,25 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 		return nil
 	}
 
-	s.events.On(containerEvents(waitingFor, waiting)...)
+	s.events.On(containerEvents(waitingFor, progress.Waiting)...)
 	// The wait node is shared across every dependent awaiting the same
 	// (dependency, condition) pair (see waitConditionNode), so no single
 	// requester name would be accurate; op.ResourceID identifies the wait
 	// itself instead. waitDependency only ever reads this for one
 	// practically unreachable log line (an unsupported depends_on condition,
 	// filtered out before a plan is ever built).
-	return s.waitDependency(ctx, op.ResourceID, op.Name, config, waitingFor)
+	//
+	reached, err := s.waitDependencyReached(ctx, origCtx, op.ResourceID, op.Name, config, waitingFor)
+	if err == nil && !reached {
+		return &waitInterrupted{}
+	}
+	if err != nil && errors.Is(ctx.Err(), context.Canceled) && errors.Is(err, context.Canceled) {
+		// a required dependency's check that failed because ctx was canceled
+		// meanwhile (an inspection cut short) is no failure of the dependency:
+		// the wait is interrupted all the same
+		return &waitInterrupted{cause: err}
+	}
+	return err
 }
 
 // execRunPreStart runs the service's pre_start hooks against the runner
@@ -258,7 +274,7 @@ func (exec *planExecutor) execWaitCondition(ctx context.Context, op Operation) e
 // window between observation and execution — the drift the plan design
 // accepts — skips a second, redundant run of the hooks rather than erroring
 // on runners already consumed.
-func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRunPreStart(ctx context.Context, op planning.Operation) error {
 	// Same relationship to run()'s failedDependency check as
 	// execStartContainer's guard above (see its comment): closed for this
 	// node's own direct dependency (the replica's create node) failing,
@@ -280,7 +296,7 @@ func (exec *planExecutor) execRunPreStart(ctx context.Context, op Operation) err
 
 // execRunPostStart runs the service's post_start hooks against the replica
 // the start chain just brought up.
-func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRunPostStart(ctx context.Context, op planning.Operation) error {
 	// Same relationship to run()'s failedDependency check as
 	// execStartContainer's guard above (see its comment): closed for this
 	// node's own direct dependency (StartContainer) failing, defense in depth
@@ -301,14 +317,14 @@ func (exec *planExecutor) execRunPostStart(ctx context.Context, op Operation) er
 	return nil
 }
 
-func (exec *planExecutor) execStopContainer(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execStopContainer(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().ContainerStop(ctx, op.Container.ID, client.ContainerStopOptions{
 		Timeout: utils.DurationSecondToInt(op.Timeout),
 	})
 	return err
 }
 
-func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation) error {
+func (exec *planExecutor) execRemoveContainer(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().ContainerRemove(ctx, op.Container.ID, client.ContainerRemoveOptions{Force: true, RemoveVolumes: op.RemoveVolumes})
 	if err != nil {
 		if op.BestEffort {
@@ -340,7 +356,7 @@ func (exec *planExecutor) execRemoveContainer(ctx context.Context, op Operation)
 // resolved from the live view at execution time: the node depends on every
 // container operation of its service, so the view is final here, and the
 // lowest-numbered replica matches the one the start phase hands the hooks.
-func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *planning.PlanNode) error {
 	// A dependency's done-channel also closes on failure: when a replica
 	// create failed and canceled the run, bail out on the cancellation
 	// instead of reporting the empty live view as an internal error.
@@ -371,7 +387,7 @@ func (exec *planExecutor) execCreateHookContainer(ctx context.Context, node *Pla
 	return nil
 }
 
-func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNode) error {
+func (exec *planExecutor) execRenameContainer(ctx context.Context, node *planning.PlanNode) error {
 	op := node.Operation
 	if op.CreateNodeID == 0 {
 		return fmt.Errorf("internal: rename node #%d missing CreateNodeID", node.ID)
@@ -383,5 +399,43 @@ func (exec *planExecutor) execRenameContainer(ctx context.Context, node *PlanNod
 	_, err := exec.compose.apiClient().ContainerRename(ctx, createdID, client.ContainerRenameOptions{
 		NewName: op.Name,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	// Update the create node's own result in place rather than publishing a
+	// separate entry under this node's ID: plannedReplica deliberately keeps
+	// every start-phase reference (resolveContainerID, groupEventName)
+	// pointed at CreateNodeID, not at this rename node, so they all see the
+	// rename take effect without each needing their own case for "was this
+	// replica's container ever renamed". The ID is unchanged by a rename;
+	// only the name this node is renaming-TO replaces the create's own
+	// temporary one.
+	exec.pctx.set(op.CreateNodeID, operationResult{ContainerID: createdID, ContainerName: op.Name})
+
+	// execCreateContainer published this container into the live view under
+	// its temporary name (the only name it had at that point); refresh it in
+	// place now that the rename landed, or OpWaitCondition and any sibling
+	// execCreateContainer resolving a service reference keep seeing the
+	// temporary one for the rest of the plan's execution.
+	if op.Service != nil {
+		exec.containersMu.Lock()
+		found := false
+		for i, ctr := range exec.containersByService[op.Service.Name] {
+			if ctr.ID == createdID {
+				exec.containersByService[op.Service.Name][i].Names = []string{"/" + op.Name}
+				found = true
+				break
+			}
+		}
+		exec.containersMu.Unlock()
+		if !found {
+			// Shouldn't happen: the DAG guarantees execCreateContainer's
+			// append ran before this node does. Logged rather than silently
+			// skipped, so a future regression that breaks that invariant is
+			// at least visible instead of just quietly serving the
+			// temporary name downstream again.
+			logrus.Warnf("execRenameContainer: container %s not found in live view for service %s; dependents may see the stale temporary name", createdID, op.Service.Name)
+		}
+	}
+	return nil
 }

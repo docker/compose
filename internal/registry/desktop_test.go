@@ -18,7 +18,6 @@ package registry
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"sync"
@@ -301,7 +300,11 @@ func TestDesktopAuthProvider_FallsBackWithoutUsableSession(t *testing.T) {
 	}{
 		{
 			name: "secrets engine not running",
-			hub:  &fakeHub{sessionErr: fmt.Errorf("%w: dial unix engine.sock: connect: no such file or directory", seclient.ErrSecretsEngineNotAvailable)},
+			hub:  &fakeHub{sessionErr: connectError(seclient.ReasonNotRunning)},
+		},
+		{
+			name: "secrets engine socket not accessible",
+			hub:  &fakeHub{sessionErr: connectError(seclient.ReasonPermissionDenied)},
 		},
 		{
 			name: "nobody signed in",
@@ -379,7 +382,11 @@ func TestDesktopAuthProvider_RetriesAfterInterval(t *testing.T) {
 
 func TestIsSessionUnavailable(t *testing.T) {
 	for _, err := range []error{
-		fmt.Errorf("%w: dial unix engine.sock", seclient.ErrSecretsEngineNotAvailable),
+		connectError(seclient.ReasonNotRunning),
+		fmt.Errorf("get session: %w", connectError(seclient.ReasonNotRunning)),
+		connectError(seclient.ReasonPermissionDenied),
+		connectError(seclient.ReasonTimeout),
+		connectError(seclient.ReasonUnknown),
 		dockerhub.ErrNoSession,
 		dockerhub.ErrNoDefaultProfile,
 		errSessionExpired,
@@ -392,6 +399,14 @@ func TestIsSessionUnavailable(t *testing.T) {
 		context.DeadlineExceeded,
 	} {
 		assert.Assert(t, !isSessionUnavailable(err), err)
+	}
+}
+
+func connectError(reason seclient.ConnectReason) error {
+	return &seclient.ConnectError{
+		Reason:     reason,
+		SocketPath: "/run/engine.sock",
+		Err:        errors.New("dial unix /run/engine.sock"),
 	}
 }
 
@@ -434,51 +449,6 @@ func TestDesktopAuthProvider_RefetchesSessionWithoutExpiry(t *testing.T) {
 	_, err = p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
 	assert.Equal(t, hub.sessionCalls.Load(), int32(2))
-}
-
-func fakeJWT(expiresAt time.Time) string {
-	enc := base64.RawURLEncoding.EncodeToString
-	return enc([]byte(`{"alg":"none"}`)) + "." + enc(fmt.Appendf(nil, `{"exp":%d}`, expiresAt.Unix())) + ".sig"
-}
-
-func TestDesktopAuthProvider_ExpiryFromTokenWhenClaimsLackIt(t *testing.T) {
-	t.Run("expired token falls back", func(t *testing.T) {
-		session := hubSession("hubuser", time.Time{})
-		session.AccessToken = fakeJWT(testNow.Add(-time.Minute))
-		p := newTestProvider(&fakeHub{session: session}, nil)
-
-		got, err := p.GetAuthConfig("docker.io")
-		assert.NilError(t, err)
-		assert.DeepEqual(t, got, cliCredentials("docker.io"))
-	})
-
-	t.Run("valid token is reused until it expires", func(t *testing.T) {
-		session := hubSession("hubuser", time.Time{})
-		session.AccessToken = fakeJWT(testNow.Add(10 * time.Minute))
-		hub := &fakeHub{session: session}
-		p := newTestProvider(hub, nil)
-
-		got, err := p.GetAuthConfig("docker.io")
-		assert.NilError(t, err)
-		assert.Equal(t, got.Password, session.AccessToken)
-
-		// Past sessionTTL, but the token's own expiry still applies.
-		p.clock.advance(sessionTTL + time.Minute)
-		_, err = p.GetAuthConfig("docker.io")
-		assert.NilError(t, err)
-		assert.Equal(t, hub.sessionCalls.Load(), int32(1))
-	})
-}
-
-func TestJWTExpiry(t *testing.T) {
-	exp, ok := jwtExpiry(fakeJWT(testNow))
-	assert.Assert(t, ok)
-	assert.Assert(t, exp.Equal(testNow))
-
-	for _, token := range []string{"", "opaque-token", "a.%%%.c", "a." + base64.RawURLEncoding.EncodeToString([]byte(`{}`)) + ".c"} {
-		_, ok := jwtExpiry(token)
-		assert.Assert(t, !ok, token)
-	}
 }
 
 func TestDesktopAuthProvider_ConcurrentLookupsShareOneFetch(t *testing.T) {

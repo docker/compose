@@ -1,0 +1,15 @@
+services:
+  db:
+    image: alpine
+    command: sleep infinity
+    healthcheck:
+      test: ["CMD", "false"]
+      interval: 1s
+      retries: 100
+
+  web:
+    image: alpine
+    command: sleep infinity
+    depends_on:
+      db:
+        condition: service_healthy

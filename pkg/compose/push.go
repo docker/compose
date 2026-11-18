@@ -18,18 +18,18 @@ package compose
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/distribution/reference"
 	"github.com/docker/go-units"
 	"github.com/moby/moby/api/types/jsonstream"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/registry"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -44,7 +44,7 @@ func (s *composeService) Push(ctx context.Context, project *types.Project, optio
 }
 
 func (s *composeService) push(ctx context.Context, project *types.Project, options api.PushOptions) error {
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 
 	for _, service := range project.Services {
 		if service.Build == nil || service.Image == "" {
@@ -65,22 +65,33 @@ func (s *composeService) push(ctx context.Context, project *types.Project, optio
 
 		for _, tag := range tags {
 			eg.Go(func() error {
-				s.events.On(newEvent(tag, api.Working, "Pushing"))
+				if options.IgnoreMissing && s.isMissingLocally(ctx, tag) {
+					s.events.On(progress.New(tag, api.Done, "Skipped", "No local image"))
+					return nil
+				}
+				s.events.On(progress.New(tag, api.Working, "Pushing"))
 				err := s.pushServiceImage(ctx, tag, options.Quiet)
 				if err != nil {
 					if !options.IgnoreFailures {
-						s.events.On(newEvent(tag, api.Error, err.Error()))
+						s.events.On(progress.New(tag, api.Error, err.Error()))
 						return err
 					}
-					s.events.On(newEvent(tag, api.Warning, err.Error()))
+					s.events.On(progress.New(tag, api.Warning, err.Error()))
 				} else {
-					s.events.On(newEvent(tag, api.Done, "Pushed"))
+					s.events.On(progress.New(tag, api.Done, "Pushed"))
 				}
 				return nil
 			})
 		}
 	}
 	return eg.Wait()
+}
+
+// isMissingLocally tells whether the image is known to be absent from the local image store; any other failure
+// to look it up is left to the push to report.
+func (s *composeService) isMissingLocally(ctx context.Context, tag string) bool {
+	_, err := s.apiClient().ImageInspect(ctx, tag)
+	return errdefs.IsNotFound(err)
 }
 
 func (s *composeService) pushServiceImage(ctx context.Context, tag string, quietPush bool) error {
@@ -100,25 +111,11 @@ func (s *composeService) pushServiceImage(ctx context.Context, tag string, quiet
 	if err != nil {
 		return err
 	}
-	dec := json.NewDecoder(stream)
-	for {
-		var jm jsonstream.Message
-		if err := dec.Decode(&jm); err != nil {
-			if errors.Is(err, io.EOF) {
-				break
-			}
-			return err
-		}
-		if jm.Error != nil {
-			return errors.New(jm.Error.Message)
-		}
-
+	return decodeProgressStream(stream, func(jm jsonstream.Message) {
 		if !quietPush {
 			toPushProgressEvent(tag, jm, s.events)
 		}
-	}
-
-	return nil
+	})
 }
 
 func toPushProgressEvent(prefix string, jm jsonstream.Message, events api.EventProcessor) {
@@ -147,7 +144,7 @@ func toPushProgressEvent(prefix string, jm jsonstream.Message, events api.EventP
 			current = jm.Progress.Current
 			total = jm.Progress.Total
 			if jm.Progress.Total > 0 {
-				percent = min(int(jm.Progress.Current*100/jm.Progress.Total), 100)
+				percent = progressPercent(jm.Progress.Current, jm.Progress.Total)
 			}
 		}
 	}

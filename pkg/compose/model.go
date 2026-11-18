@@ -33,6 +33,8 @@ import (
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/spf13/cobra"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -48,7 +50,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	defer mdlAPI.Close()
 	availableModels, err := mdlAPI.ListModels(ctx)
 
-	eg, ctx := newLimitedErrgroup(ctx, s.maxConcurrency)
+	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
 		return mdlAPI.SetModelVariables(ctx, project)
 	})
@@ -76,6 +78,7 @@ type modelAPI struct {
 	prepare func(ctx context.Context, cmd *exec.Cmd) error
 	cleanup func()
 	version string
+	dryRun  bool
 }
 
 func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) {
@@ -101,6 +104,7 @@ func (s *composeService) newModelAPI(project *types.Project) (*modelAPI, error) 
 		},
 		cleanup: cleanup,
 		env:     append(project.Environment.Values(), endpoint...),
+		dryRun:  s.dryRun,
 	}, nil
 }
 
@@ -114,6 +118,11 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 		Status: api.Working,
 		Text:   api.StatusPulling,
 	})
+	if m.dryRun {
+		// the plugin is an external process the dry-run API client cannot intercept
+		events.On(api.Resource{ID: model.Name, Status: api.Working, Text: api.StatusPulled})
+		return nil
+	}
 
 	cmd := exec.CommandContext(ctx, m.path, "pull", model.Model)
 	err := m.prepare(ctx, cmd)
@@ -148,7 +157,7 @@ func (m *modelAPI) PullModel(ctx context.Context, model types.ModelConfig, quiet
 
 	err = cmd.Wait()
 	if err != nil {
-		events.On(errorEvent(model.Name, err.Error()))
+		events.On(progress.Error(model.Name, err.Error()))
 	}
 	events.On(api.Resource{
 		ID:     model.Name,
@@ -164,6 +173,10 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 		Status: api.Working,
 		Text:   api.StatusConfiguring,
 	})
+	if m.dryRun {
+		events.On(api.Resource{ID: config.Name, Status: api.Done, Text: api.StatusConfigured})
+		return nil
+	}
 	// configure [--context-size=<n>] MODEL [-- <runtime-flags...>]
 	args := []string{"configure"}
 	if config.ContextSize > 0 {
@@ -182,7 +195,7 @@ func (m *modelAPI) ConfigureModel(ctx context.Context, config types.ModelConfig,
 	}
 	err = cmd.Run()
 	if err != nil {
-		events.On(errorEvent(config.Name, err.Error()))
+		events.On(progress.Error(config.Name, err.Error()))
 		return err
 	}
 	events.On(api.Resource{

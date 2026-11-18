@@ -1,0 +1,14 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    post_start:
+      - command: touch /tmp/post_start_ran
+    pre_stop:
+      - command: touch /tmp/pre_stop_ran
+
+volumes:
+  data:

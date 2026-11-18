@@ -23,6 +23,8 @@ import (
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -41,12 +43,9 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return err
 	}
 
-	project := options.Project
-	if project == nil {
-		project, err = s.getProjectWithResources(ctx, containers, projectName)
-		if err != nil {
-			return err
-		}
+	project, err := s.projectOrFromResources(ctx, options.Project, containers, projectName)
+	if err != nil {
+		return err
 	}
 
 	if !options.RemoveOrphans {
@@ -56,17 +55,17 @@ func (s *composeService) kill(ctx context.Context, projectName string, options a
 		return api.ErrNoResources
 	}
 
-	return forEachContainerConcurrent(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
+	return concurrency.ForEachBounded(ctx, s.maxConcurrency, containers, func(ctx context.Context, ctr container.Summary) error {
 		eventName := getContainerProgressName(ctr)
-		s.events.On(newEvent(eventName, api.Working, api.StatusKilling))
+		s.events.On(progress.New(eventName, api.Working, api.StatusKilling))
 		_, err := s.apiClient().ContainerKill(ctx, ctr.ID, client.ContainerKillOptions{
 			Signal: options.Signal,
 		})
 		if err != nil {
-			s.events.On(errorEvent(eventName, "Error while Killing"))
+			s.events.On(progress.Error(eventName, "Error while Killing"))
 			return err
 		}
-		s.events.On(newEvent(eventName, api.Done, api.StatusKilled))
+		s.events.On(progress.New(eventName, api.Done, api.StatusKilled))
 		return nil
 	})
 }

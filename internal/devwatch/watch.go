@@ -1,0 +1,875 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+       http://www.apache.org/licenses/LICENSE-2.0
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+// Package devwatch implements the development loop of a project: the
+// develop.watch triggers that sync, restart or rebuild services as the files
+// they come from change. It sits on top of pkg/watch, which only reports the
+// file system events.
+package devwatch
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path"
+	"path/filepath"
+	"slices"
+	"strconv"
+	"strings"
+	gsync "sync"
+	"time"
+
+	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/compose-spec/compose-go/v2/utils"
+	"github.com/docker/cli/cli/command"
+	ccli "github.com/docker/cli/cli/command/container"
+	"github.com/moby/buildkit/util/progress/progressui"
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/api/types/image"
+	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/docker/compose/v5/internal/concurrency"
+	"github.com/docker/compose/v5/internal/engine"
+	pathutil "github.com/docker/compose/v5/internal/paths"
+	"github.com/docker/compose/v5/internal/sync"
+	"github.com/docker/compose/v5/internal/tracing"
+	"github.com/docker/compose/v5/pkg/api"
+	cutils "github.com/docker/compose/v5/pkg/utils"
+	"github.com/docker/compose/v5/pkg/watch"
+)
+
+// Backend is what the development loop needs from the engine it drives.
+type Backend interface {
+	engine.Backend
+	// CLI is the Docker CLI Compose runs in: it owns the output stream the
+	// sync commands write to, the config the exec hooks read, and runs them.
+	CLI() command.Cli
+	// Build builds the images of the project's services.
+	Build(ctx context.Context, project *types.Project, options api.BuildOptions) (map[string]string, error)
+	// CreateAndStart converges the project's services to their configuration
+	// and starts them.
+	CreateAndStart(ctx context.Context, project *types.Project, options api.CreateOptions) error
+	// Restart restarts the services of a project.
+	Restart(ctx context.Context, projectName string, options api.RestartOptions) error
+	// RemoveDanglingImages removes the dangling images of a project, but the ones keep reports.
+	RemoveDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) error
+}
+
+// Service runs the development loop on a Backend.
+type Service struct {
+	backend Backend
+}
+
+// New creates a Service driving the given Backend.
+func New(backend Backend) *Service {
+	return &Service{backend: backend}
+}
+
+// WatchFunc starts a watch and returns the function that waits for its end.
+type WatchFunc func(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error)
+
+type Watcher struct {
+	project *types.Project
+	options api.WatchOptions
+	watchFn WatchFunc
+	stopFn  func()
+	errCh   chan error
+	// mx keeps Start/Stop state changes atomic, for this watcher only.
+	mx gsync.Mutex
+}
+
+func NewWatcher(project *types.Project, options api.UpOptions, w WatchFunc, consumer api.LogConsumer) (*Watcher, error) {
+	for i := range project.Services {
+		service := project.Services[i]
+
+		if service.Develop != nil && service.Develop.Watch != nil {
+			build := options.Create.Build
+			return &Watcher{
+				project: project,
+				options: api.WatchOptions{
+					LogTo: consumer,
+					Build: build,
+				},
+				watchFn: w,
+				errCh:   make(chan error),
+			}, nil
+		}
+	}
+	// none of the services is eligible to watch
+	return nil, errors.New("none of the selected services is configured for watch, see https://docs.docker.com/compose/how-tos/file-watch/")
+}
+
+func (w *Watcher) Start(ctx context.Context) error {
+	w.mx.Lock()
+	defer w.mx.Unlock()
+	ctx, cancelFunc := context.WithCancel(ctx)
+	w.stopFn = cancelFunc
+	wait, err := w.watchFn(ctx, w.project, w.options)
+	if err != nil {
+		go func() {
+			w.errCh <- err
+		}()
+		return err
+	}
+	go func() {
+		w.errCh <- wait()
+	}()
+	return nil
+}
+
+func (w *Watcher) Stop() error {
+	w.mx.Lock()
+	defer w.mx.Unlock()
+	if w.stopFn == nil {
+		return nil
+	}
+	w.stopFn()
+	w.stopFn = nil
+	err := <-w.errCh
+	return err
+}
+
+// getSyncImplementation returns an appropriate sync implementation for the
+// project.
+//
+// Currently, an implementation that batches files and transfers them using
+// the Moby `Untar` API.
+func (s *Service) getSyncImplementation(project *types.Project) (sync.Syncer, error) {
+	var useTar bool
+	if useTarEnv, ok := os.LookupEnv("COMPOSE_EXPERIMENTAL_WATCH_TAR"); ok {
+		useTar, _ = strconv.ParseBool(useTarEnv)
+	} else {
+		useTar = true
+	}
+	if !useTar {
+		return nil, errors.New("no available sync implementation")
+	}
+
+	return sync.NewTar(project.Name, tarDockerClient{backend: s.backend}, s.backend.MaxConcurrency()), nil
+}
+
+type watchRule struct {
+	types.Trigger
+	include watch.PathMatcher
+	ignore  watch.PathMatcher
+	service string
+}
+
+func (r watchRule) Matches(event watch.FileEvent) *sync.PathMapping {
+	hostPath := string(event)
+	if !pathutil.IsChild(r.Path, hostPath) {
+		return nil
+	}
+	included, err := r.include.Matches(hostPath)
+	if err != nil {
+		logrus.Warnf("error include matching %q: %v", hostPath, err)
+		return nil
+	}
+	if !included {
+		logrus.Debugf("%s is not matching include pattern", hostPath)
+		return nil
+	}
+	isIgnored, err := r.ignore.Matches(hostPath)
+	if err != nil {
+		logrus.Warnf("error ignore matching %q: %v", hostPath, err)
+		return nil
+	}
+
+	if isIgnored {
+		logrus.Debugf("%s is matching ignore pattern", hostPath)
+		return nil
+	}
+
+	var containerPath string
+	if r.Target != "" {
+		rel, err := filepath.Rel(r.Path, hostPath)
+		if err != nil {
+			logrus.Warnf("error making %s relative to %s: %v", hostPath, r.Path, err)
+			return nil
+		}
+		// always use Unix-style paths for inside the container
+		containerPath = path.Join(r.Target, filepath.ToSlash(rel))
+	}
+	return &sync.PathMapping{
+		HostPath:      hostPath,
+		ContainerPath: containerPath,
+	}
+}
+
+// Watch starts watching the project's services and returns the function that
+// waits for the watch to end.
+func (s *Service) Watch(ctx context.Context, project *types.Project, options api.WatchOptions) (func() error, error) {
+	var err error
+	if project, err = project.WithSelectedServices(options.Services); err != nil {
+		return nil, err
+	}
+	syncer, err := s.getSyncImplementation(project)
+	if err != nil {
+		return nil, err
+	}
+	// exactly one goroutine is ever submitted to eg (below); the real
+	// --parallel bound for watch is handleWatchBatch's per-batch fan-out.
+	eg, ctx := errgroup.WithContext(ctx)
+
+	var (
+		rules []watchRule
+		paths []string
+	)
+	for serviceName, service := range project.Services {
+		config := service.Develop
+		if config == nil {
+			continue
+		}
+
+		service, err = prepareRebuildTriggers(project, serviceName, service, config, options)
+		if err != nil {
+			return nil, err
+		}
+
+		triggerPaths, err := s.watchTriggerPaths(ctx, service, config, syncer)
+		if err != nil {
+			return nil, err
+		}
+		paths = append(paths, triggerPaths...)
+
+		serviceWatchRules, err := getWatchRules(config, service)
+		if err != nil {
+			return nil, err
+		}
+		rules = append(rules, serviceWatchRules...)
+	}
+
+	if len(paths) == 0 {
+		return nil, errors.New("none of the selected services is configured for watch, consider setting a 'develop' section")
+	}
+
+	watcher, err := watch.NewWatcher(paths)
+	if err != nil {
+		return nil, err
+	}
+
+	err = watcher.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	eg.Go(func() error {
+		return s.watchEvents(ctx, project, options, watcher, syncer, rules)
+	})
+	options.LogTo.Log(api.WatchLogger, "Watch enabled")
+
+	return func() error {
+		err := eg.Wait()
+		if werr := watcher.Close(); werr != nil {
+			logrus.Debugf("Error closing Watcher: %v", werr)
+		}
+		return err
+	}, nil
+}
+
+// prepareRebuildTriggers validates rebuild watch actions and marks the
+// service to always be built — watch triggers `Up()` when it receives a
+// rebuild event. It returns the possibly-updated service config.
+func prepareRebuildTriggers(project *types.Project, serviceName string, service types.ServiceConfig, config *types.DevelopConfig, options api.WatchOptions) (types.ServiceConfig, error) {
+	for _, trigger := range config.Watch {
+		if trigger.Action != types.WatchActionRebuild {
+			continue
+		}
+		if service.Build == nil {
+			return service, fmt.Errorf("can't watch service %q with action %s without a build context", service.Name, types.WatchActionRebuild)
+		}
+		if options.Build == nil {
+			return service, fmt.Errorf("--no-build is incompatible with watch action %s in service %s", types.WatchActionRebuild, service.Name)
+		}
+		service.PullPolicy = types.PullPolicyBuild
+		project.Services[serviceName] = service
+	}
+	return service, nil
+}
+
+// watchTriggerPaths collects the paths to monitor for a service, skipping
+// (with a warning) those already covered by a bind mount volume, and runs the
+// initial sync for sync triggers requesting one.
+func (s *Service) watchTriggerPaths(ctx context.Context, service types.ServiceConfig, config *types.DevelopConfig, syncer sync.Syncer) ([]string, error) {
+	var paths []string
+	for _, trigger := range config.Watch {
+		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+			logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
+			continue
+		}
+		if initialSyncRequested(trigger) && isSync(trigger) {
+			// Need to check that initial files meant to be synced from the watch action are in the container
+			err := s.initialSync(ctx, service, trigger, syncer)
+			if err != nil {
+				return nil, err
+			}
+		}
+		paths = append(paths, trigger.Path)
+	}
+	return paths, nil
+}
+
+// initialSyncRequested tells whether a sync trigger requests an initial sync.
+// compose-go promotes the legacy x-initialSync extension into InitialSync at load time.
+func initialSyncRequested(trigger types.Trigger) bool {
+	return trigger.InitialSync
+}
+
+func getWatchRules(config *types.DevelopConfig, service types.ServiceConfig) ([]watchRule, error) {
+	var rules []watchRule
+
+	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
+	if err != nil {
+		return nil, err
+	}
+
+	// add a hardcoded set of ignores on top of what came from .dockerignore
+	// some of this should likely be configurable (e.g. there could be cases
+	// where you want `.git` to be synced) but this is suitable for now
+	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{"**/.git"})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, trigger := range config.Watch {
+		ignore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
+		if err != nil {
+			return nil, err
+		}
+
+		var include watch.PathMatcher
+		if len(trigger.Include) == 0 {
+			include = watch.AnyMatcher{}
+		} else {
+			include, err = watch.NewDockerPatternMatcher(trigger.Path, trigger.Include)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		rules = append(rules, watchRule{
+			Trigger: trigger,
+			include: include,
+			ignore: watch.NewCompositeMatcher(
+				dockerIgnores,
+				watch.EphemeralPathMatcher(),
+				dotGitIgnore,
+				ignore,
+			),
+			service: service.Name,
+		})
+	}
+	return rules, nil
+}
+
+func isSync(trigger types.Trigger) bool {
+	return trigger.Action == types.WatchActionSync || trigger.Action == types.WatchActionSyncRestart || trigger.Action == types.WatchActionSyncExec
+}
+
+func (s *Service) watchEvents(ctx context.Context, project *types.Project, options api.WatchOptions, watcher watch.Notify, syncer sync.Syncer, rules []watchRule) error {
+	ctx, cancel := context.WithCancel(ctx)
+
+	// debounce and group filesystem events so that we capture IDE saving many files as one "batch" event
+	batchEvents := watch.BatchDebounceEvents(ctx, watcher.Events())
+
+	scheduler := newRebuildScheduler(ctx, func(ctx context.Context, services []string) error {
+		return s.Rebuild(ctx, project, services, options)
+	})
+	// Rebuilds run asynchronously in their own goroutine(s); cancel first so
+	// an in-flight one can unwind, then wait for it to settle so none
+	// outlive this function.
+	defer scheduler.Wait()
+	defer cancel()
+
+	for {
+		select {
+		case <-ctx.Done():
+			options.LogTo.Log(api.WatchLogger, "Watch disabled")
+			// Ensure watcher is closed to release resources
+			_ = watcher.Close()
+			return nil
+		case err, open := <-watcher.Errors():
+			if err != nil {
+				options.LogTo.Err(api.WatchLogger, "Watch disabled with errors: "+err.Error())
+			}
+			if open {
+				continue
+			}
+			_ = watcher.Close()
+			return err
+		case batch, ok := <-batchEvents:
+			if !ok {
+				options.LogTo.Log(api.WatchLogger, "Watch disabled")
+				_ = watcher.Close()
+				return nil
+			}
+			if len(batch) > 1000 {
+				logrus.Warnf("Very large batch of file changes detected: %d files. This may impact performance.", len(batch))
+				options.LogTo.Log(api.WatchLogger, "Large batch of file changes detected. If you just switched branches, this is expected.")
+			}
+			start := time.Now()
+			logrus.Debugf("batch start: count[%d]", len(batch))
+			err := s.handleWatchBatch(ctx, project, options, batch, rules, syncer, scheduler)
+			if err != nil {
+				logrus.Warnf("Error handling changed files: %v", err)
+				// If context was canceled, exit immediately
+				if ctx.Err() != nil {
+					_ = watcher.Close()
+					return ctx.Err()
+				}
+			}
+			logrus.Debugf("batch complete: duration[%s] count[%d]", time.Since(start), len(batch))
+		}
+	}
+}
+
+func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
+	for _, volume := range volumes {
+		if volume.Bind != nil {
+			relPath, err := filepath.Rel(volume.Source, watchPath)
+			// A child name such as "..local" is local despite starting with two dots.
+			if err == nil && filepath.IsLocal(relPath) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+type tarDockerClient struct {
+	backend Backend
+}
+
+func (t tarDockerClient) ContainersForService(ctx context.Context, projectName string, serviceName string) ([]container.Summary, error) {
+	containers, err := t.backend.Containers(ctx, projectName, engine.OneOffExclude, true, serviceName)
+	if err != nil {
+		return nil, err
+	}
+	return containers, nil
+}
+
+func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
+	execCreateResp, err := t.backend.APIClient().ExecCreate(ctx, containerID, client.ExecCreateOptions{
+		Cmd:          cmd,
+		AttachStdout: false,
+		AttachStderr: true,
+		AttachStdin:  in != nil,
+		TTY:          false,
+	})
+	if err != nil {
+		return err
+	}
+
+	conn, err := t.backend.APIClient().ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{
+		TTY: false,
+	})
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	var eg errgroup.Group
+	if in != nil {
+		eg.Go(func() error {
+			defer func() {
+				_ = conn.CloseWrite()
+			}()
+			_, err := io.Copy(conn.Conn, in)
+			return err
+		})
+	}
+	eg.Go(func() error {
+		_, err := io.Copy(t.backend.CLI().Out(), conn.Reader)
+		return err
+	})
+
+	_, err = t.backend.APIClient().ExecStart(ctx, execCreateResp.ID, client.ExecStartOptions{
+		TTY:    false,
+		Detach: false,
+	})
+	if err != nil {
+		return err
+	}
+
+	// although the errgroup is not tied directly to the context, the operations
+	// in it are reading/writing to the connection, which is tied to the context,
+	// so they won't block indefinitely
+	if err := eg.Wait(); err != nil {
+		return err
+	}
+
+	execResult, err := t.backend.APIClient().ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
+	if err != nil {
+		return err
+	}
+	if execResult.Running {
+		return errors.New("process still running")
+	}
+	if execResult.ExitCode != 0 {
+		return errors.New("exit code " + strconv.Itoa(execResult.ExitCode))
+	}
+	return nil
+}
+
+func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
+	_, err := t.backend.APIClient().CopyToContainer(ctx, id, client.CopyToContainerOptions{
+		DestinationPath: "/",
+		Content:         archive,
+		CopyUIDGID:      true,
+	})
+	return err
+}
+
+func (s *Service) handleWatchBatch(ctx context.Context, project *types.Project, options api.WatchOptions,
+	batch []watch.FileEvent, rules []watchRule, syncer sync.Syncer, scheduler *rebuildScheduler,
+) error {
+	var (
+		restart   = map[string]bool{}
+		syncfiles = map[string][]*sync.PathMapping{}
+		exec      = map[string][]int{}
+		rebuild   = map[string]bool{}
+	)
+	for _, event := range batch {
+		for i, rule := range rules {
+			mapping := rule.Matches(event)
+			if mapping == nil {
+				continue
+			}
+
+			switch rule.Action {
+			case types.WatchActionRebuild:
+				rebuild[rule.service] = true
+			case types.WatchActionSync:
+				syncfiles[rule.service] = append(syncfiles[rule.service], mapping)
+			case types.WatchActionRestart:
+				restart[rule.service] = true
+			case types.WatchActionSyncRestart:
+				syncfiles[rule.service] = append(syncfiles[rule.service], mapping)
+				restart[rule.service] = true
+			case types.WatchActionSyncExec:
+				syncfiles[rule.service] = append(syncfiles[rule.service], mapping)
+				// We want to run exec hooks only once after syncfiles if multiple file events match
+				// as we can't compare ServiceHook to sort and compact a slice, collect rule indexes
+				exec[rule.service] = append(exec[rule.service], i)
+			}
+		}
+	}
+
+	if len(rebuild) > 0 {
+		scheduler.Request(utils.MapKeys(rebuild))
+	}
+
+	// A rebuild already recreates and starts the service, so a separate
+	// restart is redundant at best and races the rebuild's create/start at
+	// worst. Which rebuild matters:
+	//   - pending: it will snapshot the build context after this change —
+	//     drop the restart, the rebuild converges on its own;
+	//   - in flight: its snapshot predates this change, so its outcome is
+	//     stale — fold the restart into a Request, which interrupts the
+	//     doomed run and rebuilds from a fresh snapshot (recreate + start:
+	//     the restart intent, converged).
+	for service := range restart {
+		switch {
+		case scheduler.Pending(service):
+			logrus.Debugf("skipping restart for service %q: rebuild pending", service)
+			delete(restart, service)
+		case scheduler.InFlight(service):
+			logrus.Debugf("turning restart for service %q into a rebuild: stale rebuild in flight", service)
+			scheduler.Request([]string{service})
+			delete(restart, service)
+		}
+	}
+
+	logrus.Debugf("watch actions: rebuild %d sync %d restart %d", len(rebuild), len(syncfiles), len(restart))
+
+	// A sync or exec below may still target a service whose container is
+	// being replaced by an in-flight asynchronous rebuild (from this batch or
+	// an earlier one): unlike restart, this is a conscious tradeoff, since
+	// syncer.Sync/exec resolve containers by lookup and simply fail loudly
+	// (rather than racing the container lifecycle) if the container is gone.
+	for serviceName, pathMappings := range syncfiles {
+		writeWatchSyncMessage(options.LogTo, serviceName, pathMappings)
+		err := syncer.Sync(ctx, serviceName, pathMappings)
+		if err != nil {
+			return err
+		}
+	}
+	if len(restart) > 0 {
+		services := utils.MapKeys(restart)
+		err := s.backend.Restart(ctx, project.Name, api.RestartOptions{
+			Services: services,
+			Project:  project,
+			NoDeps:   false,
+		})
+		if err != nil {
+			return err
+		}
+		options.LogTo.Log(
+			api.WatchLogger,
+			fmt.Sprintf("service(s) %q restarted", services))
+	}
+
+	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())
+	for service, rulesToExec := range exec {
+		slices.Sort(rulesToExec)
+		for _, i := range slices.Compact(rulesToExec) {
+			err := s.exec(ctx, project, service, rules[i].Exec, eg)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return eg.Wait()
+}
+
+func (s *Service) exec(ctx context.Context, project *types.Project, serviceName string, x types.ServiceHook, eg *errgroup.Group) error {
+	containers, err := s.backend.Containers(ctx, project.Name, engine.OneOffExclude, false, serviceName)
+	if err != nil {
+		return err
+	}
+	for _, ctr := range containers {
+		eg.Go(func() error {
+			exec := ccli.NewExecOptions()
+			exec.User = x.User
+			exec.Privileged = x.Privileged
+			exec.Command = x.Command
+			exec.Workdir = x.WorkingDir
+			exec.DetachKeys = s.backend.CLI().ConfigFile().DetachKeys
+			for _, v := range x.Environment.ToMapping().Values() {
+				err := exec.Env.Set(v)
+				if err != nil {
+					return err
+				}
+			}
+			return ccli.RunExec(ctx, s.backend.CLI(), ctr.ID, exec)
+		})
+	}
+	return nil
+}
+
+// Rebuild rebuilds the given services and converges what depends on them, as
+// the watch loop does when a rebuild trigger fires.
+func (s *Service) Rebuild(ctx context.Context, project *types.Project, services []string, options api.WatchOptions) error {
+	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Rebuilding service(s) %q after changes were detected...", services))
+	// Work on a copy so concurrent watch events don't race on the shared
+	// BuildOptions pointer carried by WatchOptions.
+	buildOpts := *options.Build
+	// Restrict the build to ONLY the watched services, not any of their
+	// dependencies. `up --build` sets Deps=true so initial startup builds
+	// images for depends_on services; here we must reset it, otherwise a
+	// rebuild for service A cascades to its upstream dependency B.
+	buildOpts.Services = services
+	buildOpts.Deps = false
+	buildOpts.Progress = string(progressui.PlainMode)
+	buildOpts.Out = cutils.GetWriter(func(line string) {
+		options.LogTo.Log(api.WatchLogger, line)
+	})
+
+	var (
+		imageNameToIdMap map[string]string
+		err              error
+	)
+	err = tracing.SpanWrapFunc("project/build", tracing.ProjectOptions(ctx, project),
+		func(ctx context.Context) error {
+			imageNameToIdMap, err = s.backend.Build(ctx, project, buildOpts)
+			return err
+		})(ctx)
+	if err != nil {
+		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Build failed. Error: %v", err))
+		return err
+	}
+
+	if options.Prune {
+		s.pruneDanglingImagesOnRebuild(ctx, project.Name, imageNameToIdMap)
+	}
+
+	options.LogTo.Log(api.WatchLogger, fmt.Sprintf("service(s) %q successfully built", services))
+
+	// Narrowed to services + their dependents for both phases, not just
+	// start: a rebuild of one service has no business re-checking drift on
+	// the rest of the project. The services left out move to
+	// DisabledServices; Networks and Volumes stay declared, and the
+	// reconciler leaves a drifted one alone while a live container of such a
+	// service still uses it (it can only detach the ones it manages).
+	p, err := project.WithSelectedServices(services, types.IncludeDependents)
+	if err != nil {
+		return err
+	}
+	err = s.backend.CreateAndStart(ctx, p, api.CreateOptions{
+		Services:      services,
+		Inherit:       true,
+		Recreate:      api.RecreateForce,
+		SkipProviders: true,
+	})
+	if err != nil {
+		options.LogTo.Log(api.WatchLogger, fmt.Sprintf("Failed to recreate and restart service(s) after update. Error: %v", err))
+	}
+	return err
+}
+
+// writeWatchSyncMessage prints out a message about the sync for the changed paths.
+func writeWatchSyncMessage(log api.LogConsumer, serviceName string, pathMappings []*sync.PathMapping) {
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		hostPathsToSync := make([]string, len(pathMappings))
+		for i := range pathMappings {
+			hostPathsToSync[i] = pathMappings[i].HostPath
+		}
+		log.Log(
+			api.WatchLogger,
+			fmt.Sprintf(
+				"Syncing service %q after changes were detected: %s",
+				serviceName,
+				strings.Join(hostPathsToSync, ", "),
+			),
+		)
+	} else {
+		log.Log(
+			api.WatchLogger,
+			fmt.Sprintf("Syncing service %q after %d changes were detected", serviceName, len(pathMappings)),
+		)
+	}
+}
+
+func (s *Service) pruneDanglingImagesOnRebuild(ctx context.Context, projectName string, imageNameToIdMap map[string]string) {
+	// imageNameToIdMap is keyed by image name; the freshly built images to
+	// spare are its VALUES (image IDs), matched against the dangling IDs
+	builtIDs := make(map[string]struct{}, len(imageNameToIdMap))
+	for _, id := range imageNameToIdMap {
+		builtIDs[id] = struct{}{}
+	}
+	keep := func(img image.Summary) bool {
+		_, ok := builtIDs[img.ID]
+		return ok
+	}
+	if err := s.backend.RemoveDanglingImages(ctx, projectName, keep); err != nil {
+		logrus.Debugf("Failed to prune dangling images: %v", err)
+	}
+}
+
+// Walks develop.watch.path and checks which files should be copied inside the container
+// ignores develop.watch.ignore, Dockerfile, compose files, bind mounted paths and .git
+func (s *Service) initialSync(ctx context.Context, service types.ServiceConfig, trigger types.Trigger, syncer sync.Syncer) error {
+	dockerIgnores, err := watch.LoadDockerIgnore(service.Build)
+	if err != nil {
+		return err
+	}
+
+	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+	if err != nil {
+		return err
+	}
+
+	triggerIgnore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
+	if err != nil {
+		return err
+	}
+
+	// also exclude override compose files and any custom-named Dockerfile
+	dockerFilePatterns := append([]string{"Dockerfile"}, cli.DefaultFileNames...)
+	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
+	if service.Build != nil && service.Build.Dockerfile != "" {
+		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+	}
+
+	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
+	if err != nil {
+		return err
+	}
+
+	ignoreInitialSync := watch.NewCompositeMatcher(
+		dockerIgnores,
+		watch.EphemeralPathMatcher(),
+		dotGitIgnore,
+		dockerFileIgnore,
+		triggerIgnore)
+
+	pathsToCopy, err := s.initialSyncFiles(service, trigger, ignoreInitialSync)
+	if err != nil {
+		return err
+	}
+
+	return syncer.Sync(ctx, service.Name, pathsToCopy)
+}
+
+// Syncs files from develop.watch.path, ignoring bind-mounted and excluded paths.
+func (s *Service) initialSyncFiles(service types.ServiceConfig, trigger types.Trigger, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+	fi, err := os.Stat(trigger.Path)
+	if err != nil {
+		return nil, err
+	}
+	switch mode := fi.Mode(); {
+	case mode.IsDir():
+		// process directory
+		return initialSyncDirectory(trigger, service, ignore)
+	case mode.IsRegular():
+		// process file
+		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+			return []*sync.PathMapping{{
+				HostPath:      trigger.Path,
+				ContainerPath: trigger.Target,
+			}}, nil
+		}
+	}
+	return nil, nil
+}
+
+// initialSyncDirectory collects the files of a watched directory, skipping
+// ignored and bind-mounted paths.
+func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
+	var pathsToCopy []*sync.PathMapping
+	err := filepath.WalkDir(trigger.Path, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			// handle possible path err, just in case...
+			return err
+		}
+		if trigger.Path == path {
+			// walk starts at the root directory
+			return nil
+		}
+		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+			// By definition sync ignores bind mounted paths
+			if d.IsDir() {
+				// skip folder
+				return fs.SkipDir
+			}
+			return nil // skip file
+		}
+		if d.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(trigger.Path, path)
+		if err != nil {
+			return err
+		}
+		// only copy files (and not full directories)
+		pathsToCopy = append(pathsToCopy, &sync.PathMapping{
+			HostPath:      path,
+			ContainerPath: filepath.Join(trigger.Target, rel),
+		})
+		return nil
+	})
+	return pathsToCopy, err
+}
+
+func shouldIgnore(name string, ignore watch.PathMatcher) bool {
+	shouldIgnore, _ := ignore.Matches(name)
+	// ignore files that match any ignore pattern
+	return shouldIgnore
+}

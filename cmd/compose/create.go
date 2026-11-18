@@ -31,7 +31,6 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/docker/compose/v5/cmd/display"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/compose"
 )
@@ -64,6 +63,7 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 		Short: "Creates containers for a service",
 		PreRunE: AdaptCmd(func(ctx context.Context, cmd *cobra.Command, args []string) error {
 			opts.pullChanged = cmd.Flags().Changed("pull")
+			opts.removeOrphans = removeOrphansFromEnv(cmd.Flags(), opts.removeOrphans)
 			if opts.Build && opts.noBuild {
 				return errors.New("--build and --no-build are incompatible")
 			}
@@ -72,18 +72,9 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 			}
 			return nil
 		}),
-		RunE: func(cmd *cobra.Command, args []string) error {
-			err := p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
-				return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
-			})(cmd, args)
-			if jobErr, replaced := jobTargetErr(cmd.Context(), dockerCli, p, args, err); replaced {
-				if display.Mode == display.ModeJSON {
-					return makeJSONError(jobErr)
-				}
-				return jobErr
-			}
-			return err
-		},
+		RunE: p.WithServices(dockerCli, func(ctx context.Context, project *types.Project, services []string) error {
+			return runCreate(ctx, dockerCli, backendOptions, opts, buildOpts, project, services)
+		}),
 		ValidArgsFunction: completeServiceNames(dockerCli, p),
 	}
 	flags := cmd.Flags()
@@ -96,23 +87,25 @@ func createCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 	flags.BoolVar(&opts.removeOrphans, "remove-orphans", false, "Remove containers for services not defined in the Compose file")
 	flags.StringArrayVar(&opts.scale, "scale", []string{}, "Scale SERVICE to NUM instances. Overrides the `scale` setting in the Compose file if present.")
 	flags.BoolVarP(&opts.AssumeYes, "yes", "y", false, `Assume "yes" as answer to all prompts and run non-interactively`)
-	flags.SetNormalizeFunc(func(f *pflag.FlagSet, name string) pflag.NormalizedName {
-		// assumeYes was introduced by mistake as `--y`
-		if name == "y" {
-			logrus.Warn("--y is deprecated, please use --yes instead")
-			name = "yes"
-		}
-		return pflag.NormalizedName(name)
-	})
+	flags.SetNormalizeFunc(normalizeYesFlag)
 	return cmd
 }
 
+// normalizeYesFlag maps the --y spelling of --yes, introduced by mistake, to --yes.
+func normalizeYesFlag(_ *pflag.FlagSet, name string) pflag.NormalizedName {
+	if name == "y" {
+		logrus.Warn("--y is deprecated, please use --yes instead")
+		name = "yes"
+	}
+	return pflag.NormalizedName(name)
+}
+
 func runCreate(ctx context.Context, dockerCli command.Cli, backendOptions *BackendOptions, createOpts createOptions, buildOpts buildOptions, project *types.Project, services []string) error {
-	// same contract as up: an active scheduled job is refused before any
-	// resource is created — silently not scheduling would break expectations
-	if err := rejectScheduledJobs(project); err != nil {
+	ignoreOrphans, err := resolveIgnoreOrphans(project, createOpts.removeOrphans)
+	if err != nil {
 		return err
 	}
+	createOpts.ignoreOrphans = ignoreOrphans
 	if err := createOpts.Apply(project); err != nil {
 		return err
 	}
@@ -215,7 +208,7 @@ func (opts createOptions) Apply(project *types.Project) error {
 func applyScaleOpts(project *types.Project, opts []string) error {
 	for _, scale := range opts {
 		name, val, ok := strings.Cut(scale, "=")
-		if !ok || val == "" {
+		if !ok || name == "" || val == "" {
 			return fmt.Errorf("invalid --scale option %q. Should be SERVICE=NUM", scale)
 		}
 		replicas, err := strconv.Atoi(val)

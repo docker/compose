@@ -23,6 +23,7 @@ import (
 	"math"
 	"os"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -73,13 +74,7 @@ func (ke *KeyboardError) error() string {
 
 type KeyboardWatch struct {
 	Watching bool
-	Watcher  Feature
-}
-
-// Feature is an compose feature that can be started/stopped by a menu command
-type Feature interface {
-	Start(context.Context) error
-	Stop() error
+	Watcher  api.Feature
 }
 
 type KEYBOARD_LOG_LEVEL int
@@ -98,6 +93,9 @@ type LogKeyboard struct {
 	IsLogsViewEnabled     bool
 	logLevel              KEYBOARD_LOG_LEVEL
 	signalChannel         chan<- os.Signal
+	keys                  <-chan keyboard.KeyEvent
+	closeOnce             sync.Once
+	closeErr              error
 }
 
 func NewKeyboardManager(isDockerDesktopActive, isLogsViewEnabled bool, sc chan<- os.Signal) *LogKeyboard {
@@ -207,65 +205,45 @@ func (lk *LogKeyboard) openDockerDesktop(ctx context.Context, project *types.Pro
 	if !lk.IsDockerDesktopActive {
 		return
 	}
-	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				link := "docker-desktop://dashboard/apps/" + project.Name
-				err := open.Run(link)
-				if err != nil {
-					err = errors.New("could not open Docker Desktop")
-					lk.keyboardError("View", err)
-				}
-				return err
-			})()
-	}()
+	lk.openLink(ctx, "menu/gui", "View", "docker-desktop://dashboard/apps/"+project.Name, func(error) error {
+		return errors.New("could not open Docker Desktop")
+	})
 }
 
 func (lk *LogKeyboard) openDDComposeUI(ctx context.Context, project *types.Project) {
 	if !lk.IsDockerDesktopActive {
 		return
 	}
-	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/composeview", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				link := "docker-desktop://dashboard/docker-compose/" + project.Name
-				err := open.Run(link)
-				if err != nil {
-					err = errors.New("could not open Docker Desktop Compose UI")
-					lk.keyboardError("View Config", err)
-				}
-				return err
-			})()
-	}()
+	lk.openLink(ctx, "menu/gui/composeview", "View Config", "docker-desktop://dashboard/docker-compose/"+project.Name, func(error) error {
+		return errors.New("could not open Docker Desktop Compose UI")
+	})
 }
 
 func (lk *LogKeyboard) openDDLogsView(ctx context.Context, project *types.Project) {
 	if !lk.IsLogsViewEnabled {
 		return
 	}
-	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/logsview", tracing.SpanOptions{},
-			func(ctx context.Context) error {
-				link := desktop.BuildLogsURL(project.Name)
-				err := open.Run(link)
-				if err != nil {
-					err = fmt.Errorf("could not open Docker Desktop Logs view: %w", err)
-					lk.keyboardError("View Logs", err)
-				}
-				return err
-			})()
-	}()
+	lk.openLink(ctx, "menu/gui/logsview", "View Logs", desktop.BuildLogsURL(project.Name), func(err error) error {
+		return fmt.Errorf("could not open Docker Desktop Logs view: %w", err)
+	})
 }
 
 func (lk *LogKeyboard) openDDWatchDocs(ctx context.Context, project *types.Project) {
+	lk.openLink(ctx, "menu/gui/watch", "Watch Docs", fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name), func(error) error {
+		return errors.New("could not open Docker Desktop Compose UI")
+	})
+}
+
+// openLink opens link in the background, within a span of the given name. When it
+// fails, the error given by failure is shown in the menu under the given prefix.
+func (lk *LogKeyboard) openLink(ctx context.Context, span, prefix, link string, failure func(error) error) {
 	go func() {
-		_ = tracing.EventWrapFuncForErrGroup(ctx, "menu/gui/watch", tracing.SpanOptions{},
+		_ = tracing.EventWrapFuncForErrGroup(ctx, span, tracing.SpanOptions{},
 			func(ctx context.Context) error {
-				link := fmt.Sprintf("docker-desktop://dashboard/docker-compose/%s/watch", project.Name)
 				err := open.Run(link)
 				if err != nil {
-					err = errors.New("could not open Docker Desktop Compose UI")
-					lk.keyboardError("Watch Docs", err)
+					err = failure(err)
+					lk.keyboardError(prefix, err)
 				}
 				return err
 			})()
@@ -310,7 +288,42 @@ func (lk *LogKeyboard) ToggleWatch(ctx context.Context, options api.UpOptions) {
 	}
 }
 
-func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions) {
+// Open puts the terminal in raw mode; keys are buffered until Run reads them.
+func (lk *LogKeyboard) Open() error {
+	keys, err := keyboard.GetKeys(100)
+	if err != nil {
+		return err
+	}
+	lk.keys = keys
+	return nil
+}
+
+// Run handles the keys typed by the user until ctx is done.
+func (lk *LogKeyboard) Run(ctx context.Context, project *types.Project, options api.UpOptions) {
+	if lk.keys == nil { // Open was not called, or failed
+		return
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case event, ok := <-lk.keys:
+			if !ok { // the keyboard was closed
+				return
+			}
+			lk.handleKeyEvent(ctx, event, project, options)
+		}
+	}
+}
+
+// Close restores the terminal. It can be called several times, from several
+// goroutines (Ctrl+C is seen both as a key and as a signal).
+func (lk *LogKeyboard) Close() error {
+	lk.closeOnce.Do(func() { lk.closeErr = keyboard.Close() })
+	return lk.closeErr
+}
+
+func (lk *LogKeyboard) handleKeyEvent(ctx context.Context, event keyboard.KeyEvent, project *types.Project, options api.UpOptions) {
 	switch kRune := event.Rune; kRune {
 	case 'd':
 		lk.clearNavigationMenu()
@@ -341,7 +354,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	}
 	switch key := event.Key; key {
 	case keyboard.KeyCtrlC:
-		_ = keyboard.Close()
+		_ = lk.Close()
 		lk.clearNavigationMenu()
 		showCursor()
 
@@ -356,7 +369,7 @@ func (lk *LogKeyboard) HandleKeyEvents(ctx context.Context, event keyboard.KeyEv
 	}
 }
 
-func (lk *LogKeyboard) EnableWatch(enabled bool, watcher Feature) {
+func (lk *LogKeyboard) EnableWatch(enabled bool, watcher api.Feature) {
 	lk.Watch = &KeyboardWatch{
 		Watching: enabled,
 		Watcher:  watcher,

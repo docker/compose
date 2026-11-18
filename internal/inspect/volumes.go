@@ -1,0 +1,77 @@
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package inspect
+
+import (
+	"context"
+
+	"github.com/moby/moby/api/types/container"
+	"github.com/moby/moby/client"
+
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/pkg/api"
+)
+
+func (s *Service) Volumes(ctx context.Context, projectName string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
+	allContainers, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+		Filters: naming.ProjectFilter(projectName),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var containers []container.Summary
+
+	if len(options.Services) > 0 {
+		containers = naming.InServices(allContainers.Items, options.Services)
+	} else {
+		containers = allContainers.Items
+	}
+
+	volumesResponse, err := s.backend.APIClient().VolumeList(ctx, client.VolumeListOptions{
+		Filters: naming.ProjectFilter(projectName),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	projectVolumes := volumesResponse.Items
+
+	if len(options.Services) == 0 {
+		return projectVolumes, nil
+	}
+
+	var volumes []api.VolumesSummary
+
+	// create a name lookup of volumes used by containers
+	serviceVolumes := make(map[string]bool)
+
+	for _, ctr := range containers {
+		for _, mount := range ctr.Mounts {
+			serviceVolumes[mount.Name] = true
+		}
+	}
+
+	// append if volumes in this project are in serviceVolumes
+	for _, v := range projectVolumes {
+		if serviceVolumes[v.Name] {
+			volumes = append(volumes, v)
+		}
+	}
+
+	return volumes, nil
+}

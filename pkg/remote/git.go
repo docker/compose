@@ -102,12 +102,12 @@ func (g gitRemoteLoader) Load(ctx context.Context, path string) (string, error) 
 			return "", fmt.Errorf("initializing remote resource cache: %w", err)
 		}
 
-		local = filepath.Join(cache, ref.Ref)
+		local = gitEntryDir(cache, ref.Ref)
 		if _, err := os.Stat(local); os.IsNotExist(err) {
 			if g.offline {
 				return "", nil
 			}
-			err = g.checkout(ctx, local, ref)
+			err = g.checkout(ctx, cache, ref)
 			if err != nil {
 				return "", err
 			}
@@ -192,11 +192,32 @@ func (g gitRemoteLoader) resolveGitRef(ctx context.Context, path string, ref *gi
 	return nil
 }
 
-func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil.GitRef) error {
-	err := os.MkdirAll(path, 0o700)
+// cacheGitDir is the directory of the cache which holds the checkouts of the Git
+// repositories, one directory for each commit. Earlier releases checked them out at
+// the root of the cache, where they are no longer looked for: one which was left
+// incomplete by an interrupted run could be taken for a complete one.
+const cacheGitDir = "git"
+
+// gitEntryDir is the directory of the checkout of the commit.
+func gitEntryDir(cache, sha string) string {
+	return filepath.Join(cache, cacheGitDir, sha)
+}
+
+// checkout fetches the commit into the cache. It does so in a directory of its own,
+// which is renamed to the one of the commit only once the checkout is complete: the
+// directory of a commit is therefore never a partial checkout, and needs no file
+// beside it to tell.
+func (g gitRemoteLoader) checkout(ctx context.Context, cache string, ref *gitutil.GitRef) error {
+	gitCache := filepath.Join(cache, cacheGitDir)
+	if err := os.MkdirAll(gitCache, 0o700); err != nil {
+		return err
+	}
+	path, err := os.MkdirTemp(gitCache, ".checkout-")
 	if err != nil {
 		return err
 	}
+	defer func() { _ = os.RemoveAll(path) }()
+
 	err = exec.CommandContext(ctx, "git", "init", path).Run()
 	if err != nil {
 		return err
@@ -222,6 +243,15 @@ func (g gitRemoteLoader) checkout(ctx context.Context, path string, ref *gitutil
 	cmd.Dir = path
 	err = cmd.Run()
 	if err != nil {
+		return err
+	}
+
+	local := gitEntryDir(cache, ref.Ref)
+	if err := os.Rename(path, local); err != nil {
+		// another run placed the same commit first
+		if _, statErr := os.Stat(local); statErr == nil {
+			return nil
+		}
 		return err
 	}
 	return nil

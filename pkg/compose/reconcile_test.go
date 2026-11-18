@@ -29,6 +29,8 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/internal/confighash"
+	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/pkg/api"
 )
 
@@ -95,7 +97,7 @@ func TestReconcileNetworks_CreateMissing(t *testing.T) {
 
 func TestReconcileNetworks_ExistingMatch(t *testing.T) {
 	nw := types.NetworkConfig{Name: "myproject_frontend"}
-	hash, err := NetworkHash(&nw)
+	hash, err := confighash.NetworkHash(&nw)
 	assert.NilError(t, err)
 
 	project := &types.Project{
@@ -260,6 +262,33 @@ func TestReconcileService_ProviderRelayLeftAlone(t *testing.T) {
 `)+"\n")
 }
 
+// A provider's relay is a singleton network stand-in, never itself a
+// replica: `compose scale`/`deploy.replicas` on a provider-backed service
+// must still plan exactly one OpRunProvider node, whatever count was
+// requested -- the value is neither rejected nor acted on by Compose, it is
+// passed through unmodified to the provider over its control channel
+// (GetServiceConfigType marshals the whole resolved ServiceConfig), which
+// decides what to do with it for the resource it actually manages.
+func TestReconcileService_ProviderScaleNeverMultipliesTheRelay(t *testing.T) {
+	scale := 3
+	db := types.ServiceConfig{
+		Name:     "db",
+		Provider: &types.ServiceProviderConfig{Type: "test"},
+		Scale:    &scale,
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"db": db},
+	}
+	observed := emptyObserved()
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 provider:db, RunProvider, provider service
+`)+"\n")
+}
+
 // TestReconcileNetworks_DivergedAlsoRecreatesChangedContainer verifies the
 // entangled case: when a container attached to a diverged network also has its
 // own config changed, it is both reconnected (by the network recreate) and
@@ -390,10 +419,10 @@ func TestReconcileNetworks_Renamed(t *testing.T) {
 	var removed, created string
 	for _, n := range plan.Nodes {
 		switch n.Operation.Type {
-		case OpRemoveNetwork:
+		case planning.OpRemoveNetwork:
 			removed = n.Operation.Name
 			assert.Assert(t, n.Operation.BestEffort, "rename removal must be best-effort")
-		case OpCreateNetwork:
+		case planning.OpCreateNetwork:
 			created = n.Operation.Name
 		}
 	}
@@ -447,7 +476,7 @@ func TestReconcileVolumes_CreateMissing(t *testing.T) {
 
 func TestReconcileVolumes_ExistingMatch(t *testing.T) {
 	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
-	hash, err := VolumeHash(vol)
+	hash, err := confighash.VolumeHash(vol)
 	assert.NilError(t, err)
 
 	project := &types.Project{
@@ -885,12 +914,12 @@ func TestReconcileVolumes_DivergedVolumesFromRemovedBeforeVolume(t *testing.T) {
 		"volumes_from consumer must be removed before RemoveVolume:\n%s", planStr)
 
 	// RemoveVolume must depend on the consumer's RemoveContainer node.
-	var removeConsumer, removeVolume *PlanNode
+	var removeConsumer, removeVolume *planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpRemoveContainer && n.Operation.ResourceID == "service:consumer:1" {
+		if n.Operation.Type == planning.OpRemoveContainer && n.Operation.ResourceID == "service:consumer:1" {
 			removeConsumer = n
 		}
-		if n.Operation.Type == OpRemoveVolume {
+		if n.Operation.Type == planning.OpRemoveVolume {
 			removeVolume = n
 		}
 	}
@@ -1271,6 +1300,64 @@ func TestReconcileContainers_ForceRecreate(t *testing.T) {
 `)+"\n")
 }
 
+// A stopped container still refers to the networks it was attached to, and
+// starting it after one was removed and created again fails (docker/compose#14516).
+// Whatever its state, a container attached to another network than the one of the
+// project, or to one that was removed, is recreated; one that was created and
+// never started has no network ID yet, and is not.
+func TestReconcileContainers_NetworkMismatchRecreates(t *testing.T) {
+	svc := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"default": {}}}}
+	hash := mustServiceHash(t, svc)
+
+	for _, tc := range []struct {
+		name      string
+		state     container.ContainerState
+		networkID string
+		// removed is set when the network no longer exists, and is to be created again
+		removed  bool
+		recreate bool
+	}{
+		{"running on the current network", container.StateRunning, "net-new", false, false},
+		{"running on another network", container.StateRunning, "net-old", false, true},
+		{"exited on the current network", container.StateExited, "net-new", false, false},
+		{"exited on another network", container.StateExited, "net-old", false, true},
+		{"exited on a removed network", container.StateExited, "net-old", true, true},
+		{"created and never started", container.StateCreated, "", false, false},
+		{"created and never started, network removed", container.StateCreated, "", true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			project := &types.Project{
+				Name:     "myproject",
+				Networks: types.Networks{"default": {Name: "myproject_default"}},
+				Services: types.Services{"web": svc},
+			}
+			networks := map[string][]ObservedNetwork{"default": {{ID: "net-new", Name: "myproject_default"}}}
+			if tc.removed {
+				networks = map[string][]ObservedNetwork{}
+			}
+			observed := &ObservedState{
+				ProjectName: "myproject",
+				Containers: map[string][]ObservedContainer{
+					"web": {{
+						ID: "c1aabbccddee", Number: 1, State: tc.state, ConfigHash: hash,
+						ConnectedNetworks: map[string]string{"myproject_default": tc.networkID},
+						Summary: container.Summary{
+							ID: "c1aabbccddee", State: tc.state,
+							Labels: map[string]string{api.ServiceLabel: "web", api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+						},
+					}},
+				},
+				Networks: networks,
+				Volumes:  map[string][]ObservedVolume{},
+			}
+
+			plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+			assert.NilError(t, err)
+			assert.Equal(t, strings.Contains(plan.String(), "CreateContainer"), tc.recreate, plan.String())
+		})
+	}
+}
+
 func TestReconcileContainers_NeverRecreate(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
@@ -1336,9 +1423,8 @@ func TestReconcileContainers_ExitedIsNoop(t *testing.T) {
 // depends_on could start before their dependencies' operations complete.
 // Stale pre_start hook runners (left by a previous run that failed before
 // removing them) are purged by the plan when pre_start is going to run again:
-// hooks declared and no replica running at observation — the imperative
-// gating. Removals are best-effort and drop the runner's anonymous volumes,
-// like the warn-only imperative purge they mirror.
+// hooks declared and no replica running at observation. Removals are
+// best-effort (warn-only) and drop the runner's anonymous volumes.
 func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
 	project := &types.Project{
 		Name: "myproject",
@@ -1373,7 +1459,7 @@ func TestReconcileContainers_StaleHookRunnersPurged(t *testing.T) {
 `)+"\n")
 
 	for _, n := range plan.Nodes {
-		if n.Operation.Type != OpRemoveContainer {
+		if n.Operation.Type != planning.OpRemoveContainer {
 			continue
 		}
 		assert.Assert(t, n.Operation.BestEffort, "purge #%d must not abort the plan on failure", n.ID)
@@ -1413,10 +1499,10 @@ func TestReconcileContainers_HooksRemovedStillPurgesStaleRunners(t *testing.T) {
 
 	purged, created := false, 0
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
+		if n.Operation.Type == planning.OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
 			purged = true
 		}
-		if n.Operation.Type == OpCreateHookContainer && n.Operation.Service.Name == "app" {
+		if n.Operation.Type == planning.OpCreateHookContainer && n.Operation.Service.Name == "app" {
 			created++
 		}
 	}
@@ -1452,10 +1538,10 @@ func TestReconcileContainers_ScaleZeroStillPurgesStaleRunners(t *testing.T) {
 
 	purged, created := false, 0
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
+		if n.Operation.Type == planning.OpRemoveContainer && n.Operation.Container.ID == "stale-app-id" {
 			purged = true
 		}
-		if n.Operation.Type == OpCreateHookContainer && n.Operation.Service.Name == "app" {
+		if n.Operation.Type == planning.OpCreateHookContainer && n.Operation.Service.Name == "app" {
 			created++
 		}
 	}
@@ -1492,7 +1578,7 @@ func TestReconcileContainers_HookRunnersPlannedOnColdStart(t *testing.T) {
 `)+"\n")
 
 	for _, n := range plan.Nodes {
-		if n.Operation.Type != OpCreateHookContainer {
+		if n.Operation.Type != planning.OpCreateHookContainer {
 			continue
 		}
 		assert.Equal(t, n.Operation.Name, getHookContainerName("myproject", "app", n.Operation.HookIndex))
@@ -1599,9 +1685,9 @@ func TestReconcileContainers_HookRunnersPlannedOnRecreate(t *testing.T) {
 	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
 	assert.NilError(t, err)
 
-	var hookCreates []*PlanNode
+	var hookCreates []*planning.PlanNode
 	for _, n := range plan.Nodes {
-		if n.Operation.Type == OpCreateHookContainer {
+		if n.Operation.Type == planning.OpCreateHookContainer {
 			hookCreates = append(hookCreates, n)
 		}
 	}
@@ -2003,21 +2089,21 @@ func TestReconcileContainers_RegularDependsOn_NoCascade(t *testing.T) {
 
 func mustServiceHash(t *testing.T, svc types.ServiceConfig) string {
 	t.Helper()
-	h, err := ServiceHash(svc)
+	h, err := confighash.ServiceHash(svc)
 	assert.NilError(t, err)
 	return h
 }
 
 func mustVolumeHash(t *testing.T, vol types.VolumeConfig) string {
 	t.Helper()
-	h, err := VolumeHash(vol)
+	h, err := confighash.VolumeHash(vol)
 	assert.NilError(t, err)
 	return h
 }
 
 func mustNetworkHash(t *testing.T, nw types.NetworkConfig) string {
 	t.Helper()
-	h, err := NetworkHash(&nw)
+	h, err := confighash.NetworkHash(&nw)
 	assert.NilError(t, err)
 	return h
 }
@@ -2031,4 +2117,214 @@ func mustResolvedServiceHash(t *testing.T, svc types.ServiceConfig, containers m
 	h, err := serviceHashWithResolvedRefs(svc, containers)
 	assert.NilError(t, err)
 	return h
+}
+
+// --- Infrastructure shared with services outside the selection ---
+//
+// A project narrowed with WithSelectedServices (watch's rebuild, `up --no-deps`)
+// keeps the networks and volumes of the whole model but moves the services left
+// out of the selection to DisabledServices, whose live containers stay attached.
+// Recreating a drifted resource would have to detach those containers too,
+// and the plan can't: it only converges the selected services.
+
+// restrictedNetworkProject builds a project narrowed to "web" whose "frontend"
+// network (drifted: stale config-hash) is also used by "api", a disabled service
+// that has a live container when apiRunning is set.
+func restrictedNetworkProject(t *testing.T, apiRunning bool) (*types.Project, *ObservedState) {
+	t.Helper()
+	onFrontend := types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: onFrontend}
+	apiSvc := types.ServiceConfig{Name: "api", Scale: intPtr(1), ContainerSpec: onFrontend}
+	project := &types.Project{
+		Name:             "myproject",
+		Networks:         types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services:         types.Services{"web": web},
+		DisabledServices: types.Services{"api": apiSvc},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"web": {networkAttachedContainer(t, web, "c1aabbccddee")}},
+		Networks: map[string][]ObservedNetwork{
+			"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}},
+		},
+		Volumes: map[string][]ObservedVolume{},
+	}
+	if apiRunning {
+		observed.Containers["api"] = []ObservedContainer{networkAttachedContainer(t, apiSvc, "c2aabbccddee")}
+	}
+	return project, observed
+}
+
+// A drifted network still attached to a container of a service outside the
+// selection is left alone, with a warning: removing it would fail with
+// "network in use".
+func TestReconcileNetworks_DivergedUsedOutsideSelectionIsKept(t *testing.T) {
+	project, observed := restrictedNetworkProject(t, true)
+
+	hook := logrustest.NewGlobal()
+	t.Cleanup(hook.Reset)
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+
+	var warned bool
+	for _, e := range hook.AllEntries() {
+		warned = warned || (e.Level == logrus.WarnLevel && strings.Contains(e.Message, `"myproject_frontend"`) && strings.Contains(e.Message, "api"))
+	}
+	assert.Assert(t, warned, "expected a warning naming the network and the service keeping it in use")
+}
+
+// A disabled service with no live container holds nothing: the drifted network
+// is recreated as usual.
+func TestReconcileNetworks_DivergedDisabledServiceWithoutContainerDoesNotBlock(t *testing.T) {
+	project, observed := restrictedNetworkProject(t, false)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, StopContainer, network frontend config changed
+[1] -> #2 service:web:1, DisconnectNetwork, network frontend recreate
+[2] -> #3 network:frontend, RemoveNetwork, config hash diverged
+[3] -> #4 network:frontend, CreateNetwork, recreate after config change
+[4] -> #5 service:web:1, ConnectNetwork, network frontend recreate
+`)+"\n")
+}
+
+// restrictedVolumeProject builds a project narrowed to "web" whose "data" volume
+// (drifted) is also mounted by "worker", a disabled service that has a live
+// container when workerRunning is set. viaVolumesFrom makes worker inherit the
+// mount from web (volumes_from) instead of declaring it.
+func restrictedVolumeProject(t *testing.T, workerRunning, viaVolumesFrom bool) (*types.Project, *ObservedState) {
+	t.Helper()
+	vol := types.VolumeConfig{Name: "myproject_data", Driver: "local"}
+	mounts := types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "data", Type: "volume"}}}
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: mounts}
+	worker := types.ServiceConfig{Name: "worker", Scale: intPtr(1), ContainerSpec: mounts}
+	if viaVolumesFrom {
+		worker.ContainerSpec = types.ContainerSpec{VolumesFrom: []string{"web"}}
+	}
+	project := &types.Project{
+		Name:             "myproject",
+		Volumes:          types.Volumes{"data": vol},
+		Services:         types.Services{"web": web},
+		DisabledServices: types.Services{"worker": worker},
+	}
+	observedContainer := func(svc types.ServiceConfig, id string) ObservedContainer {
+		hash := mustServiceHash(t, svc)
+		return ObservedContainer{
+			ID: id, Number: 1, State: container.StateRunning, ConfigHash: hash,
+			Summary: container.Summary{
+				ID: id, State: container.StateRunning,
+				Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+				Mounts: []container.MountPoint{{Type: "volume", Name: vol.Name}},
+			},
+		}
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"web": {observedContainer(web, "web-1")}},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{"data": {{Name: vol.Name, ConfigHash: "oldhash"}}},
+	}
+	if workerRunning {
+		observed.Containers["worker"] = []ObservedContainer{observedContainer(worker, "worker-1")}
+	}
+	return project, observed
+}
+
+// A drifted volume still mounted by a container outside the selection is left
+// alone, and the user is not asked to destroy its data: the removal could not
+// succeed while that container references it.
+func TestReconcileVolumes_DivergedUsedOutsideSelectionIsKept(t *testing.T) {
+	for name, viaVolumesFrom := range map[string]bool{"direct mount": false, "volumes_from": true} {
+		t.Run(name, func(t *testing.T) {
+			project, observed := restrictedVolumeProject(t, true, viaVolumesFrom)
+
+			hook := logrustest.NewGlobal()
+			t.Cleanup(hook.Reset)
+			plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+			assert.NilError(t, err)
+			assert.Assert(t, plan.IsEmpty(), "unexpected plan:\n%s", plan.String())
+
+			var warned bool
+			for _, e := range hook.AllEntries() {
+				warned = warned || (e.Level == logrus.WarnLevel && strings.Contains(e.Message, `"myproject_data"`) && strings.Contains(e.Message, "worker"))
+			}
+			assert.Assert(t, warned, "expected a warning naming the volume and the service keeping it in use")
+		})
+	}
+}
+
+// A disabled service with no live container holds nothing: the usual prompt
+// and recreation apply.
+func TestReconcileVolumes_DivergedDisabledServiceWithoutContainerDoesNotBlock(t *testing.T) {
+	project, observed := restrictedVolumeProject(t, false, false)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:web:1, StopContainer, mounted volume config changed
+[1] -> #2 service:web:1, RemoveContainer, mounted volume config changed
+[2] -> #3 volume:data, RemoveVolume, config hash diverged
+[3] -> #4 volume:data, CreateVolume, recreate after config change
+[4] -> #5 service:web:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// A rebuild narrows the project to the rebuilt service and its dependents:
+// the services left out must stay out of the plan altogether, however far
+// they drifted, and out of the orphans --remove-orphans would clean.
+func TestReconcile_SelectionLeavesOtherServicesUntouched(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1)}
+	worker := types.ServiceConfig{Name: "worker", Scale: intPtr(1)}
+	worker.DependsOn = types.DependsOnConfig{"web": {Condition: types.ServiceConditionStarted, Required: true}}
+	apiSvc := types.ServiceConfig{Name: "api", Scale: intPtr(1)}
+	full := &types.Project{
+		Name:     "myproject",
+		Services: types.Services{"web": web, "worker": worker, "api": apiSvc},
+	}
+	project, err := full.WithSelectedServices([]string{"web"}, types.IncludeDependents)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, project.ServiceNames(), []string{"web", "worker"})
+	assert.DeepEqual(t, project.DisabledServiceNames(), []string{"api"})
+
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers: map[string][]ObservedContainer{
+			"web":    {runningContainer(t, web, "c1aabbccddee")},
+			"worker": {runningContainer(t, worker, "c2aabbccddee")},
+			"api":    {runningContainer(t, apiSvc, "c3aabbccddee")},
+		},
+		Networks: map[string][]ObservedNetwork{},
+		Volumes:  map[string][]ObservedVolume{},
+	}
+
+	// force recreate rebuilds every service of the plan: api would be
+	// recreated too if the narrowing ever stopped keeping it out
+	opts := defaultReconcileOptions()
+	opts.Recreate = api.RecreateForce
+	opts.RemoveOrphans = true
+	plan, err := reconcile(t.Context(), project, observed, opts, noPrompt)
+	assert.NilError(t, err)
+
+	recreated := map[string]bool{}
+	for _, node := range plan.Nodes {
+		assert.Assert(t, !strings.HasPrefix(node.Operation.ResourceID, "service:api:") && !strings.HasPrefix(node.Operation.ResourceID, "orphan:"),
+			"a service outside the selection must not be touched:\n%s", plan.String())
+		recreated[node.Operation.ResourceID] = true
+	}
+	assert.Assert(t, recreated["service:web:1"], "the selected service must be recreated:\n%s", plan.String())
+	assert.Assert(t, recreated["service:worker:1"], "a dependent of the selected service must be recreated too:\n%s", plan.String())
+}
+
+func runningContainer(t *testing.T, svc types.ServiceConfig, id string) ObservedContainer {
+	t.Helper()
+	hash := mustServiceHash(t, svc)
+	return ObservedContainer{
+		ID: id, Number: 1, State: container.StateRunning, ConfigHash: hash,
+		Summary: container.Summary{
+			ID: id, State: container.StateRunning,
+			Labels: map[string]string{api.ServiceLabel: svc.Name, api.ContainerNumberLabel: "1", api.ConfigHashLabel: hash},
+		},
+	}
 }

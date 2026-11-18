@@ -1,0 +1,7 @@
+services:
+  app:
+    image: alpine
+    command: sh -c 'sleep 2; exit 3'
+    pre_start:
+      - image: alpine
+        command: echo hook-ran

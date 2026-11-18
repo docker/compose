@@ -43,6 +43,7 @@ func attachCommand(p *ProjectOptions, dockerCli command.Cli, backendOptions *Bac
 			ProjectOptions: p,
 		},
 	}
+	//nolint:dupl // declarative cobra command: its flags and wiring look like its siblings' by design
 	runCmd := &cobra.Command{
 		Use:   "attach [OPTIONS] SERVICE",
 		Short: "Attach local standard input, output, and error streams to a service's running container",

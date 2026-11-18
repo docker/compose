@@ -17,38 +17,76 @@
 package compose
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
+	"github.com/docker/cli/cli/config/configfile"
+	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/client"
+	"github.com/sirupsen/logrus"
+	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
+
+	"github.com/docker/compose/v5/pkg/mocks"
 )
 
-// TestNewLimitedErrgroup_NonPositiveIsUnlimited guards against the bug this
-// helper exists to fix: errgroup.SetLimit(0) means "allow zero goroutines",
-// not "unlimited". A composeService{} built without going through
-// NewComposeService has maxConcurrency's Go zero-value (0), so an
-// unconditional SetLimit(maxConcurrency) at any call site would silently
-// hang forever instead of running.
-func TestNewLimitedErrgroup_NonPositiveIsUnlimited(t *testing.T) {
-	for _, maxConcurrency := range []int{0, -1} {
-		t.Run(fmt.Sprintf("maxConcurrency=%d", maxConcurrency), func(t *testing.T) {
-			eg, _ := newLimitedErrgroup(t.Context(), maxConcurrency)
+func swarmInfo(state swarm.LocalNodeState) client.SystemInfoResult {
+	res := client.SystemInfoResult{}
+	res.Info.Swarm.LocalNodeState = state
+	return res
+}
 
-			done := make(chan struct{})
-			go func() {
-				for range 5 {
-					eg.Go(func() error { return nil })
-				}
-				close(done)
-			}()
+// TestIsSwarmEnabled_PerInstance guards that the swarm answer is cached per
+// service: two services talking to different daemons must each report their
+// own daemon's mode instead of sharing the first answer given in the process.
+func TestIsSwarmEnabled_PerInstance(t *testing.T) {
+	inactive, inactiveClient := newTestService(t)
+	inactiveClient.EXPECT().Info(gomock.Any(), gomock.Any()).Times(1).
+		Return(swarmInfo(swarm.LocalNodeStateInactive), nil)
+	active, activeClient := newTestService(t)
+	activeClient.EXPECT().Info(gomock.Any(), gomock.Any()).Times(1).
+		Return(swarmInfo(swarm.LocalNodeStateActive), nil)
 
-			select {
-			case <-done:
-			case <-time.After(2 * time.Second):
-				t.Fatal("eg.Go blocked: maxConcurrency <= 0 must mean unlimited, not SetLimit(0) (zero goroutines allowed)")
-			}
-			assert.NilError(t, eg.Wait())
-		})
+	for range 2 { // second round is served from each instance's own cache
+		enabled, err := inactive.isSwarmEnabled(t.Context())
+		assert.NilError(t, err)
+		assert.Assert(t, !enabled)
+
+		enabled, err = active.isSwarmEnabled(t.Context())
+		assert.NilError(t, err)
+		assert.Assert(t, enabled)
 	}
+}
+
+// TestDrainTimeout guards the per-instance log drain bound and its fallback
+// for a composeService not built by NewComposeService.
+func TestDrainTimeout(t *testing.T) {
+	svc, _ := newTestService(t)
+	assert.Equal(t, svc.drainTimeout(), defaultLogStreamDrainTimeout)
+
+	svc.logStreamDrainTimeout = time.Millisecond
+	other, _ := newTestService(t)
+	assert.Equal(t, svc.drainTimeout(), time.Millisecond)
+	assert.Equal(t, other.drainTimeout(), defaultLogStreamDrainTimeout)
+
+	assert.Equal(t, (&composeService{}).drainTimeout(), defaultLogStreamDrainTimeout)
+}
+
+// TestWithDryRunKeepsLogLevel guards that switching to the dry-run client
+// does not reset the log level: re-initializing the Docker CLI with fresh
+// client options would otherwise drop --verbose back to info, hiding every
+// debug log of the dry-run operation.
+func TestWithDryRunKeepsLogLevel(t *testing.T) {
+	previous := logrus.GetLevel()
+	t.Cleanup(func() { logrus.SetLevel(previous) })
+	logrus.SetLevel(logrus.TraceLevel)
+
+	mockCtrl := gomock.NewController(t)
+	cli := mocks.NewMockCli(mockCtrl)
+	cli.EXPECT().Client().Return(mocks.NewMockAPIClient(mockCtrl)).AnyTimes()
+	cli.EXPECT().CurrentContext().Return("default").AnyTimes()
+	cli.EXPECT().ConfigFile().Return(&configfile.ConfigFile{}).AnyTimes()
+
+	assert.NilError(t, WithDryRun(&composeService{dockerCli: cli}))
+	assert.Equal(t, logrus.GetLevel(), logrus.TraceLevel)
 }

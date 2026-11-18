@@ -30,15 +30,11 @@ import (
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/image"
 	"github.com/moby/moby/api/types/jsonstream"
-	registrytypes "github.com/moby/moby/api/types/registry"
 	"github.com/moby/moby/client"
-	"github.com/opencontainers/go-digest"
-	ocispec "github.com/opencontainers/image-spec/specs-go/v1"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/pkg/api"
-	"github.com/docker/compose/v5/pkg/mocks"
 )
 
 // scheduledDependentImages runs addDependentImagePulls and returns the

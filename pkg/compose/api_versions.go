@@ -30,6 +30,7 @@ const (
 	apiVersion144 = "1.44"
 
 	// apiVersion148 represents Docker Engine API version 1.48 (Engine v28.0).
+	// internal/images declares the same constant: keep the two in sync.
 	//
 	// New features in this version:
 	//  - Volume mounts with type=image support
@@ -39,6 +40,7 @@ const (
 	apiVersion148 = "1.48"
 
 	// apiVersion149 represents Docker Engine API version 1.49 (Engine v28.1).
+	// internal/images declares the same constant: keep the two in sync.
 	//
 	// New features in this version:
 	//  - Network interface_name configuration
@@ -48,6 +50,26 @@ const (
 	//  - interface_name was not configurable
 	//  - ImageList didn't support platform filtering
 	apiVersion149 = "1.49"
+
+	// apiVersion156 represents Docker Engine API version 1.56 (Engine v29.8).
+	//
+	// New features in this version:
+	//  - HostConfig.Umask in ContainerCreate
+	//
+	// Before this version:
+	//  - The daemon silently ignores HostConfig.Umask, so the container would
+	//    run with the runtime's default umask instead of the requested one
+	apiVersion156 = "1.56"
+
+	// apiVersionJobs is the first Docker Engine API version of an engine
+	// shipping the jobs extension (one-shot and scheduled jobs). The extension
+	// is disabled by default (dockerd --extension-enable org.mobyproject.jobs.v0),
+	// so this version only says it is compiled in: jobsAvailability probes it.
+	//
+	// Before this version, or with the extension disabled:
+	//  - Scheduled jobs cannot be registered, they are refused
+	//  - Manual jobs run as one-off service containers
+	apiVersionJobs = "1.57"
 )
 
 // Docker Engine version strings for user-facing error messages.
@@ -58,10 +80,7 @@ const (
 
 	// DockerEngineV28_1 is the specific version string for Docker Engine 28.1
 	DockerEngineV28_1 = "v28.1"
-)
 
-// Build tool version constants
-const (
-	// buildxMinVersion is the minimum required version of buildx for compose build
-	buildxMinVersion = "0.17.0"
+	// dockerEngineV29_8 is the specific version string for Docker Engine 29.8
+	dockerEngineV29_8 = "v29.8"
 )

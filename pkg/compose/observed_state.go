@@ -21,15 +21,21 @@ import (
 	"slices"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
+	"github.com/docker/compose/v5/internal/naming"
+	"github.com/docker/compose/v5/internal/planning"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/pkg/api"
 )
+
+// jobContainerIDLabel is the engine's reserved label identifying a job run
+// container (see the jobsv0 contract); Compose never sets it itself.
+const jobContainerIDLabel = "com.docker.job.id"
 
 // ObservedState captures the current state of all Docker resources belonging to
 // a Compose project. It is a snapshot taken before reconciliation so that the
@@ -60,6 +66,8 @@ type ObservedState struct {
 // orphans. Selection is deterministic: an exact name match wins; otherwise the
 // lexicographically smallest name is chosen so repeated runs are stable
 // regardless of the daemon's list order.
+//
+//nolint:dupl // mirrors selectVolume over distinct types; a generic version would read worse than the two
 func (s *ObservedState) selectNetwork(key, desiredName string) (ObservedNetwork, []ObservedNetwork, bool) {
 	matches := s.Networks[key]
 	if len(matches) == 0 {
@@ -84,6 +92,8 @@ func (s *ObservedState) selectNetwork(key, desiredName string) (ObservedNetwork,
 }
 
 // selectVolume is the volume counterpart of selectNetwork.
+//
+//nolint:dupl // mirrors selectNetwork, see there
 func (s *ObservedState) selectVolume(key, desiredName string) (ObservedVolume, []ObservedVolume, bool) {
 	matches := s.Volumes[key]
 	if len(matches) == 0 {
@@ -192,7 +202,7 @@ func (s *composeService) mergeHookContainers(ctx context.Context, project *types
 
 // The project model is used to classify containers by service and to identify
 // orphans, and to scope network/volume queries to declared resources.
-func (s *composeService) collectObservedState(ctx context.Context, project *types.Project) (*ObservedState, error) {
+func (s *composeService) collectObservedState(ctx context.Context, project *types.Project, scope ReconcileScope) (*ObservedState, error) {
 	state := &ObservedState{
 		ProjectName: project.Name,
 		Containers:  map[string][]ObservedContainer{},
@@ -210,9 +220,20 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	if err != nil {
 		return nil, err
 	}
-	raw, err = s.mergeHookContainers(ctx, project, raw)
-	if err != nil {
-		return nil, err
+	// Hook-runner snapshots are consumed exclusively by create-phase runner
+	// reconciliation (planPreStartHookRunners, reconcile.go) -- the start
+	// phase's own RunPreStart never reads observed.HookContainers, it
+	// executes a runner the create phase already prepared or fails outright
+	// if none exists. Skipping this for ScopeStart matches the
+	// network/volume guard below: one more unconditional daemon call a start
+	// never made, which could otherwise fail a no-op
+	// `compose start` on a service with pre_start hooks declared (second
+	// Copilot review finding in the same vein as the first).
+	if scope.plansCreatePhase() {
+		raw, err = s.mergeHookContainers(ctx, project, raw)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	knownServices := map[string]bool{}
@@ -240,21 +261,42 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		}
 		if isNotOneOff(ctr) && knownServices[svcName] {
 			state.Containers[svcName] = append(state.Containers[svcName], toObservedContainer(ctr))
-		} else if isOrphaned(project)(ctr) {
+		} else if isOrphaned(project)(ctr) && !isLiveJobRun(ctr) {
 			state.Orphans = append(state.Orphans, toObservedContainer(ctr))
 		}
-		// else: a still-RUNNING one-off. Deliberately absent from the
-		// observed state: it is somebody's live `compose run` session — up
-		// neither reconciles it, nor warns about it, nor removes it (only
-		// `down` stops running one-offs).
+		// else: a still-RUNNING one-off, or a run of a job still going.
+		// Deliberately absent from the observed state: it is somebody's live
+		// `compose run` session, or a job firing — up neither reconciles it,
+		// nor warns about it, nor removes it (only `down` stops them).
 	}
 
-	// --- Networks ---
+	// Networks and volumes are a create-phase concern: ScopeStart's
+	// planStartPhase never reads resolvedNetworks/resolvedVolumes (only
+	// reconcileNetworks/reconcileVolumes, which ScopeStart never runs, do).
+	// Skipping these calls for ScopeStart isn't just an optimization -- a
+	// Copilot review finding on #14296 noted that querying them unconditionally
+	// gives `compose start` new daemon dependencies it never had (it only ever
+	// called getContainers): an authorization plugin
+	// permitting container list/start but denying network or volume listing
+	// would now make `compose start` fail before starting anything.
+	if scope.plansCreatePhase() {
+		if err := s.collectObservedNetworksAndVolumes(ctx, project, state); err != nil {
+			return nil, err
+		}
+	}
+
+	return state, nil
+}
+
+// collectObservedNetworksAndVolumes populates state.Networks/Volumes, split
+// out of collectObservedState to keep cognitive complexity in check (and
+// gated behind scope.plansCreatePhase() there -- see its own comment).
+func (s *composeService) collectObservedNetworksAndVolumes(ctx context.Context, project *types.Project, state *ObservedState) error {
 	networkList, err := s.apiClient().NetworkList(ctx, client.NetworkListOptions{
-		Filters: projectFilter(project.Name),
+		Filters: naming.ProjectFilter(project.Name),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, network := range networkList.Items {
 		key := network.Labels[api.NetworkLabel]
@@ -269,12 +311,11 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 		})
 	}
 
-	// --- Volumes ---
 	volList, err := s.apiClient().VolumeList(ctx, client.VolumeListOptions{
-		Filters: projectFilter(project.Name),
+		Filters: naming.ProjectFilter(project.Name),
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
 	for _, vol := range volList.Items {
 		key := vol.Labels[api.VolumeLabel]
@@ -290,14 +331,10 @@ func (s *composeService) collectObservedState(ctx context.Context, project *type
 	}
 
 	if err := s.discoverUnmanagedNetworks(ctx, project, state); err != nil {
-		return nil, err
+		return err
 	}
 
-	if err := s.discoverUnmanagedVolumes(ctx, project, state); err != nil {
-		return nil, err
-	}
-
-	return state, nil
+	return s.discoverUnmanagedVolumes(ctx, project, state)
 }
 
 // discoverUnmanagedNetworks augments the observed state with networks that match
@@ -403,7 +440,7 @@ func toObservedContainer(c container.Summary) ObservedContainer {
 
 	return ObservedContainer{
 		ID:                c.ID,
-		Name:              getCanonicalContainerName(c),
+		Name:              naming.CanonicalContainerName(c),
 		State:             c.State,
 		ConfigHash:        c.Labels[api.ConfigHashLabel],
 		ImageDigest:       c.Labels[api.ImageDigestLabel],
@@ -445,7 +482,7 @@ func (s *ObservedState) setResolvedVolumes(volumes map[string]string) {
 // Iterates project.Services (not observed.Containers) so that containers of
 // disabled services (e.g. dependencies untouched by `compose run --no-deps`)
 // are not falsely reported as Running — see issue 13882.
-func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Plan, events api.EventProcessor) {
+func emitRunningEvents(project *types.Project, observed *ObservedState, plan *planning.Plan, events api.EventProcessor) {
 	planned := map[string]bool{}
 	for _, node := range plan.Nodes {
 		if node.Operation.Container != nil {
@@ -456,19 +493,10 @@ func emitRunningEvents(project *types.Project, observed *ObservedState, plan *Pl
 	for _, service := range project.Services {
 		for _, observedContainer := range observed.Containers[service.Name] {
 			if observedContainer.State == container.StateRunning && !planned[observedContainer.ID] {
-				events.On(newEvent("Container "+observedContainer.Name, api.Done, api.StatusRunning))
+				events.On(progress.New("Container "+observedContainer.Name, api.Done, api.StatusRunning))
 			}
 		}
 	}
-}
-
-// orphanNames returns the names of orphaned containers as a comma-separated string.
-func (s *ObservedState) orphanNames() string {
-	names := make([]string, len(s.Orphans))
-	for i, o := range s.Orphans {
-		names[i] = o.Name
-	}
-	return strings.Join(names, ", ")
 }
 
 // containersByService flattens the observed containers into the shape

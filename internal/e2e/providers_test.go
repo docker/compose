@@ -1,0 +1,210 @@
+//go:build e2e
+
+/*
+   Copyright 2020 Docker Compose CLI authors
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+*/
+
+package e2e
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"gotest.tools/v3/assert"
+)
+
+// providerScenario creates a scenario whose commands can resolve the
+// example-provider binary from PATH. The provider echoes options back as env
+// variables, which the test service prints with its `env` command — the
+// "test-1  | " log prefix anchors the assertions to the container's output.
+func providerScenario(t *testing.T, intent string) *Scenario {
+	t.Helper()
+	provider, err := findExecutable("example-provider")
+	if err != nil {
+		t.Fatalf("example-provider binary not available (run make example-provider): %v", err)
+	}
+	s := NewScenario(t, intent)
+	s.Env("PATH=" + fmt.Sprintf("%s%s%s", filepath.Dir(provider), string(os.PathListSeparator), os.Getenv("PATH")))
+	return s
+}
+
+func TestProviderStopHook(t *testing.T) {
+	// The example provider writes a sentinel file at PROVIDER_STOP_MARKER when
+	// its stop subcommand runs.
+	marker := filepath.Join(t.TempDir(), "example-provider-stop-marker")
+	providerScenario(t, "stop must invoke the provider binary's stop subcommand").
+		Env("PROVIDER_STOP_MARKER="+marker).
+		Step("up runs the provider then the service",
+			ComposeCmd("up", "-d")).
+		Step("stop triggers the provider's stop subcommand",
+			ComposeCmd("stop"),
+			FileExists(marker))
+}
+
+func TestProviderImagePull(t *testing.T) {
+	// The example provider's pull subcommand requests the image bytes with a
+	// get-image message and records what it received (digest facts, sha256,
+	// size) at PROVIDER_PULL_MARKER.
+	marker := filepath.Join(t.TempDir(), "example-provider-pull-marker")
+	s := providerScenario(t, "a provider-backed service with a build must get the built image distributed to the provider")
+	s.Env("PROVIDER_PULL_MARKER=" + marker)
+	s.Step("up builds the image and streams it to the provider with the local-authority verdict",
+		ComposeCmd("up", "-d"),
+		FileContains(marker, "source=local"),
+		FileContains(marker, "policy=missing"),
+		FileContains(marker, "sha256="),
+		FileContains(marker, "digest=sha256:")).
+		Step("pull re-invokes the provider under the freshness contract",
+			ComposeCmd("pull"),
+			FileContains(marker, "policy=always"))
+}
+
+func TestDependsOnMultipleProviders(t *testing.T) {
+	providerScenario(t, "a service depending on several providers must receive each provider's variables").
+		Step("the service sees both providers' URLs",
+			ComposeCmd("up"),
+			OutputContains("test-1  | PROVIDER1_URL=https://magic.cloud/provider1"),
+			OutputContains("test-1  | PROVIDER2_URL=https://magic.cloud/provider2"))
+}
+
+func TestProviderControlChannel(t *testing.T) {
+	// The example provider requests its own resolved service config over the
+	// stdio control channel and reflects provider.type back through setenv:
+	// the dependent service seeing DB_CONFIG_TYPE proves the round trip.
+	providerScenario(t, "a provider must be able to request its resolved service config from the running compose process").
+		Step("the dependent service sees the value the provider read from its config",
+			ComposeCmd("up"),
+			OutputContains("test-1  | DB_CONFIG_TYPE=example-provider"))
+}
+
+func TestProviderRawSetEnv(t *testing.T) {
+	providerScenario(t, "setenv variables must be service-prefixed, rawsetenv injected as-is").
+		Step("the service sees both variable flavors",
+			ComposeCmd("up"),
+			OutputContains("test-1  | SECRETS_URL=https://magic.cloud/secrets"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"))
+}
+
+func TestProviderRawSetEnvOverridesUserEnv(t *testing.T) {
+	providerScenario(t, "rawsetenv must override a user-defined variable, with a visible warning").
+		Step("the provider's value wins and the override is surfaced",
+			ComposeCmd("up"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
+			OutputNotContains("test-1  | CLOUD_REGION=user-defined-region"),
+			OutputContains("overrides environment variable"))
+}
+
+func TestProviderRawSetEnvOverridesInheritedEnv(t *testing.T) {
+	providerScenario(t, "rawsetenv must override an inherited passthrough variable, with a visible warning").
+		Step("the provider's value wins over the passthrough",
+			ComposeCmd("up"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
+			OutputContains("overrides environment variable"))
+}
+
+func TestProviderRawSetEnvOverridesInheritedEnvMapForm(t *testing.T) {
+	providerScenario(t, "rawsetenv must override a map-form passthrough variable, with a visible warning").
+		Step("the provider's value wins over the map-form passthrough",
+			ComposeCmd("up"),
+			OutputContains("test-1  | CLOUD_REGION=us-east-1"),
+			OutputContains("overrides environment variable"))
+}
+
+func TestProviderMigration(t *testing.T) {
+	// Regression: migrating an already-deployed service to a provider left
+	// its replica standing — neither converged (provider services have no
+	// replicas) nor orphaned (the service is still in the model) — and the
+	// relay creation then failed with a name conflict on the canonical
+	// container name the replica still held.
+	relayImage := "compose-relay-e2e"
+	s := providerScenario(t, "migrating a deployed service to a provider must replace its replica with the relay")
+	s.CLI().RunCmd(t, "docker", "build", "-t", relayImage, "../../relay")
+	s.Env("PROVIDER_DEMO_ENDPOINT=1", "COMPOSE_RELAY_IMAGE="+relayImage)
+	s.Step("the service first runs as a regular container",
+		ComposeCmd("up", "-d"),
+		ServiceState("db", "running"))
+	s.FromFile("migrated.yaml")
+	s.Step("up after the migration replaces the replica with the relay, reachable at the compose-native address",
+		ComposeCmd("up"),
+		Recreated("db"),
+		OutputContains("test-1  | hello from provider"))
+}
+
+// TestProviderScaleReachesTheProvider locks that `compose scale` on a
+// provider-backed service neither fails nor multiplies the relay: the
+// requested count is passed through unmodified to the provider over its
+// control channel (get-service-config), which is free to act on it for the
+// real resource it manages, while Compose's own relay stays a single
+// container regardless. PROVIDER_DEMO_ENDPOINT publishes a real endpoint so
+// a relay container actually exists to assert singularity against; test is
+// included in the scale targets so it gets created in the same call and its
+// env records the exact value the provider received.
+func TestProviderScaleReachesTheProvider(t *testing.T) {
+	relayImage := "compose-relay-e2e"
+	s := providerScenario(t, "scale on a provider-backed service must reach the provider, not be rejected or applied to the relay")
+	s.CLI().RunCmd(t, "docker", "build", "-t", relayImage, "../../relay")
+	s.Env("PROVIDER_DEMO_ENDPOINT=1", "COMPOSE_RELAY_IMAGE="+relayImage)
+	s.Step("scale converges without error and the dependent sees the exact value the provider received",
+		ComposeCmd("scale", "db=5", "test=1"),
+		ContainerEnv("test", "DB_CONFIG_SCALE", "5"),
+		ServiceScale("db", 1)).
+		Step("a second scale updates the value without ever multiplying the relay",
+			ComposeCmd("scale", "db=7", "test=1"),
+			ContainerEnv("test", "DB_CONFIG_SCALE", "7"),
+			ServiceScale("db", 1))
+}
+
+func TestProviderPublishEndpoint(t *testing.T) {
+	// The example provider stands up a real endpoint on the host and
+	// publishes it; compose deploys a relay under the service's name, so the
+	// consumer reaches the provider's resource at the compose-native
+	// address http://db. The relay stands in for the service but refuses
+	// process-level commands.
+	relayImage := "compose-relay-e2e"
+	s := providerScenario(t, "a published endpoint must be reachable at the service's compose-native address")
+	s.CLI().RunCmd(t, "docker", "build", "-t", relayImage, "../../relay")
+	s.Env("PROVIDER_DEMO_ENDPOINT=1", "COMPOSE_RELAY_IMAGE="+relayImage)
+	s.Step("the consumer fetches through the relay at http://db",
+		ComposeCmd("up"),
+		OutputContains("test-1  | hello from provider"))
+
+	res := s.CLI().RunDockerComposeCmdNoCheck(t, "--project-name", "e2e-provider-publish-endpoint", "exec", "db", "true")
+	assert.Assert(t, res.ExitCode != 0, "exec on a relay container must fail")
+	assert.Assert(t, strings.Contains(res.Combined(), "network relay"), res.Combined())
+
+	// The relay is a first-class project container, not just process-level
+	// commands' target: stop/start/restart must reach it like any other
+	// service's container, consistent with docs/extension.md ("ps, logs,
+	// stop and down treat it as the service").
+	s.Step("stop halts the relay container",
+		ComposeCmd("stop", "db"),
+		ServiceState("db", "exited"))
+	s.Step("start brings the relay container back",
+		ComposeCmd("start", "db"),
+		ServiceState("db", "running"))
+	s.Step("restart cycles the relay container",
+		ComposeCmd("restart", "db"),
+		ServiceState("db", "running"))
+
+	// The relay belongs to the provider service's deprovisioning: down must
+	// remove it along with the provider's resource, or the project network
+	// stays in use and its removal fails.
+	s.Step("down removes the relay with the provider service",
+		ComposeCmd("down", "-v"),
+		ServiceNotCreated("db"))
+}

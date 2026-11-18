@@ -105,6 +105,7 @@ options allow you to configure I/O streams, concurrency limits, dry-run mode, an
 - `WithStreams(out, err, in)` - Set all I/O streams at once
 - `WithMaxConcurrency(int)` - Limit the number of concurrent operations against the Docker API
 - `WithPrompt(Prompt)` - Customize user confirmation behavior (use `AlwaysOkPrompt()` for non-interactive mode)
+- `WithNavigationMenu(NavigationMenuFactory)` - Provide the interactive keyboard menu of a foreground `up` (no menu is displayed without it)
 - `WithDryRun` - Run operations in dry-run mode without actually applying changes
 - `WithContextInfo(api.ContextInfo)` - Set custom Docker context information
 - `WithProxyConfig(map[string]string)` - Configure HTTP proxy settings for builds
