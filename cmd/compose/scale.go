@@ -116,6 +116,9 @@ func parseServicesReplicasArgs(args []string) (map[string]int, error) {
 		if err != nil {
 			return nil, fmt.Errorf("invalid scale specifier: can't parse replica value as int: %v", arg)
 		}
+		if intValue < 0 {
+			return nil, fmt.Errorf("invalid scale specifier: replica count must be a non-negative integer: %s", arg)
+		}
 		serviceReplicaTuples[key] = intValue
 	}
 	return serviceReplicaTuples, nil
