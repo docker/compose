@@ -23,12 +23,12 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
-	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/containerd/errdefs"
+	"github.com/distribution/reference"
 	"github.com/docker/cli/cli-plugins/manager"
 	"github.com/moby/moby/client/pkg/versions"
 	"github.com/spf13/cobra"
@@ -49,6 +49,10 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 	}
 	defer mdlAPI.Close()
 	availableModels, err := mdlAPI.ListModels(ctx)
+	available := make(map[string]struct{}, len(availableModels))
+	for _, m := range availableModels {
+		available[normalizeModelReference(m)] = struct{}{}
+	}
 
 	eg, ctx := concurrency.NewErrgroup(ctx, s.maxConcurrency)
 	eg.Go(func() error {
@@ -60,7 +64,7 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 			config.Name = name
 		}
 		eg.Go(func() error {
-			if !slices.Contains(availableModels, config.Model) {
+			if _, ok := available[normalizeModelReference(config.Model)]; !ok {
 				err = mdlAPI.PullModel(ctx, config, quietPull, s.events)
 				if err != nil {
 					return err
@@ -70,6 +74,30 @@ func (s *composeService) ensureModels(ctx context.Context, project *types.Projec
 		})
 	}
 	return eg.Wait()
+}
+
+// normalizeModelReference gives a model reference the form under which the model
+// runner lists the model it has, whatever way it was asked for: docker.io/ai/smollm2:latest
+// for ai/smollm2, and for a Hugging Face model huggingface.co/org/model-gguf:latest for
+// hf.co/Org/Model-GGUF. The runner resolves Hugging Face references case-insensitively
+// (the tag, such as Q4_K_M, keeps its case) and lists them under the huggingface.co
+// host. A reference that cannot be parsed otherwise is left as it is.
+func normalizeModelReference(model string) string {
+	if host, path, ok := strings.Cut(model, "/"); ok && (strings.EqualFold(host, "hf.co") || strings.EqualFold(host, "huggingface.co")) {
+		var tag string
+		if i := strings.LastIndex(path, ":"); i > strings.LastIndex(path, "/") {
+			path, tag = path[:i], path[i+1:]
+		}
+		if tag == "" {
+			tag = "latest"
+		}
+		return "huggingface.co/" + strings.ToLower(path) + ":" + tag
+	}
+	ref, err := reference.ParseNormalizedNamed(model)
+	if err != nil {
+		return model
+	}
+	return reference.TagNameOnly(ref).String()
 }
 
 type modelAPI struct {
