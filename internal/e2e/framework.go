@@ -533,6 +533,27 @@ func (c *CLI) ServicePublishedPort(t testing.TB, project, service string, target
 	return port
 }
 
+// CreateBuilder creates a buildx builder named name and fails the test on error.
+//
+// "docker buildx create" refuses to run against the default context when its
+// TLS settings come from the environment (DOCKER_TLS_VERIFY, DOCKER_CERT_PATH),
+// so in that case the default context is first copied to a context named
+// "<name>-ctx" (buildx treats every context as an implicit builder, so it
+// cannot share the builder's name) and the builder is created on top of it.
+// The context lives in the per-test DOCKER_CONFIG directory, so it needs no
+// cleanup.
+func (c *CLI) CreateBuilder(t testing.TB, name string, args ...string) *icmd.Result {
+	t.Helper()
+	create := []string{"buildx", "create", "--name", name, "--use", "--bootstrap"}
+	create = append(create, args...)
+	if os.Getenv("DOCKER_TLS_VERIFY") != "" || os.Getenv("DOCKER_CERT_PATH") != "" {
+		ctx := name + "-ctx"
+		c.RunDockerCmd(t, "context", "create", ctx, "--from", "default")
+		create = append(create, ctx)
+	}
+	return c.RunDockerCmd(t, create...)
+}
+
 // BuilderName returns a buildx builder name that is unique to the test,
 // preventing container-name collisions when tests run in parallel on the
 // same Docker daemon.
