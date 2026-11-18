@@ -296,8 +296,7 @@ func TestBuildPlatformsWithCorrectBuildxConfig(t *testing.T) {
 	// declare a per-test-unique builder to avoid container-name collisions
 	// when tests run in parallel on the same Docker daemon.
 	builderName := BuilderName(t, "build-platform")
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap")
-	assert.NilError(t, result.Error)
+	c.CreateBuilder(t, builderName)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/platforms", "down")
@@ -362,9 +361,8 @@ func TestBuildPrivileged(t *testing.T) {
 	// declare a per-test-unique builder to avoid container-name collisions
 	// when tests run in parallel on the same Docker daemon.
 	builderName := BuilderName(t, "build-privileged")
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap", "--buildkitd-flags",
+	c.CreateBuilder(t, builderName, "--buildkitd-flags",
 		`'--allow-insecure-entitlement=security.insecure'`)
-	assert.NilError(t, result.Error)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/privileged", "down")
@@ -479,8 +477,7 @@ func TestBuildBuilder(t *testing.T) {
 	// declare a per-test-unique builder to avoid container-name collisions
 	// when tests run in parallel on the same Docker daemon.
 	builderName := BuilderName(t, "build-with-builder")
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap")
-	assert.NilError(t, result.Error)
+	c.CreateBuilder(t, builderName)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/", "down")
@@ -507,9 +504,8 @@ func TestBuildEntitlements(t *testing.T) {
 	// declare a per-test-unique builder to avoid container-name collisions
 	// when tests run in parallel on the same Docker daemon.
 	builderName := BuilderName(t, "build-insecure")
-	result := c.RunDockerCmd(t, "buildx", "create", "--name", builderName, "--use", "--bootstrap", "--buildkitd-flags",
+	c.CreateBuilder(t, builderName, "--buildkitd-flags",
 		`'--allow-insecure-entitlement=security.insecure'`)
-	assert.NilError(t, result.Error)
 
 	t.Cleanup(func() {
 		c.RunDockerComposeCmd(t, "--project-directory", "fixtures/build-test/entitlements", "down")
