@@ -114,7 +114,7 @@ func expectEventStream(apiClient *mocks.MockAPIClient, initial []container.Summa
 
 func TestMonitorStartLifecycle(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 	got := recordEvents(m)
 
 	messages, _ := expectEventStream(apiClient, []container.Summary{
@@ -165,7 +165,7 @@ func TestMonitorStartLifecycle(t *testing.T) {
 
 func TestMonitorStartServiceFilter(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 	m.WithServices([]string{"web"})
 	got := recordEvents(m)
 
@@ -191,7 +191,7 @@ func TestMonitorStartServiceFilter(t *testing.T) {
 
 func TestMonitorStartNoContainers(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 
 	expectEventStream(apiClient, nil, 1)
 
@@ -201,7 +201,7 @@ func TestMonitorStartNoContainers(t *testing.T) {
 
 func TestMonitorStartEventsError(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 
 	_, errs := expectEventStream(apiClient, []container.Summary{
 		{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db"}},
@@ -216,7 +216,7 @@ func TestMonitorStartEventsError(t *testing.T) {
 
 func TestMonitorStartContextCancelled(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 
 	expectEventStream(apiClient, []container.Summary{
 		{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db"}},
@@ -231,7 +231,7 @@ func TestMonitorStartContextCancelled(t *testing.T) {
 
 func TestMonitorStartBadExitCode(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 
 	messages, _ := expectEventStream(apiClient, []container.Summary{
 		{ID: "c1", Labels: map[string]string{api.ServiceLabel: "db"}},
@@ -292,7 +292,7 @@ func newMonitorTestFixtureListing(t *testing.T, initial []container.Summary, lis
 			return client.ContainerListResult{Items: initial}, nil
 		})
 
-	m := logstream.NewMonitor(apiMock, strings.ToLower(testProject))
+	m := logstream.NewMonitor(apiMock, apiMock, strings.ToLower(testProject))
 	return m, apiMock
 }
 
@@ -486,7 +486,7 @@ func TestMonitorStopBeforeDiePreservesExitCode(t *testing.T) {
 // entry's effect on target's following start event be observed.
 func TestMonitorDieClearsStaleRestartingEntry(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 	got := recordEvents(m)
 
 	messages, _ := expectEventStream(apiClient, []container.Summary{
@@ -653,7 +653,7 @@ func monitorWithEventLog(t *testing.T, listed []container.Summary, during func(*
 		DoAndReturn(func(_ context.Context, opts client.EventsListOptions) client.EventsResult {
 			return log.subscribe(t, opts, live...)
 		})
-	return logstream.NewMonitor(apiClient, "p"), apiClient, log
+	return logstream.NewMonitor(apiClient, apiClient, "p"), apiClient, log
 }
 
 // startWithin runs the monitor and fails the test when it doesn't terminate
@@ -889,7 +889,7 @@ func TestMonitorStartFailsWithoutDaemonTime(t *testing.T) {
 			apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
 			apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(
 				client.SystemInfoResult{Info: system.Info{SystemTime: tt.systemTime}}, nil)
-			m := logstream.NewMonitor(apiClient, "p")
+			m := logstream.NewMonitor(apiClient, apiClient, "p")
 
 			err := m.Start(t.Context())
 
@@ -943,7 +943,7 @@ func TestMonitorStartWithoutInfoSubscribesLive(t *testing.T) {
 func TestMonitorStartCanceledBeforeDaemonTime(t *testing.T) {
 	apiClient := mocks.NewMockAPIClient(gomock.NewController(t))
 	apiClient.EXPECT().Info(gomock.Any(), gomock.Any()).Return(client.SystemInfoResult{}, context.Canceled)
-	m := logstream.NewMonitor(apiClient, "p")
+	m := logstream.NewMonitor(apiClient, apiClient, "p")
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 

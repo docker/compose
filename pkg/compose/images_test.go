@@ -225,7 +225,7 @@ func TestImagesBackendWiring(t *testing.T) {
 	b := imagesBackend{s}
 
 	assert.Equal(t, b.MaxConcurrency(), 7)
-	assert.Assert(t, b.APIClient() == client.APIClient(api))
+	assert.Assert(t, b.ImageAPI() == client.ImageAPIClient(api))
 	version, err := b.RuntimeAPIVersion(t.Context())
 	assert.NilError(t, err)
 	assert.Equal(t, version, "1.48")

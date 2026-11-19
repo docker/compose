@@ -46,8 +46,9 @@ type fakeBackend struct {
 	version   string
 }
 
-func (f *fakeBackend) APIClient() client.APIClient { return f.apiClient }
-func (f *fakeBackend) MaxConcurrency() int         { return 0 }
+func (f *fakeBackend) ImageAPI() client.ImageAPIClient         { return f.apiClient }
+func (f *fakeBackend) ContainerAPI() client.ContainerAPIClient { return f.apiClient }
+func (f *fakeBackend) MaxConcurrency() int                     { return 0 }
 
 func (f *fakeBackend) RuntimeAPIVersion(context.Context) (string, error) { return f.version, nil }
 

@@ -19,12 +19,20 @@
 package inspect
 
 import (
+	"github.com/moby/moby/client"
+
 	"github.com/docker/compose/v5/internal/engine"
 )
 
 // Backend is what the operations need from the engine they report on.
 type Backend interface {
 	engine.Backend
+	// ContainerAPI lists, inspects and reads the processes of the containers.
+	ContainerAPI() client.ContainerAPIClient
+	// VolumeAPI lists the volumes.
+	VolumeAPI() client.VolumeAPIClient
+	// SystemAPI streams the events of the daemon.
+	SystemAPI() client.SystemAPIClient
 }
 
 // Service runs the inspection operations on a Backend.

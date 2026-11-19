@@ -22,11 +22,13 @@ import (
 
 	"github.com/docker/cli/cli/config/configfile"
 	"github.com/moby/moby/api/types/swarm"
+	"github.com/moby/moby/api/types/volume"
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/mock/gomock"
 	"gotest.tools/v3/assert"
 
+	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/mocks"
 )
 
@@ -89,4 +91,43 @@ func TestWithDryRunKeepsLogLevel(t *testing.T) {
 
 	assert.NilError(t, WithDryRun(&composeService{dockerCli: cli}))
 	assert.Equal(t, logrus.GetLevel(), logrus.TraceLevel)
+}
+
+// TestEngineAPIIsReachedWithoutDockerCLI guards that the engine API is reached
+// through the engine alone: a service handed an engine runs its operations and
+// releases it on Close without ever asking the Docker CLI, which a mock with no
+// expectation would fail on.
+func TestEngineAPIIsReachedWithoutDockerCLI(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	apiClient := mocks.NewMockAPIClient(mockCtrl)
+	svc := &composeService{
+		engine:    apiClient,
+		dockerCli: mocks.NewMockCli(mockCtrl),
+	}
+
+	apiClient.EXPECT().VolumeList(gomock.Any(), gomock.Any()).Return(client.VolumeListResult{
+		Items: []volume.Volume{{
+			Name:   "proj_data",
+			Driver: "local",
+			Labels: map[string]string{api.VolumeLabel: "data"},
+		}},
+	}, nil)
+	volumes, err := svc.actualVolumes(t.Context(), "proj")
+	assert.NilError(t, err)
+	assert.Equal(t, volumes["data"].Name, "proj_data")
+
+	apiClient.EXPECT().Close().Return(nil)
+	assert.NilError(t, svc.Close())
+}
+
+// TestWithDryRunRefusesInjectedEngine guards that a dry run is never silently
+// skipped: the dry-run client only wraps the client of the Docker CLI, so a
+// service holding an engine of its own cannot honor it and says so.
+func TestWithDryRunRefusesInjectedEngine(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	svc := &composeService{engine: mocks.NewMockAPIClient(mockCtrl)}
+
+	err := WithDryRun(svc)
+	assert.ErrorContains(t, err, "injected engine")
+	assert.Assert(t, !svc.dryRun)
 }

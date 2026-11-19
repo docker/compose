@@ -57,7 +57,7 @@ func (s *Service) Export(ctx context.Context, projectName string, options api.Ex
 		Status: api.Working,
 	})
 
-	responseBody, err := s.backend.APIClient().ContainerExport(ctx, container.ID, client.ContainerExportOptions{})
+	responseBody, err := s.backend.ContainerAPI().ContainerExport(ctx, container.ID, client.ContainerExportOptions{})
 	if err != nil {
 		return err
 	}

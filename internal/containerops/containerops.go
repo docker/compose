@@ -20,6 +20,7 @@ package containerops
 
 import (
 	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/pkg/api"
@@ -33,6 +34,8 @@ import (
 // implementation).
 type Backend interface {
 	engine.Backend
+	// ContainerAPI acts on the containers: copy, export, commit.
+	ContainerAPI() client.ContainerAPIClient
 	// Events receives the progress of the operations.
 	Events() api.EventProcessor
 	// DryRun tells whether the operations only report what they would do.

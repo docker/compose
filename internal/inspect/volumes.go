@@ -27,7 +27,7 @@ import (
 )
 
 func (s *Service) Volumes(ctx context.Context, projectName string, options api.VolumesOptions) ([]api.VolumesSummary, error) {
-	allContainers, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+	allContainers, err := s.backend.ContainerAPI().ContainerList(ctx, client.ContainerListOptions{
 		Filters: naming.ProjectFilter(projectName),
 	})
 	if err != nil {
@@ -42,7 +42,7 @@ func (s *Service) Volumes(ctx context.Context, projectName string, options api.V
 		containers = allContainers.Items
 	}
 
-	volumesResponse, err := s.backend.APIClient().VolumeList(ctx, client.VolumeListOptions{
+	volumesResponse, err := s.backend.VolumeAPI().VolumeList(ctx, client.VolumeListOptions{
 		Filters: naming.ProjectFilter(projectName),
 	})
 	if err != nil {

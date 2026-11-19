@@ -74,7 +74,7 @@ func (s *Service) AttachContainers(ctx context.Context, project *types.Project, 
 
 // AttachContainer attaches to one container, reporting its output to listener.
 func (s *Service) AttachContainer(ctx context.Context, service, id, name string, listener api.ContainerEventListener) error {
-	inspected, err := s.backend.APIClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	inspected, err := s.backend.ContainerAPI().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func (s *Service) attachContainerStreams(ctx context.Context, containerID string
 }
 
 func (s *Service) getContainerStreams(ctx context.Context, containerID string) (io.ReadCloser, error) {
-	attachResponse, err := s.backend.APIClient().ContainerAttach(ctx, containerID, client.ContainerAttachOptions{
+	attachResponse, err := s.backend.ContainerAPI().ContainerAttach(ctx, containerID, client.ContainerAttachOptions{
 		Stream: true,
 		Stdin:  false,
 		Stdout: true,
@@ -154,7 +154,7 @@ func (s *Service) getContainerStreams(ctx context.Context, containerID string) (
 	}
 
 	// Fallback to logs API
-	logs, err := s.backend.APIClient().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
+	logs, err := s.backend.ContainerAPI().ContainerLogs(ctx, containerID, client.ContainerLogsOptions{
 		ShowStdout: true,
 		ShowStderr: true,
 		Follow:     true,

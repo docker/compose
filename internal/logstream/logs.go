@@ -74,7 +74,7 @@ func (s *Service) Logs(
 	if options.Follow {
 		printer := NewPrinter(consumer)
 
-		monitor := NewMonitor(s.backend.APIClient(), projectName)
+		monitor := NewMonitor(s.backend.ContainerAPI(), s.backend.SystemAPI(), projectName)
 		if len(options.Services) > 0 {
 			monitor.WithServices(options.Services)
 		} else if options.Project != nil {
@@ -121,7 +121,7 @@ func (s *Service) InspectWithSlot(ctx context.Context, limiter *semaphore.Weight
 		return container.InspectResponse{}, err
 	}
 	defer concurrency.PanicSafeRelease(limiter)
-	res, err := s.backend.APIClient().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
+	res, err := s.backend.ContainerAPI().ContainerInspect(ctx, id, client.ContainerInspectOptions{})
 	if err != nil {
 		concurrency.Release(limiter)
 		return container.InspectResponse{}, err
@@ -298,7 +298,7 @@ func (s *Service) DoLogContainer(
 	// must not re-trigger it and release the same slot twice.
 	r, err := func() (io.ReadCloser, error) {
 		defer concurrency.PanicSafeRelease(limiter)
-		r, err := s.backend.APIClient().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
+		r, err := s.backend.ContainerAPI().ContainerLogs(ctx, ctr.ID, client.ContainerLogsOptions{
 			ShowStdout: true,
 			ShowStderr: true,
 			Follow:     options.Follow,

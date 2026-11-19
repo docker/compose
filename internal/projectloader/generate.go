@@ -34,7 +34,7 @@ import (
 )
 
 func (s *Service) Generate(ctx context.Context, options api.GenerateOptions) (*types.Project, error) {
-	res, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+	res, err := s.backend.ContainerAPI().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("name", options.Containers...),
 		All:     true,
 	})
@@ -43,7 +43,7 @@ func (s *Service) Generate(ctx context.Context, options api.GenerateOptions) (*t
 	}
 	containers := res.Items
 
-	containersByIds, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+	containersByIds, err := s.backend.ContainerAPI().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("id", options.Containers...),
 		All:     true,
 	})
@@ -103,7 +103,7 @@ func (s *Service) createProjectFromContainers(containers []container.Summary, pr
 	for _, ctr := range containers {
 		serviceLabel, service := ServiceOfContainer(services, ctr)
 
-		inspect, err := s.backend.APIClient().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
+		inspect, err := s.backend.ContainerAPI().ContainerInspect(context.Background(), ctr.ID, client.ContainerInspectOptions{})
 		if err != nil {
 			services[serviceLabel] = service
 			continue
@@ -228,7 +228,7 @@ func (s *Service) toComposeNetwork(networks map[string]*network.EndpointSettings
 	serviceNetworkConfigs := make(map[string]*types.ServiceNetworkConfig)
 
 	for name, net := range networks {
-		inspect, err := s.backend.APIClient().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
+		inspect, err := s.backend.NetworkAPI().NetworkInspect(context.Background(), name, client.NetworkInspectOptions{})
 		if err != nil {
 			networkConfigs[name] = types.NetworkConfig{}
 		} else {

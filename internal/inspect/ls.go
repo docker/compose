@@ -31,7 +31,7 @@ import (
 )
 
 func (s *Service) List(ctx context.Context, options api.ListOptions) ([]api.Stack, error) {
-	list, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+	list, err := s.backend.ContainerAPI().ContainerList(ctx, client.ContainerListOptions{
 		Filters: make(client.Filters).Add("label", api.ProjectLabel).Add("label", api.ConfigHashLabel),
 		All:     options.All,
 	})

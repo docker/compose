@@ -95,7 +95,11 @@ type imagesBackend struct {
 	s *composeService
 }
 
-func (b imagesBackend) APIClient() client.APIClient {
+func (b imagesBackend) ContainerAPI() client.ContainerAPIClient {
+	return b.s.apiClient()
+}
+
+func (b imagesBackend) ImageAPI() client.ImageAPIClient {
 	return b.s.apiClient()
 }
 

@@ -168,7 +168,7 @@ func (c *Client) IsFeatureEnabled(ctx context.Context, feature string) (bool, er
 // given feature flag is enabled. Returns false silently on any failure — the
 // engine being unreachable, Desktop not being the active engine, or the flag
 // being off — so callers can use this as a single gating check.
-func IsFeatureActive(ctx context.Context, apiClient client.APIClient, feature string) bool {
+func IsFeatureActive(ctx context.Context, apiClient client.SystemAPIClient, feature string) bool {
 	endpoint, err := Endpoint(ctx, apiClient)
 	if err != nil || endpoint == "" {
 		return false

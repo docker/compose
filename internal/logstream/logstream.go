@@ -20,6 +20,7 @@ package logstream
 
 import (
 	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/engine"
 	"github.com/docker/compose/v5/internal/naming"
@@ -32,6 +33,10 @@ import (
 // announcement to, and the Docker CLI's own attach implementation.
 type Backend interface {
 	engine.Backend
+	// ContainerAPI inspects, attaches to and reads the logs of the containers.
+	ContainerAPI() client.ContainerAPIClient
+	// SystemAPI reads the daemon and its events.
+	SystemAPI() client.SystemAPIClient
 	// CLI is the Docker CLI Compose runs in, and the owner of the terminal streams.
 	CLI() command.Cli
 }

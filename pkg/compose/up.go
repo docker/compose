@@ -332,7 +332,8 @@ func (s *composeService) runInteractiveUp(ctx context.Context, created *createdU
 		}
 	}
 
-	monitor := logstream.NewMonitor(s.apiClient(), project.Name)
+	engine := s.apiClient()
+	monitor := logstream.NewMonitor(engine, engine, project.Name)
 	if len(options.Start.Services) > 0 {
 		monitor.WithServices(options.Start.Services)
 	} else {

@@ -175,7 +175,7 @@ func (s *Service) RemoveImages(ctx context.Context, images []image.Summary, limi
 	// shared errgroup ctx, so fn always returns nil and collects into the
 	// buckets below instead.
 	_ = concurrency.ForEach(ctx, limiter, images, func(ctx context.Context, img image.Summary) error {
-		if _, err := s.backend.APIClient().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
+		if _, err := s.backend.ImageAPI().ImageRemove(ctx, img.ID, client.ImageRemoveOptions{}); err != nil {
 			mu.Lock()
 			defer mu.Unlock()
 			imgStillInUse, alreadyGone := s.backend.ClassifyRemovalError(err)
@@ -206,7 +206,7 @@ func (s *Service) RemoveImages(ctx context.Context, images []image.Summary, limi
 // itself, to decide whether there's anything to report) and watch --prune,
 // so the two don't drift apart.
 func (s *Service) EligibleDanglingImages(ctx context.Context, projectName string, keep func(image.Summary) bool) ([]image.Summary, error) {
-	res, err := s.backend.APIClient().ImageList(ctx, client.ImageListOptions{
+	res, err := s.backend.ImageAPI().ImageList(ctx, client.ImageListOptions{
 		Filters: naming.ProjectFilter(projectName).Add("dangling", "true"),
 	})
 	if err != nil {

@@ -41,7 +41,11 @@ type publishBackend struct {
 	s *composeService
 }
 
-func (b publishBackend) APIClient() client.APIClient {
+func (b publishBackend) DistributionAPI() client.DistributionAPIClient {
+	return b.s.apiClient()
+}
+
+func (b publishBackend) SystemAPI() client.SystemAPIClient {
 	return b.s.apiClient()
 }
 

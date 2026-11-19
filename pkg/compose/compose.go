@@ -171,6 +171,11 @@ func WithMaxConcurrency(maxConcurrency int) Option {
 
 // WithDryRun configure Compose to run without actually applying changes
 func WithDryRun(s *composeService) error {
+	if s.engine != nil {
+		// The dry-run client wraps the client of the Docker CLI: it would leave the
+		// engine handed to the service, and the calls made on it, out of the dry run.
+		return errors.New("dry-run cannot be combined with an injected engine")
+	}
 	s.dryRun = true
 	cli, err := command.NewDockerCli()
 	if err != nil {
@@ -183,7 +188,7 @@ func WithDryRun(s *composeService) error {
 	// keep the level already set (e.g. by --verbose).
 	options.LogLevel = logrus.GetLevel().String()
 	err = cli.Initialize(options, command.WithInitializeClient(func(cli *command.DockerCli) (client.APIClient, error) {
-		return dryrun.NewDryRunClient(s.apiClient(), s.dockerCli)
+		return dryrun.NewDryRunClient(s.dockerCli.Client(), s.dockerCli)
 	}))
 	if err != nil {
 		return err
@@ -211,6 +216,15 @@ func WithEventProcessor(bus api.EventProcessor) Option {
 }
 
 type composeService struct {
+	// engine is the Docker Engine API the service works against. When unset, it is
+	// the client of dockerCli, which only connects on first use: a command that
+	// never reaches the engine (`compose config`) must not open the connection.
+	// WithDryRun refuses a service holding one: it only knows how to wrap the
+	// client of dockerCli.
+	engine client.APIClient
+	// dockerCli serves what is bound to a terminal and its plugins: the standard
+	// streams, the config file, buildx and the model plugin, attach and exec.
+	// The engine is not among them: it goes through the engine field.
 	dockerCli command.Cli
 	// prompt is used to interact with user and confirm actions
 	prompt Prompt
@@ -264,8 +278,13 @@ type composeService struct {
 // will get cleaned up at about the same time regardless even if not invoked.
 func (s *composeService) Close() error {
 	var errs []error
-	if s.dockerCli != nil {
-		errs = append(errs, s.apiClient().Close())
+	switch {
+	case s.engine != nil:
+		// The service owns the engine it was handed. The client of dockerCli stays
+		// with the Docker CLI, which closes it with the rest of its resources.
+		errs = append(errs, s.engine.Close())
+	case s.dockerCli != nil:
+		errs = append(errs, s.dockerCli.Client().Close())
 	}
 	if s.jobsExtClient != nil {
 		errs = append(errs, s.jobsExtClient.Close())
@@ -274,6 +293,9 @@ func (s *composeService) Close() error {
 }
 
 func (s *composeService) apiClient() client.APIClient {
+	if s.engine != nil {
+		return s.engine
+	}
 	return s.dockerCli.Client()
 }
 

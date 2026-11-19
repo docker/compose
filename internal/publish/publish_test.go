@@ -53,10 +53,11 @@ type fakeBackend struct {
 	auth      registry.AuthProvider
 }
 
-func (f *fakeBackend) APIClient() client.APIClient         { return f.apiClient }
-func (f *fakeBackend) AuthProvider() registry.AuthProvider { return f.auth }
-func (f *fakeBackend) Events() api.EventProcessor          { return progress.Noop{} }
-func (f *fakeBackend) DryRun() bool                        { return false }
+func (f *fakeBackend) DistributionAPI() client.DistributionAPIClient { return f.apiClient }
+func (f *fakeBackend) SystemAPI() client.SystemAPIClient             { return f.apiClient }
+func (f *fakeBackend) AuthProvider() registry.AuthProvider           { return f.auth }
+func (f *fakeBackend) Events() api.EventProcessor                    { return progress.Noop{} }
+func (f *fakeBackend) DryRun() bool                                  { return false }
 
 func (f *fakeBackend) Prompt(message string, defaultValue bool) (bool, error) {
 	return f.prompt(message, defaultValue)
