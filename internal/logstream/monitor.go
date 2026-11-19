@@ -37,8 +37,9 @@ import (
 // Monitor follows the events of the containers of a project and reports them to
 // its listeners, see Start.
 type Monitor struct {
-	apiClient client.APIClient
-	project   string
+	containers client.ContainerAPIClient
+	system     client.SystemAPIClient
+	project    string
 	// services tells us which service to consider and those we can ignore, maybe ran by a concurrent compose command
 	services  map[string]bool
 	listeners []api.ContainerEventListener
@@ -51,11 +52,12 @@ type Monitor struct {
 }
 
 // NewMonitor creates a Monitor of the containers of a project.
-func NewMonitor(apiClient client.APIClient, project string) *Monitor {
+func NewMonitor(containers client.ContainerAPIClient, system client.SystemAPIClient, project string) *Monitor {
 	return &Monitor{
-		apiClient: apiClient,
-		project:   project,
-		services:  map[string]bool{},
+		containers: containers,
+		system:     system,
+		project:    project,
+		services:   map[string]bool{},
 	}
 }
 
@@ -178,7 +180,7 @@ func (c *Monitor) Start(ctx context.Context) error {
 	// restarting tracks containers which exited but are configured to restart on exit
 	restarting := utils.Set[string]{}
 
-	res := c.apiClient.Events(ctx, client.EventsListOptions{
+	res := c.system.Events(ctx, client.EventsListOptions{
 		Since:   c.since,
 		Filters: naming.ProjectFilter(c.project).Add("type", "container").Add("label", oneOffFilter(false)),
 	})
@@ -238,7 +240,7 @@ func (c *Monitor) ReadDaemonTime(ctx context.Context) error {
 	if c.sinceRead {
 		return nil
 	}
-	res, err := c.apiClient.Info(ctx, client.InfoOptions{})
+	res, err := c.system.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		if ctx.Err() != nil {
 			return fmt.Errorf("reading the daemon time to subscribe to container events: %w", err)
@@ -263,7 +265,7 @@ func (c *Monitor) ReadDaemonTime(ctx context.Context) error {
 // initialContainers collects the application's containers at startup,
 // restricted to the services this monitor watches
 func (c *Monitor) initialContainers(ctx context.Context) (utils.Set[string], error) {
-	initialState, err := c.apiClient.ContainerList(ctx, client.ContainerListOptions{
+	initialState, err := c.containers.ContainerList(ctx, client.ContainerListOptions{
 		All: true,
 		Filters: naming.ProjectFilter(c.project).Add("label",
 			oneOffFilter(false),
@@ -405,7 +407,7 @@ func (c *Monitor) onContainerDestroy(ctr *api.ContainerSummary, containers, rest
 // (see https://github.com/moby/moby/issues/45538). A container already removed won't
 // come back, which found reports; exitCode is only meaningful when found is true.
 func (c *Monitor) isRestarting(ctx context.Context, containerID string) (willRestart, found bool, exitCode int, err error) {
-	inspect, err := c.apiClient.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
+	inspect, err := c.containers.ContainerInspect(ctx, containerID, client.ContainerInspectOptions{})
 	if errdefs.IsNotFound(err) {
 		return false, false, 0, nil
 	}

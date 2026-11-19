@@ -41,7 +41,7 @@ func (s *Service) Top(ctx context.Context, projectName string, services []string
 	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())
 	for i, ctr := range containers {
 		eg.Go(func() error {
-			topContent, err := s.backend.APIClient().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{
+			topContent, err := s.backend.ContainerAPI().ContainerTop(ctx, ctr.ID, client.ContainerTopOptions{
 				Arguments: []string{},
 			})
 			if err != nil {

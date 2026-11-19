@@ -67,7 +67,15 @@ type relayBackend struct {
 	s *composeService
 }
 
-func (b relayBackend) APIClient() client.APIClient {
+func (b relayBackend) ContainerAPI() client.ContainerAPIClient {
+	return b.s.apiClient()
+}
+
+func (b relayBackend) ImageAPI() client.ImageAPIClient {
+	return b.s.apiClient()
+}
+
+func (b relayBackend) NetworkAPI() client.NetworkAPIClient {
 	return b.s.apiClient()
 }
 

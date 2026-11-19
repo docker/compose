@@ -26,8 +26,10 @@ import (
 
 // Backend is what loading or generating a project needs from the engine.
 type Backend interface {
-	// APIClient talks to the Docker daemon, to read the containers to generate a project from.
-	APIClient() client.APIClient
+	// ContainerAPI reads the containers to generate a project from.
+	ContainerAPI() client.ContainerAPIClient
+	// NetworkAPI reads the networks of those containers.
+	NetworkAPI() client.NetworkAPIClient
 	// CLI is the Docker CLI, which resolves the remote (Git, OCI) Compose files.
 	CLI() command.Cli
 }

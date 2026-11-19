@@ -49,7 +49,12 @@ type fakeBackend struct {
 	removeDanglingImages func(ctx context.Context, projectName string, keep func(image.Summary) bool) error
 }
 
-func (f *fakeBackend) APIClient() client.APIClient {
+func (f *fakeBackend) ExecAPI() client.ExecAPIClient {
+	f.t.Errorf("unexpected call to the Docker client")
+	return nil
+}
+
+func (f *fakeBackend) ContainerAPI() client.ContainerAPIClient {
 	f.t.Errorf("unexpected call to the Docker client")
 	return nil
 }

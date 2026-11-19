@@ -41,8 +41,10 @@ type fakeBackend struct {
 	index    int
 }
 
-func (f *fakeBackend) APIClient() client.APIClient { return f.apiClient }
-func (f *fakeBackend) MaxConcurrency() int         { return 2 }
+func (f *fakeBackend) ContainerAPI() client.ContainerAPIClient { return f.apiClient }
+func (f *fakeBackend) VolumeAPI() client.VolumeAPIClient       { return f.apiClient }
+func (f *fakeBackend) SystemAPI() client.SystemAPIClient       { return f.apiClient }
+func (f *fakeBackend) MaxConcurrency() int                     { return 2 }
 
 func (f *fakeBackend) Containers(_ context.Context, _ string, oneOff engine.OneOff, all bool, services ...string) ([]container.Summary, error) {
 	f.oneOff, f.all, f.services = oneOff, all, services

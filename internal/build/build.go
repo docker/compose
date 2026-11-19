@@ -25,6 +25,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 
 	"github.com/docker/compose/v5/internal/envresolver"
 	"github.com/docker/compose/v5/pkg/api"
@@ -33,9 +34,11 @@ import (
 
 // Backend is what the build needs from the engine it acts on.
 type Backend interface {
-	// CLI is the Docker CLI Compose runs in: the daemon client, the credentials,
-	// the terminal output and the buildx plugin all come from it.
+	// CLI is the Docker CLI Compose runs in: the credentials, the terminal output
+	// and the buildx plugin come from it.
 	CLI() command.Cli
+	// ImageBuildAPI builds the images through the Docker daemon.
+	ImageBuildAPI() client.ImageBuildAPIClient
 	// Events receives the progress of the builds.
 	Events() api.EventProcessor
 	// DryRun tells whether the build only reports what it would do.

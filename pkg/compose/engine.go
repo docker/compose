@@ -31,7 +31,19 @@ type engineBackend struct {
 	s *composeService
 }
 
-func (b engineBackend) APIClient() client.APIClient {
+func (b engineBackend) ContainerAPI() client.ContainerAPIClient {
+	return b.s.apiClient()
+}
+
+func (b engineBackend) ExecAPI() client.ExecAPIClient {
+	return b.s.apiClient()
+}
+
+func (b engineBackend) SystemAPI() client.SystemAPIClient {
+	return b.s.apiClient()
+}
+
+func (b engineBackend) VolumeAPI() client.VolumeAPIClient {
 	return b.s.apiClient()
 }
 

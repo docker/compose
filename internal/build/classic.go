@@ -196,7 +196,7 @@ func (s *Service) doBuildImage(ctx context.Context, project *types.Project, serv
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	s.backend.Events().On(composeprogress.Building(imageName))
-	response, err := s.backend.CLI().Client().ImageBuild(ctx, body, buildOpts)
+	response, err := s.backend.ImageBuildAPI().ImageBuild(ctx, body, buildOpts)
 	if err != nil {
 		return "", err
 	}

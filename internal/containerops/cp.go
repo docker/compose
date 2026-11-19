@@ -155,7 +155,7 @@ func (s *Service) copyToContainer(ctx context.Context, containerID string, srcPa
 	// Prepare destination copy info by stat-ing the container path.
 	dstInfo := archive.CopyInfo{Path: dstPath}
 	var dstStat container.PathStat
-	res, err := s.backend.APIClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+	res, err := s.backend.ContainerAPI().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
 		Path: dstPath,
 	})
 	if err == nil {
@@ -172,7 +172,7 @@ func (s *Service) copyToContainer(ctx context.Context, containerID string, srcPa
 		}
 
 		dstInfo.Path = linkTarget
-		res, err = s.backend.APIClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+		res, err = s.backend.ContainerAPI().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
 			Path: linkTarget,
 		})
 		if err == nil {
@@ -244,7 +244,7 @@ func (s *Service) copyToContainer(ctx context.Context, containerID string, srcPa
 		}
 	}
 
-	_, err = s.backend.APIClient().CopyToContainer(ctx, containerID, client.CopyToContainerOptions{
+	_, err = s.backend.ContainerAPI().CopyToContainer(ctx, containerID, client.CopyToContainerOptions{
 		DestinationPath:           resolvedDstPath,
 		Content:                   content,
 		AllowOverwriteDirWithFile: false,
@@ -271,7 +271,7 @@ func (s *Service) copyFromContainer(ctx context.Context, containerID, srcPath, d
 	var rebaseName string
 	if options.FollowLink {
 		var srcStat container.PathStat
-		res, err := s.backend.APIClient().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
+		res, err := s.backend.ContainerAPI().ContainerStatPath(ctx, containerID, client.ContainerStatPathOptions{
 			Path: srcPath,
 		})
 		if err == nil {
@@ -292,7 +292,7 @@ func (s *Service) copyFromContainer(ctx context.Context, containerID, srcPath, d
 		}
 	}
 
-	res, err := s.backend.APIClient().CopyFromContainer(ctx, containerID, client.CopyFromContainerOptions{
+	res, err := s.backend.ContainerAPI().CopyFromContainer(ctx, containerID, client.CopyFromContainerOptions{
 		SourcePath: srcPath,
 	})
 	if err != nil {

@@ -43,8 +43,12 @@ import (
 
 // Backend is what the relay management needs from the engine.
 type Backend interface {
-	// APIClient talks to the Docker daemon.
-	APIClient() client.APIClient
+	// ContainerAPI manages the containers of the relays.
+	ContainerAPI() client.ContainerAPIClient
+	// NetworkAPI manages the networks the relays are linked through.
+	NetworkAPI() client.NetworkAPIClient
+	// ImageAPI pulls the image of the relays.
+	ImageAPI() client.ImageAPIClient
 	// Events receives the progress of the operations.
 	Events() api.EventProcessor
 	// IsDesktopIntegrationActive tells whether Docker Desktop is the engine.
@@ -251,7 +255,7 @@ func (s *Service) listRelayLinkNetworks(ctx context.Context, projectName, servic
 	if serviceName != "" {
 		filters = filters.Add("label", naming.ServiceFilter(serviceName))
 	}
-	existing, err := s.backend.APIClient().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
+	existing, err := s.backend.NetworkAPI().NetworkList(ctx, client.NetworkListOptions{Filters: filters})
 	if err != nil {
 		if serviceName == "" {
 			return nil, fmt.Errorf("list relay link networks for project %s: %w", projectName, err)
@@ -297,7 +301,7 @@ func (s *Service) ensureRelayLinkNetwork(ctx context.Context, project *types.Pro
 		}
 	}
 
-	if _, err := s.backend.APIClient().NetworkCreate(ctx, name, client.NetworkCreateOptions{
+	if _, err := s.backend.NetworkAPI().NetworkCreate(ctx, name, client.NetworkCreateOptions{
 		Labels: map[string]string{
 			api.ProjectLabel:      project.Name,
 			api.ServiceLabel:      service.Name,
@@ -339,7 +343,7 @@ func (s *Service) ensureRelayLinkNetwork(ctx context.Context, project *types.Pro
 }
 
 func (s *Service) relayLinkNetworkGateway(ctx context.Context, idOrName string) (string, error) {
-	inspected, err := s.backend.APIClient().NetworkInspect(ctx, idOrName, client.NetworkInspectOptions{})
+	inspected, err := s.backend.NetworkAPI().NetworkInspect(ctx, idOrName, client.NetworkInspectOptions{})
 	if err != nil {
 		return "", fmt.Errorf("inspect relay link network %s: %w", idOrName, err)
 	}
@@ -378,7 +382,7 @@ func (s *Service) removeRelayLinkNetwork(ctx context.Context, projectName, servi
 func (s *Service) RemoveLinkNetwork(ctx context.Context, n network.Summary) error {
 	eventName := "Network " + n.Name
 	s.backend.Events().On(progress.Removing(eventName))
-	if _, err := s.backend.APIClient().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil {
+	if _, err := s.backend.NetworkAPI().NetworkRemove(ctx, n.ID, client.NetworkRemoveOptions{}); err != nil {
 		switch {
 		case errdefs.IsNotFound(err):
 			s.backend.Events().On(progress.New(eventName, api.Warning, "No resource found to remove"))
@@ -456,12 +460,12 @@ func (s *Service) Ensure(ctx context.Context, project *types.Project, service ty
 			case container.StateCreated, container.StateExited:
 				// Routes unchanged: start the existing container rather than
 				// recreating it.
-				if _, err := s.backend.APIClient().ContainerStart(ctx, existing.ID, client.ContainerStartOptions{}); err != nil {
+				if _, err := s.backend.ContainerAPI().ContainerStart(ctx, existing.ID, client.ContainerStartOptions{}); err != nil {
 					return fmt.Errorf("start relay for service %s: %w", service.Name, err)
 				}
 				return nil
 			case container.StatePaused:
-				if _, err := s.backend.APIClient().ContainerUnpause(ctx, existing.ID, client.ContainerUnpauseOptions{}); err != nil {
+				if _, err := s.backend.ContainerAPI().ContainerUnpause(ctx, existing.ID, client.ContainerUnpauseOptions{}); err != nil {
 					return fmt.Errorf("unpause relay for service %s: %w", service.Name, err)
 				}
 				return nil
@@ -474,7 +478,7 @@ func (s *Service) Ensure(ctx context.Context, project *types.Project, service ty
 			if err := s.waitRelayRemoved(ctx, project.Name, service.Name); err != nil {
 				return err
 			}
-		} else if _, err := s.backend.APIClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
+		} else if _, err := s.backend.ContainerAPI().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
 			return fmt.Errorf("remove stale relay for service %s: %w", service.Name, err)
 		}
 	}
@@ -484,7 +488,7 @@ func (s *Service) Ensure(ctx context.Context, project *types.Project, service ty
 	if err != nil {
 		return err
 	}
-	if _, err := s.backend.APIClient().ContainerStart(ctx, id, client.ContainerStartOptions{}); err != nil {
+	if _, err := s.backend.ContainerAPI().ContainerStart(ctx, id, client.ContainerStartOptions{}); err != nil {
 		return fmt.Errorf("start relay for service %s: %w", service.Name, err)
 	}
 	s.backend.Events().On(progress.Created("Relay " + name))
@@ -512,7 +516,7 @@ func (s *Service) ensureRelayNetworks(ctx context.Context, project *types.Projec
 		if connected[netName] {
 			continue
 		}
-		if _, err := s.backend.APIClient().NetworkConnect(ctx, netName, client.NetworkConnectOptions{
+		if _, err := s.backend.NetworkAPI().NetworkConnect(ctx, netName, client.NetworkConnectOptions{
 			Container:      existing.ID,
 			EndpointConfig: &network.EndpointSettings{Aliases: []string{service.Name}},
 		}); err != nil && !errdefs.IsConflict(err) {
@@ -524,7 +528,7 @@ func (s *Service) ensureRelayNetworks(ctx context.Context, project *types.Projec
 		}
 	}
 	if linkNetwork != "" && !connected[linkNetwork] {
-		if _, err := s.backend.APIClient().NetworkConnect(ctx, linkNetwork, client.NetworkConnectOptions{
+		if _, err := s.backend.NetworkAPI().NetworkConnect(ctx, linkNetwork, client.NetworkConnectOptions{
 			Container: existing.ID,
 		}); err != nil && !errdefs.IsConflict(err) {
 			return fmt.Errorf("connect relay for service %s to its relay link network: %w", service.Name, err)
@@ -592,7 +596,7 @@ func (s *Service) Remove(ctx context.Context, projectName, serviceName string) e
 			if err := s.waitRelayRemoved(ctx, projectName, serviceName); err != nil {
 				return err
 			}
-		} else if _, err := s.backend.APIClient().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
+		} else if _, err := s.backend.ContainerAPI().ContainerRemove(ctx, existing.ID, client.ContainerRemoveOptions{Force: true}); err != nil && !errdefs.IsNotFound(err) {
 			return fmt.Errorf("remove stale relay for service %s: %w", serviceName, err)
 		}
 		s.backend.Events().On(progress.Removed(eventID))
@@ -612,7 +616,7 @@ func (s *Service) findRelayContainer(ctx context.Context, projectName, serviceNa
 	f := naming.ProjectFilter(projectName)
 	f.Add("label", naming.ServiceFilter(serviceName))
 	f.Add("label", api.RelayLabel)
-	result, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+	result, err := s.backend.ContainerAPI().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: f,
 	})
@@ -677,7 +681,7 @@ func (s *Service) createRelayContainer(ctx context.Context, project *types.Proje
 		},
 	}
 
-	created, err := s.backend.APIClient().ContainerCreate(ctx, client.ContainerCreateOptions{
+	created, err := s.backend.ContainerAPI().ContainerCreate(ctx, client.ContainerCreateOptions{
 		Name:             name,
 		Config:           config,
 		HostConfig:       hostConfig,
@@ -687,7 +691,7 @@ func (s *Service) createRelayContainer(ctx context.Context, project *types.Proje
 		if err := s.pullRelayImage(ctx); err != nil {
 			return "", err
 		}
-		created, err = s.backend.APIClient().ContainerCreate(ctx, client.ContainerCreateOptions{
+		created, err = s.backend.ContainerAPI().ContainerCreate(ctx, client.ContainerCreateOptions{
 			Name:             name,
 			Config:           config,
 			HostConfig:       hostConfig,
@@ -700,14 +704,14 @@ func (s *Service) createRelayContainer(ctx context.Context, project *types.Proje
 
 	for _, key := range networkKeys[1:] {
 		netName := project.Networks[key].Name
-		if _, err := s.backend.APIClient().NetworkConnect(ctx, netName, client.NetworkConnectOptions{
+		if _, err := s.backend.NetworkAPI().NetworkConnect(ctx, netName, client.NetworkConnectOptions{
 			Container:      created.ID,
 			EndpointConfig: endpointSettings(netName),
 		}); err != nil {
 			// remove the half-connected container: left in place (with its
 			// restart policy) it would serve only a subset of the consumers'
 			// networks, and its identity would shield it from recreation
-			if _, rmErr := s.backend.APIClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); rmErr != nil {
+			if _, rmErr := s.backend.ContainerAPI().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); rmErr != nil {
 				logrus.Warnf("removing half-connected relay %s: %v", name, rmErr)
 			}
 			return "", fmt.Errorf("connect relay for service %s to network %s: %w", service.Name, netName, err)
@@ -717,8 +721,8 @@ func (s *Service) createRelayContainer(ctx context.Context, project *types.Proje
 		// no alias: nothing addresses the relay by name on this network, it
 		// exists purely so the relay can reach the provider (see
 		// ensureRelayLinkNetwork).
-		if _, err := s.backend.APIClient().NetworkConnect(ctx, linkNetwork, client.NetworkConnectOptions{Container: created.ID}); err != nil {
-			if _, rmErr := s.backend.APIClient().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); rmErr != nil {
+		if _, err := s.backend.NetworkAPI().NetworkConnect(ctx, linkNetwork, client.NetworkConnectOptions{Container: created.ID}); err != nil {
+			if _, rmErr := s.backend.ContainerAPI().ContainerRemove(ctx, created.ID, client.ContainerRemoveOptions{Force: true}); rmErr != nil {
 				logrus.Warnf("removing half-connected relay %s: %v", name, rmErr)
 			}
 			return "", fmt.Errorf("connect relay for service %s to its relay link network: %w", service.Name, err)
@@ -730,7 +734,7 @@ func (s *Service) createRelayContainer(ctx context.Context, project *types.Proje
 func (s *Service) pullRelayImage(ctx context.Context) error {
 	image := relayImage()
 	s.backend.Events().On(progress.New(image, api.Working, "Pulling"))
-	response, err := s.backend.APIClient().ImagePull(ctx, image, client.ImagePullOptions{})
+	response, err := s.backend.ImageAPI().ImagePull(ctx, image, client.ImagePullOptions{})
 	if err != nil {
 		return fmt.Errorf("pull %s: %w", image, err)
 	}

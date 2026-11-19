@@ -40,7 +40,7 @@ const ddProxyHost = "docker-desktop-http-proxy.invalid"
 
 // Endpoint returns the Docker Desktop API socket endpoint advertised via the
 // engine info labels, or "" when the active engine is not Docker Desktop.
-func Endpoint(ctx context.Context, apiClient client.APIClient) (string, error) {
+func Endpoint(ctx context.Context, apiClient client.SystemAPIClient) (string, error) {
 	res, err := apiClient.Info(ctx, client.InfoOptions{})
 	if err != nil {
 		return "", err
@@ -177,7 +177,7 @@ func isLoopbackHost(host string) bool {
 // ProxyTransportFor discovers the Docker Desktop endpoint via apiClient and
 // returns the matching transport, or nil when DD is not active or discovery
 // fails (so callers fall back to their own default transport).
-func ProxyTransportFor(ctx context.Context, apiClient client.APIClient) http.RoundTripper {
+func ProxyTransportFor(ctx context.Context, apiClient client.SystemAPIClient) http.RoundTripper {
 	endpoint, err := Endpoint(ctx, apiClient)
 	if err != nil {
 		logrus.Debugf("could not detect Docker Desktop endpoint, deferring to caller's default transport: %v", err)

@@ -38,11 +38,13 @@ type testBackend struct {
 	mu        sync.Mutex
 }
 
-func (b *testBackend) APIClient() client.APIClient { return b.apiClient }
-func (b *testBackend) Events() api.EventProcessor  { return progress.Noop{} }
-func (b *testBackend) CLI() command.Cli            { return b.cli }
-func (b *testBackend) DryRun() bool                { return b.dryRun }
-func (b *testBackend) ProjectLock() sync.Locker    { return &b.mu }
+func (b *testBackend) ContainerAPI() client.ContainerAPIClient { return b.apiClient }
+func (b *testBackend) NetworkAPI() client.NetworkAPIClient     { return b.apiClient }
+func (b *testBackend) ImageAPI() client.ImageAPIClient         { return b.apiClient }
+func (b *testBackend) Events() api.EventProcessor              { return progress.Noop{} }
+func (b *testBackend) CLI() command.Cli                        { return b.cli }
+func (b *testBackend) DryRun() bool                            { return b.dryRun }
+func (b *testBackend) ProjectLock() sync.Locker                { return &b.mu }
 
 func (b *testBackend) IsDesktopIntegrationActive(ctx context.Context) (bool, error) {
 	endpoint, err := desktop.Endpoint(ctx, b.apiClient)

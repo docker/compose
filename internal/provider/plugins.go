@@ -393,7 +393,7 @@ func (s *Service) streamImageTo(ctx context.Context, w io.Writer, ref, platform 
 		}
 		opts = append(opts, client.ImageSaveWithPlatforms(p))
 	}
-	tar, err := s.backend.APIClient().ImageSave(ctx, []string{ref}, opts...)
+	tar, err := s.backend.ImageAPI().ImageSave(ctx, []string{ref}, opts...)
 	if err != nil {
 		if werr := announce(imageStreamAnswer{Type: ImageStreamType, Error: err.Error()}); werr != nil {
 			return &streamAbortedError{werr}
