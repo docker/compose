@@ -40,8 +40,10 @@ type testBackend struct {
 	apiClient client.APIClient
 }
 
-func (b testBackend) APIClient() client.APIClient { return b.apiClient }
-func (testBackend) Events() api.EventProcessor    { return progress.Noop{} }
+func (b testBackend) ContainerAPI() client.ContainerAPIClient { return b.apiClient }
+func (b testBackend) NetworkAPI() client.NetworkAPIClient     { return b.apiClient }
+func (b testBackend) ImageAPI() client.ImageAPIClient         { return b.apiClient }
+func (testBackend) Events() api.EventProcessor                { return progress.Noop{} }
 func (testBackend) IsDesktopIntegrationActive(context.Context) (bool, error) {
 	return false, nil
 }

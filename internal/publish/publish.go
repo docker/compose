@@ -54,8 +54,10 @@ import (
 
 // Backend is what publishing needs from the engine it acts on.
 type Backend interface {
-	// APIClient talks to the Docker daemon.
-	APIClient() client.APIClient
+	// DistributionAPI resolves the digests of the images through the Docker daemon.
+	DistributionAPI() client.DistributionAPIClient
+	// SystemAPI reads the daemon, to tell whether Docker Desktop is the engine.
+	SystemAPI() client.SystemAPIClient
 	// AuthProvider supplies the registry credentials.
 	AuthProvider() registry.AuthProvider
 	// Events receives the progress of the operation.
@@ -152,7 +154,7 @@ func (s *Service) pushComposeArtifact(ctx context.Context, project *types.Projec
 		insecureRegistries = append(insecureRegistries, reference.Domain(named))
 	}
 
-	resolver := oci.NewResolver(s.backend.AuthProvider(), desktop.ProxyTransportFor(ctx, s.backend.APIClient()), insecureRegistries...)
+	resolver := oci.NewResolver(s.backend.AuthProvider(), desktop.ProxyTransportFor(ctx, s.backend.SystemAPI()), insecureRegistries...)
 
 	descriptor, didFallback, err := oci.PushManifest(ctx, resolver, named, layers, options.OCIVersion)
 	if err != nil {
@@ -359,7 +361,7 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 }
 
 func (s *Service) generateImageDigestsOverride(ctx context.Context, project *types.Project) ([]byte, error) {
-	resolver := registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.APIClient())
+	resolver := registry.ImageDigestResolver(ctx, s.backend.AuthProvider(), s.backend.DistributionAPI())
 	project, err := project.WithImagesResolved(resolver)
 	if err != nil {
 		return nil, err

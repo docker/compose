@@ -51,7 +51,11 @@ type projectLoaderBackend struct {
 	s *composeService
 }
 
-func (b projectLoaderBackend) APIClient() client.APIClient {
+func (b projectLoaderBackend) ContainerAPI() client.ContainerAPIClient {
+	return b.s.apiClient()
+}
+
+func (b projectLoaderBackend) NetworkAPI() client.NetworkAPIClient {
 	return b.s.apiClient()
 }
 

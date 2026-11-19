@@ -316,5 +316,6 @@ func TestLoadProject_MissingComposeFile(t *testing.T) {
 // noBackend is a Backend with no daemon and no CLI, enough to load local Compose files.
 type noBackend struct{}
 
-func (noBackend) APIClient() client.APIClient { return nil }
-func (noBackend) CLI() command.Cli            { return nil }
+func (noBackend) ContainerAPI() client.ContainerAPIClient { return nil }
+func (noBackend) NetworkAPI() client.NetworkAPIClient     { return nil }
+func (noBackend) CLI() command.Cli                        { return nil }

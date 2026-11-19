@@ -26,6 +26,7 @@ import (
 
 	"github.com/compose-spec/compose-go/v2/types"
 	"github.com/docker/cli/cli/command"
+	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 
 	"github.com/docker/compose/v5/internal/build"
@@ -250,6 +251,10 @@ type buildBackend struct {
 
 func (b buildBackend) CLI() command.Cli {
 	return b.s.dockerCli
+}
+
+func (b buildBackend) ImageBuildAPI() client.ImageBuildAPIClient {
+	return b.s.apiClient()
 }
 
 func (b buildBackend) Events() api.EventProcessor {

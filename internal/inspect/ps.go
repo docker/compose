@@ -59,7 +59,7 @@ func (s *Service) Ps(ctx context.Context, projectName string, options api.PsOpti
 // containerSummary builds the api summary for a container, inspecting it to
 // retrieve its health and exit code
 func (s *Service) containerSummary(ctx context.Context, ctr container.Summary) (api.ContainerSummary, error) {
-	inspect, err := s.backend.APIClient().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
+	inspect, err := s.backend.ContainerAPI().ContainerInspect(ctx, ctr.ID, client.ContainerInspectOptions{})
 	if err != nil {
 		return api.ContainerSummary{}, err
 	}

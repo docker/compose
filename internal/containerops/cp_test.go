@@ -40,11 +40,11 @@ type fakeBackend struct {
 	asked    string
 }
 
-func (f *fakeBackend) APIClient() client.APIClient { return nil }
-func (f *fakeBackend) MaxConcurrency() int         { return 0 }
-func (f *fakeBackend) Events() api.EventProcessor  { return nil }
-func (f *fakeBackend) DryRun() bool                { return false }
-func (f *fakeBackend) CLI() command.Cli            { return nil }
+func (f *fakeBackend) ContainerAPI() client.ContainerAPIClient { return nil }
+func (f *fakeBackend) MaxConcurrency() int                     { return 0 }
+func (f *fakeBackend) Events() api.EventProcessor              { return nil }
+func (f *fakeBackend) DryRun() bool                            { return false }
+func (f *fakeBackend) CLI() command.Cli                        { return nil }
 
 func (f *fakeBackend) Containers(_ context.Context, _ string, oneOff engine.OneOff, all bool, services ...string) ([]container.Summary, error) {
 	f.asked = "Containers"

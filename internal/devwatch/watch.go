@@ -58,6 +58,10 @@ import (
 // Backend is what the development loop needs from the engine it drives.
 type Backend interface {
 	engine.Backend
+	// ExecAPI runs the sync commands and hooks in the containers.
+	ExecAPI() client.ExecAPIClient
+	// ContainerAPI copies the synced files into the containers.
+	ContainerAPI() client.ContainerAPIClient
 	// CLI is the Docker CLI Compose runs in: it owns the output stream the
 	// sync commands write to, the config the exec hooks read, and runs them.
 	CLI() command.Cli
@@ -466,7 +470,7 @@ func (t tarDockerClient) ContainersForService(ctx context.Context, projectName s
 }
 
 func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []string, in io.Reader) error {
-	execCreateResp, err := t.backend.APIClient().ExecCreate(ctx, containerID, client.ExecCreateOptions{
+	execCreateResp, err := t.backend.ExecAPI().ExecCreate(ctx, containerID, client.ExecCreateOptions{
 		Cmd:          cmd,
 		AttachStdout: false,
 		AttachStderr: true,
@@ -477,7 +481,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	conn, err := t.backend.APIClient().ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{
+	conn, err := t.backend.ExecAPI().ExecAttach(ctx, execCreateResp.ID, client.ExecAttachOptions{
 		TTY: false,
 	})
 	if err != nil {
@@ -500,7 +504,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	})
 
-	_, err = t.backend.APIClient().ExecStart(ctx, execCreateResp.ID, client.ExecStartOptions{
+	_, err = t.backend.ExecAPI().ExecStart(ctx, execCreateResp.ID, client.ExecStartOptions{
 		TTY:    false,
 		Detach: false,
 	})
@@ -515,7 +519,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 		return err
 	}
 
-	execResult, err := t.backend.APIClient().ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
+	execResult, err := t.backend.ExecAPI().ExecInspect(ctx, execCreateResp.ID, client.ExecInspectOptions{})
 	if err != nil {
 		return err
 	}
@@ -529,7 +533,7 @@ func (t tarDockerClient) Exec(ctx context.Context, containerID string, cmd []str
 }
 
 func (t tarDockerClient) Untar(ctx context.Context, id string, archive io.ReadCloser) error {
-	_, err := t.backend.APIClient().CopyToContainer(ctx, id, client.CopyToContainerOptions{
+	_, err := t.backend.ContainerAPI().CopyToContainer(ctx, id, client.CopyToContainerOptions{
 		DestinationPath: "/",
 		Content:         archive,
 		CopyUIDGID:      true,

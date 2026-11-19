@@ -54,7 +54,7 @@ func (s *Service) Commit(ctx context.Context, projectName string, options api.Co
 		return nil
 	}
 
-	response, err := s.backend.APIClient().ContainerCommit(ctx, ctr.ID, client.ContainerCommitOptions{
+	response, err := s.backend.ContainerAPI().ContainerCommit(ctx, ctr.ID, client.ContainerCommitOptions{
 		Reference: options.Reference,
 		Comment:   options.Comment,
 		Author:    options.Author,

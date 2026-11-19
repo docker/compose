@@ -42,7 +42,7 @@ func TestPublishBackendWiring(t *testing.T) {
 	b := publishBackend{s}
 
 	t.Run("service accessors", func(t *testing.T) {
-		assert.Assert(t, b.APIClient() == client.APIClient(api))
+		assert.Assert(t, b.DistributionAPI() == client.DistributionAPIClient(api))
 		assert.Assert(t, b.AuthProvider() == auth)
 		assert.Assert(t, b.Events() == compose.EventProcessor(events))
 	})

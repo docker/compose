@@ -114,7 +114,7 @@ func EncodedAuth(ref reference.Named, cfg AuthProvider) (string, error) {
 // compare a running container with a fresh build/pull; never funnel this
 // resolution through the local content-digest producer, and never pin a
 // published reference with a per-platform digest.
-func ImageDigestResolver(ctx context.Context, auth AuthProvider, c client.APIClient) func(named reference.Named) (digest.Digest, error) {
+func ImageDigestResolver(ctx context.Context, auth AuthProvider, c client.DistributionAPIClient) func(named reference.Named) (digest.Digest, error) {
 	return func(named reference.Named) (digest.Digest, error) {
 		encodedAuth, err := EncodedAuth(named, auth)
 		if err != nil {

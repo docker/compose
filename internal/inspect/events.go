@@ -32,7 +32,7 @@ import (
 
 func (s *Service) Events(ctx context.Context, projectName string, options api.EventsOptions) error {
 	projectName = strings.ToLower(projectName)
-	res := s.backend.APIClient().Events(ctx, client.EventsListOptions{
+	res := s.backend.SystemAPI().Events(ctx, client.EventsListOptions{
 		Filters: naming.ProjectFilter(projectName),
 		Since:   options.Since,
 		Until:   options.Until,

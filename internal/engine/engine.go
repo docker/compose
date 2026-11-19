@@ -22,7 +22,6 @@ import (
 	"context"
 
 	"github.com/moby/moby/api/types/container"
-	"github.com/moby/moby/client"
 )
 
 // OneOff tells whether the containers of `compose run` are part of a listing.
@@ -35,11 +34,10 @@ const (
 	OneOffExclude
 )
 
-// Backend is what every operation needs from the engine: the Docker daemon, the
-// bound on the calls made to it, and the containers of a project.
+// Backend is what every operation needs from the engine: the bound on the calls
+// made to it, and the containers of a project. The calls themselves come from
+// the families of the engine API each operation asks for in its own Backend.
 type Backend interface {
-	// APIClient talks to the Docker daemon.
-	APIClient() client.APIClient
 	// MaxConcurrency bounds the daemon calls made in parallel, 0 meaning no bound.
 	MaxConcurrency() int
 	// Containers lists the containers of a project, narrowed to services when given.

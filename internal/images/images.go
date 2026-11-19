@@ -55,13 +55,15 @@ const (
 )
 
 // Backend is what the operations need from the engine they act on. It is
-// narrow on purpose: it redeclares APIClient and MaxConcurrency of
-// engine.Backend rather than embedding it, which would force every
+// narrow on purpose: it redeclares MaxConcurrency of engine.Backend rather
+// than embedding it, which would force every
 // implementation (the fake of the tests included) to provide Containers and
 // SpecifiedContainer, that these operations never call.
 type Backend interface {
-	// APIClient talks to the Docker daemon.
-	APIClient() client.APIClient
+	// ImageAPI reads and removes the images of the Docker daemon.
+	ImageAPI() client.ImageAPIClient
+	// ContainerAPI lists the containers that use the images.
+	ContainerAPI() client.ContainerAPIClient
 	// MaxConcurrency bounds the daemon calls made in parallel, 0 meaning no bound.
 	MaxConcurrency() int
 	// RuntimeAPIVersion is the API version negotiated with the daemon.
@@ -85,7 +87,7 @@ func New(backend Backend) *Service {
 // Images lists the images the containers of a project run.
 func (s *Service) Images(ctx context.Context, projectName string, options api.ImagesOptions) (map[string]api.ImageSummary, error) {
 	projectName = strings.ToLower(projectName)
-	allContainers, err := s.backend.APIClient().ContainerList(ctx, client.ContainerListOptions{
+	allContainers, err := s.backend.ContainerAPI().ContainerList(ctx, client.ContainerListOptions{
 		All:     true,
 		Filters: naming.ProjectFilter(projectName),
 	})
@@ -147,7 +149,7 @@ func (s *Service) containerImageSummary(ctx context.Context, c container.Summary
 		}
 	}
 
-	img, err := s.backend.APIClient().ImageInspect(ctx, c.Image)
+	img, err := s.backend.ImageAPI().ImageInspect(ctx, c.Image)
 	if errdefs.IsNotFound(err) {
 		return api.ImageSummary{
 			ID:         c.ImageID,
@@ -161,7 +163,7 @@ func (s *Service) containerImageSummary(ctx context.Context, c container.Summary
 	id := img.ID // platform-specific image ID can't be combined with image tag, see https://github.com/moby/moby/issues/49995
 
 	if withPlatform && c.ImageManifestDescriptor != nil && c.ImageManifestDescriptor.Platform != nil {
-		img, err = s.backend.APIClient().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
+		img, err = s.backend.ImageAPI().ImageInspect(ctx, c.Image, client.ImageInspectWithPlatform(c.ImageManifestDescriptor.Platform))
 		if err != nil {
 			return api.ImageSummary{}, err
 		}
@@ -205,7 +207,7 @@ func (s *Service) InspectLocalImages(ctx context.Context, repoTags []string) (ma
 	eg, ctx := concurrency.NewErrgroup(ctx, s.backend.MaxConcurrency())
 	for _, repoTag := range repoTags {
 		eg.Go(func() error {
-			inspect, err := s.backend.APIClient().ImageInspect(ctx, repoTag, opts...)
+			inspect, err := s.backend.ImageAPI().ImageInspect(ctx, repoTag, opts...)
 			if err != nil {
 				if errdefs.IsNotFound(err) {
 					return nil
@@ -389,7 +391,7 @@ func (s *Service) InspectLocalContent(ctx context.Context, ref string, platform 
 	if err != nil {
 		return "", false, err
 	}
-	inspected, err := s.backend.APIClient().ImageInspect(ctx, ref, opts...)
+	inspected, err := s.backend.ImageAPI().ImageInspect(ctx, ref, opts...)
 	if err != nil {
 		return "", false, err
 	}
