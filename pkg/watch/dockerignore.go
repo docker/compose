@@ -55,7 +55,17 @@ func (i dockerPathMatcher) MatchesEntireDir(f string) (bool, error) {
 			if !pattern.Exclusion() {
 				continue
 			}
-			if paths.IsChild(f, pattern.String()) {
+			exclusion := pattern.String()
+			if wildcard := strings.IndexAny(exclusion, "*?["); wildcard >= 0 {
+				// A wildcard exclusion might include a file below this directory.
+				// Only prune when its literal prefix cannot overlap the directory.
+				prefix := filepath.Dir(exclusion[:wildcard])
+				if paths.IsChild(prefix, f) || paths.IsChild(f, prefix) {
+					return false, nil
+				}
+				continue
+			}
+			if paths.IsChild(f, exclusion) {
 				// Found an exclusion match -- we don't match this whole dir
 				return false, nil
 			}
