@@ -318,6 +318,7 @@ func (s *Service) DoLogContainer(
 	w := utils.GetWriter(func(line string) {
 		consumer.Log(name, line)
 	})
+	defer w.Close() //nolint:errcheck
 	switch {
 	case ctr.Config.Tty:
 		_, err = io.Copy(w, r)

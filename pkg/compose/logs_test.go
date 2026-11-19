@@ -153,6 +153,46 @@ func TestComposeService_Logs_Demux(t *testing.T) {
 	assert.DeepEqual(t, []string{"hello stdout", "hello stderr"}, consumer.LogsForContainer("c"))
 }
 
+func TestDoLogContainerFlushesFinalLine(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		tty  bool
+	}{
+		{name: "TTY", tty: true},
+		{name: "multiplexed"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			api, cli := prepareMocks(mockCtrl)
+			tested, err := NewComposeService(cli)
+			assert.NilError(t, err)
+
+			var stream io.ReadCloser
+			if tt.tty {
+				stream = io.NopCloser(strings.NewReader("final line"))
+			} else {
+				var framed bytes.Buffer
+				_, err = newStdWriter(&framed, stdcopy.Stdout).Write([]byte("final line"))
+				assert.NilError(t, err)
+				stream = io.NopCloser(&framed)
+			}
+			api.EXPECT().ContainerLogs(gomock.Any(), "c", gomock.Any()).Return(stream, nil)
+
+			limiter := semaphore.NewWeighted(1)
+			assert.NilError(t, limiter.Acquire(t.Context(), 1))
+			consumer := &testLogConsumer{}
+			err = tested.(*composeService).doLogContainer(t.Context(), limiter, consumer, "c", containerType.InspectResponse{
+				ID:     "c",
+				Config: &containerType.Config{Tty: tt.tty},
+			}, compose.LogOptions{}, nil)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, []string{"final line"}, consumer.LogsForContainer("c"))
+		})
+	}
+}
+
 // TestComposeService_Logs_ServiceFiltering ensures that we do not include
 // logs from out-of-scope services based on the Compose file vs actual state.
 //
