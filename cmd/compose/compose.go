@@ -301,9 +301,12 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 			if jobErr, replaced := jobTargetErr(ctx, dockerCli, o, services, err); replaced {
 				return nil, "", jobErr
 			}
-			envProjectName := os.Getenv(ComposeProjectName)
-			if envProjectName != "" {
-				return nil, envProjectName, nil
+			if envProjectName := os.Getenv(ComposeProjectName); envProjectName != "" {
+				// -p takes precedence over COMPOSE_PROJECT_NAME
+				if name == "" {
+					name = envProjectName
+				}
+				return nil, name, nil
 			}
 			return nil, "", err
 		}

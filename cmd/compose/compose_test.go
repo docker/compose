@@ -105,3 +105,33 @@ func TestProjectOrNameLoadsComposeFileFromEnv(t *testing.T) {
 		assert.Equal(t, name, "other")
 	})
 }
+
+// When the model can't be loaded, the label-driven fallback must honor the
+// usual precedence: -p over COMPOSE_PROJECT_NAME.
+func TestProjectOrNameFallbackNamePrecedence(t *testing.T) {
+	stale := filepath.Join(t.TempDir(), "missing.yaml")
+	t.Setenv("COMPOSE_PROJECT_NAME", "from-env")
+
+	t.Run("-p wins over COMPOSE_PROJECT_NAME", func(t *testing.T) {
+		opts := &ProjectOptions{ProjectName: "from-flag", ConfigPaths: []string{stale}}
+		project, name, err := opts.projectOrName(t.Context(), nil)
+		assert.NilError(t, err)
+		assert.Assert(t, project == nil)
+		assert.Equal(t, name, "from-flag")
+	})
+
+	t.Run("a load error is still reported when COMPOSE_PROJECT_NAME is not set", func(t *testing.T) {
+		unsetEnv(t, "COMPOSE_PROJECT_NAME")
+		opts := &ProjectOptions{ProjectName: "from-flag", ConfigPaths: []string{stale}}
+		_, _, err := opts.projectOrName(t.Context(), nil)
+		assert.ErrorContains(t, err, "missing.yaml")
+	})
+
+	t.Run("COMPOSE_PROJECT_NAME is used without -p", func(t *testing.T) {
+		opts := &ProjectOptions{ConfigPaths: []string{stale}}
+		project, name, err := opts.projectOrName(t.Context(), nil)
+		assert.NilError(t, err)
+		assert.Assert(t, project == nil)
+		assert.Equal(t, name, "from-env")
+	})
+}
