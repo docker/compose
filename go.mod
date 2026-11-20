@@ -17,7 +17,7 @@ require (
 	github.com/docker/cli v29.10.0+incompatible
 	github.com/docker/cli-docs-tool v0.11.0
 	github.com/docker/go-units v0.5.0
-	github.com/docker/secrets-engine/client v0.2.2
+	github.com/docker/secrets-engine/client v1.0.0
 	github.com/docker/secrets-engine/x v0.8.5
 	github.com/eiannone/keyboard v0.0.0-20220611211555-0d226195f203
 	github.com/fsnotify/fsevents v0.2.0
@@ -63,7 +63,6 @@ require (
 )
 
 require (
-	connectrpc.com/connect v1.19.1 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20261006220739-8c912ac31dd4 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -79,6 +78,7 @@ require (
 	github.com/docker/distribution v2.8.3+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.9.9 // indirect
 	github.com/docker/go-connections v0.8.2 // indirect
+	github.com/docker/secrets-engine/secrets v1.0.0 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fvbommel/sortorder v1.2.0 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
