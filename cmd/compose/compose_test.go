@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -75,5 +76,32 @@ func TestProjectOrNameRefusesJob(t *testing.T) {
 	t.Run("a real typo among several targets keeps its own error, not a same-invocation job's", func(t *testing.T) {
 		_, _, err := opts.projectOrName(t.Context(), nil, "typo", "migrate")
 		assert.ErrorContains(t, err, "no such service: typo")
+	})
+}
+
+// COMPOSE_FILE is the environment equivalent of -f: with -p, the model must be
+// loaded from it too, otherwise the project is rebuilt from container labels
+// and anything not stored in them (e.g. pre_stop hooks) is silently skipped.
+func TestProjectOrNameLoadsComposeFileFromEnv(t *testing.T) {
+	dir := t.TempDir()
+	mustWrite(t, dir, "compose.yaml", "services:\n  web:\n    image: nginx\n    pre_stop:\n      - command: echo bye\n")
+	path := filepath.Join(dir, "compose.yaml")
+	opts := &ProjectOptions{ProjectName: "other"}
+
+	t.Run("-p with COMPOSE_FILE loads the project", func(t *testing.T) {
+		t.Setenv("COMPOSE_FILE", path)
+		project, name, err := opts.projectOrName(t.Context(), nil)
+		assert.NilError(t, err)
+		assert.Assert(t, project != nil)
+		assert.Equal(t, name, "other")
+		assert.Equal(t, len(project.Services["web"].PreStop), 1)
+	})
+
+	t.Run("-p without COMPOSE_FILE stays label-driven", func(t *testing.T) {
+		unsetEnv(t, "COMPOSE_FILE")
+		project, name, err := opts.projectOrName(t.Context(), nil)
+		assert.NilError(t, err)
+		assert.Assert(t, project == nil)
+		assert.Equal(t, name, "other")
 	})
 }
