@@ -17,6 +17,8 @@
 package compose
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -76,4 +78,17 @@ func TestProjectOrNameRefusesJob(t *testing.T) {
 		_, _, err := opts.projectOrName(t.Context(), nil, "typo", "migrate")
 		assert.ErrorContains(t, err, "no such service: typo")
 	})
+}
+
+func TestProjectOrNameLoadsComposeFileEnvWithProjectName(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "compose.yaml")
+	assert.NilError(t, os.WriteFile(path, []byte("services:\n  web:\n    image: alpine\n"), 0o644))
+	t.Setenv("COMPOSE_FILE", path)
+
+	opts := &ProjectOptions{ProjectName: "custom"}
+	project, name, err := opts.projectOrName(t.Context(), nil)
+	assert.NilError(t, err)
+	assert.Equal(t, name, "custom")
+	assert.Assert(t, project != nil)
+	assert.Equal(t, project.Name, "custom")
 }
