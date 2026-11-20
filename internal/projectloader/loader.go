@@ -113,6 +113,16 @@ func (s *Service) buildProjectOptions(options api.ProjectLoadOptions, remoteLoad
 		cli.WithName(options.ProjectName),
 	)
 
+	// Narrow the model while it is loaded, not once it is: the services which are not selected don't
+	// get their env_file read, and the model is not copied over again for each narrowing.
+	if len(options.Services) > 0 {
+		projectOptionsFns = append(projectOptionsFns, cli.WithSelectedServices(options.Services...))
+	}
+	// Remove unnecessary resources if not All
+	if !options.All {
+		projectOptionsFns = append(projectOptionsFns, cli.WithoutUnnecessaryResources)
+	}
+
 	if options.OnUnsupportedAttribute != nil {
 		projectOptionsFns = append(projectOptionsFns, unsupportedAttributesLoadOption(options.OnUnsupportedAttribute))
 	}
@@ -124,11 +134,6 @@ func (s *Service) buildProjectOptions(options api.ProjectLoadOptions, remoteLoad
 func (s *Service) postProcessProject(project *types.Project, options api.ProjectLoadOptions) (*types.Project, error) {
 	if project.Name == "" {
 		return nil, errors.New("project name can't be empty. Use ProjectName option to set a valid name")
-	}
-
-	project, err := project.WithServicesEnabled(options.Services...)
-	if err != nil {
-		return nil, err
 	}
 
 	// Add custom labels
@@ -145,16 +150,6 @@ func (s *Service) postProcessProject(project *types.Project, options api.Project
 			s.CustomLabels[api.EnvironmentFileLabel] = strings.Join(options.EnvFiles, ",")
 		}
 		project.Services[name] = s
-	}
-
-	project, err = project.WithSelectedServices(options.Services)
-	if err != nil {
-		return nil, err
-	}
-
-	// Remove unnecessary resources if not All
-	if !options.All {
-		project = project.WithoutUnnecessaryResources()
 	}
 
 	return project, nil
