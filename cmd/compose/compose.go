@@ -300,6 +300,10 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 			if jobErr, replaced := jobTargetErr(ctx, dockerCli, o, services, err); replaced {
 				return nil, "", jobErr
 			}
+			if len(o.ConfigPaths) == 0 && o.ProjectName != "" {
+				logrus.Warnf("could not load COMPOSE_FILE (%s), falling back to label-based mode for project %q", err, o.ProjectName)
+				return nil, o.ProjectName, nil
+			}
 			envProjectName := os.Getenv(ComposeProjectName)
 			if envProjectName != "" {
 				return nil, envProjectName, nil

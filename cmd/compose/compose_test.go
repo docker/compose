@@ -92,3 +92,14 @@ func TestProjectOrNameLoadsComposeFileEnvWithProjectName(t *testing.T) {
 	assert.Assert(t, project != nil)
 	assert.Equal(t, project.Name, "custom")
 }
+
+func TestProjectOrNameFallsBackToProjectNameOnBrokenComposeFileEnv(t *testing.T) {
+	t.Setenv("COMPOSE_FILE", filepath.Join(t.TempDir(), "missing.yaml"))
+	t.Setenv("COMPOSE_PROJECT_NAME", "envname")
+
+	opts := &ProjectOptions{ProjectName: "custom"}
+	project, name, err := opts.projectOrName(t.Context(), nil)
+	assert.NilError(t, err)
+	assert.Equal(t, name, "custom")
+	assert.Assert(t, project == nil)
+}
