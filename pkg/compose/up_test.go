@@ -22,7 +22,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -226,6 +228,102 @@ func TestUpSessionStopsWithUpTimeout(t *testing.T) {
 			assert.DeepEqual(t, got, client.ContainerStopOptions{Timeout: utils.DurationSecondToInt(&timeout)})
 		})
 	}
+}
+
+// newEndWaitSession returns a session whose caller's context and globalCtx are
+// both canceled, as after a Ctrl+C that came once the monitor had ended, with a
+// stack of one container that a stop would reach.
+func newEndWaitSession(t *testing.T) (*upSession, context.Context, *int) {
+	t.Helper()
+	svc, apiClient := newTestService(t)
+	project, containers := nIndependentServiceContainers(1)
+	apiClient.EXPECT().ContainerList(gomock.Any(), gomock.Any()).
+		Return(client.ContainerListResult{Items: containers}, nil).AnyTimes()
+	stops := new(int)
+	var mu sync.Mutex
+	apiClient.EXPECT().ContainerStop(gomock.Any(), "c0", gomock.Any()).
+		DoAndReturn(func(context.Context, string, client.ContainerStopOptions) (client.ContainerStopResult, error) {
+			mu.Lock()
+			defer mu.Unlock()
+			*stops++
+			return client.ContainerStopResult{}, nil
+		}).AnyTimes()
+
+	ctx, interrupt := context.WithCancel(t.Context())
+	globalCtx, cancel := context.WithCancel(ctx)
+	u := &upSession{
+		composeService: svc,
+		project:        project,
+		globalCtx:      globalCtx,
+		cancel:         cancel,
+		printer:        newLogPrinter(&testLogConsumer{}),
+		eventLoopDone:  make(chan struct{}),
+	}
+	interrupt()
+	return u, ctx, stops
+}
+
+// TestEndWaitWaitsForTheEventLoopToLeave covers an interruption met while the
+// event loop is leaving because globalCtx is done, but has not returned yet: it
+// may not have reacted to the interruption, so endWait must let it finish before
+// deciding whether the stack still has to be stopped.
+func TestEndWaitWaitsForTheEventLoopToLeave(t *testing.T) {
+	u, ctx, stops := newEndWaitSession(t)
+
+	returned := make(chan error, 1)
+	go func() { returned <- u.endWait(ctx, nil) }()
+	select {
+	case err := <-returned:
+		t.Fatalf("endWait returned (%v) while the event loop had not", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(u.eventLoopDone) // the loop left without having stopped the stack
+	assert.NilError(t, <-returned)
+	assert.NilError(t, u.eg.Wait())
+	assert.Equal(t, *stops, 1, "the stack must be stopped by endWait")
+	assert.Assert(t, u.isTerminated.Load())
+}
+
+// TestEndWaitDoesNotStopTwice pins that a stack the event loop already stopped
+// is left to it.
+func TestEndWaitDoesNotStopTwice(t *testing.T) {
+	u, ctx, stops := newEndWaitSession(t)
+	u.isTerminated.Store(true) // the loop's graceful teardown
+	close(u.eventLoopDone)
+
+	assert.NilError(t, u.endWait(ctx, nil))
+	assert.NilError(t, u.eg.Wait())
+	assert.Equal(t, *stops, 0)
+}
+
+// TestEndWaitStopsTheStackOnce runs the real event loop with the caller's ctx
+// and globalCtx canceled together, as a Ctrl+C does: the loop may pick either
+// of them, and whichever it picks the stack must be stopped exactly once, by the
+// loop or by endWait.
+func TestEndWaitStopsTheStackOnce(t *testing.T) {
+	for i := range 50 {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			u, ctx, stops := newEndWaitSession(t)
+			u.signalChan = make(chan os.Signal, 2)
+			u.eg.Go(func() error { return u.runEventLoop(ctx) })
+
+			assert.NilError(t, u.endWait(ctx, nil))
+			assert.NilError(t, u.eg.Wait())
+			assert.Equal(t, *stops, 1)
+		})
+	}
+}
+
+// TestEndWaitReturnsTheVerificationError pins that the verification's error is
+// reported, and the session ended, when nothing interrupted it.
+func TestEndWaitReturnsTheVerificationError(t *testing.T) {
+	u, _, _ := newEndWaitSession(t)
+	u.globalCtx, u.cancel = context.WithCancel(t.Context())
+	failure := errors.New("service is unhealthy")
+
+	assert.Equal(t, u.endWait(t.Context(), failure), failure)
+	assert.Assert(t, u.globalCtx.Err() != nil, "the session must be ended")
 }
 
 // TestStreamContainerLogs_ConcurrencyIsBounded guards a regression flagged
