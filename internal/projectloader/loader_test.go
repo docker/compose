@@ -319,3 +319,141 @@ type noBackend struct{}
 func (noBackend) ContainerAPI() client.ContainerAPIClient { return nil }
 func (noBackend) NetworkAPI() client.NetworkAPIClient     { return nil }
 func (noBackend) CLI() command.Cli                        { return nil }
+
+// A service which is not selected is not part of what the command works on: its env_file is not
+// read, so one that is missing does not fail the command. Selecting that service does.
+func TestLoadProject_ServiceSelectionSkipsEnvFileOfOtherServices(t *testing.T) {
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	err := os.WriteFile(composeFile, []byte(`
+services:
+  web:
+    image: nginx:latest
+  worker:
+    image: alpine
+    env_file: missing.env
+`), 0o644)
+	assert.NilError(t, err)
+
+	service := New(noBackend{})
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"web"},
+	})
+	assert.NilError(t, err)
+	assert.Check(t, is.Contains(project.Services, "web"))
+	assert.Check(t, is.Contains(project.DisabledServices, "worker"))
+
+	_, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"worker"},
+	})
+	assert.ErrorContains(t, err, "missing.env")
+}
+
+// The selected services bring their dependencies, and the resources only the other services use
+// are dropped unless the whole model is requested.
+func TestLoadProject_ServiceSelectionResources(t *testing.T) {
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	err := os.WriteFile(composeFile, []byte(`
+services:
+  web:
+    image: nginx:latest
+    depends_on: [db]
+    networks: [front]
+  db:
+    image: postgres:latest
+    volumes: [data:/var/lib/postgresql/data]
+    networks: [front]
+  batch:
+    image: alpine
+    volumes: [scratch:/scratch]
+    networks: [back]
+networks:
+  front:
+  back:
+volumes:
+  data:
+  scratch:
+`), 0o644)
+	assert.NilError(t, err)
+
+	service := New(noBackend{})
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"web"},
+	})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, project.ServiceNames(), []string{"db", "web"})
+	assert.DeepEqual(t, project.NetworkNames(), []string{"front"})
+	assert.DeepEqual(t, project.VolumeNames(), []string{"data"})
+	assert.Equal(t, project.Services["web"].CustomLabels[api.ServiceLabel], "web")
+
+	project, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"web"},
+		All:         true,
+	})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, project.NetworkNames(), []string{"back", "front"})
+	assert.DeepEqual(t, project.VolumeNames(), []string{"data", "scratch"})
+
+	_, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"nope"},
+	})
+	assert.ErrorContains(t, err, `no such service: nope`)
+}
+
+// A service gated by a profile is enabled when it is selected by name, and what it depends on
+// still has its env_file read: only the services left out are skipped.
+func TestLoadProject_ServiceSelectionEnablesProfileAndKeepsDependencies(t *testing.T) {
+	tmpDir := t.TempDir()
+	composeFile := filepath.Join(tmpDir, "compose.yaml")
+	err := os.WriteFile(composeFile, []byte(`
+services:
+  debug:
+    image: busybox
+    profiles: [debug]
+    depends_on: [db]
+  db:
+    image: postgres:latest
+    env_file: db.env
+  other:
+    image: alpine
+    env_file: missing.env
+`), 0o644)
+	assert.NilError(t, err)
+	assert.NilError(t, os.WriteFile(filepath.Join(tmpDir, "db.env"), []byte("PGUSER=app\n"), 0o644))
+
+	service := New(noBackend{})
+
+	project, err := service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"debug"},
+		All:         true,
+	})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, project.ServiceNames(), []string{"db", "debug"})
+	assert.Equal(t, *project.Services["db"].Environment["PGUSER"], "app")
+
+	// same without All: the profile-gated service is enabled, not left in the disabled ones
+	project, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"debug"},
+	})
+	assert.NilError(t, err)
+	assert.DeepEqual(t, project.ServiceNames(), []string{"db", "debug"})
+	assert.Check(t, !is.Contains(project.DisabledServices, "debug")().Success())
+
+	// the dependency's own env_file is still required
+	assert.NilError(t, os.Remove(filepath.Join(tmpDir, "db.env")))
+	_, err = service.LoadProject(t.Context(), api.ProjectLoadOptions{
+		ConfigPaths: []string{composeFile},
+		Services:    []string{"debug"},
+	})
+	assert.ErrorContains(t, err, "db.env")
+}
