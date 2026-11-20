@@ -36,6 +36,11 @@ func (s *Service) Ports(ctx context.Context, projectName string, serviceName str
 
 	var publishers api.PortPublishers
 	for _, p := range containerPublishers(ctr) {
+		if p.PublishedPort == 0 {
+			// exposed by the image, not published to the host: nothing to report,
+			// like `docker port`
+			continue
+		}
 		if options.Protocol != "" && p.Protocol != options.Protocol {
 			continue
 		}
@@ -57,9 +62,15 @@ func portNotFoundError(protocol string, port uint16, ctr container.Summary) erro
 
 	var containerPorts []string
 	for _, p := range ctr.Ports {
+		if p.PublicPort == 0 {
+			continue
+		}
 		containerPorts = append(containerPorts, formatPort(p.Type, p.PrivatePort))
 	}
 
 	name := strings.TrimPrefix(ctr.Names[0], "/")
+	if len(containerPorts) == 0 {
+		return fmt.Errorf("no port %s for container %s", formatPort(protocol, port), name)
+	}
 	return fmt.Errorf("no port %s for container %s: %s", formatPort(protocol, port), name, strings.Join(containerPorts, ", "))
 }

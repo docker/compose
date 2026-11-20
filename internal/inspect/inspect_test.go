@@ -107,3 +107,19 @@ func TestPortsAsksForTheReplica(t *testing.T) {
 	assert.Equal(t, backend.oneOff, engine.OneOffInclude)
 	assert.Equal(t, backend.all, false)
 }
+
+// TestPortsSkipsExposedButUnpublishedPorts: a port the image exposes without
+// publishing it has no public port to print. It is neither listed nor found,
+// as with `docker port`, and the error does not claim to list it as a mapping.
+func TestPortsSkipsExposedButUnpublishedPorts(t *testing.T) {
+	db := summary("db", "db1")
+	db.Ports = []container.PortSummary{{PrivatePort: 6379, Type: "tcp"}}
+	backend := &fakeBackend{listed: []container.Summary{db}}
+
+	got, err := New(backend).Ports(t.Context(), "proj", "db", 0, api.PortOptions{})
+	assert.NilError(t, err)
+	assert.Equal(t, len(got), 0)
+
+	_, err = New(backend).Ports(t.Context(), "proj", "db", 6379, api.PortOptions{Protocol: "tcp"})
+	assert.Error(t, err, "no port 6379/tcp for container db1")
+}

@@ -1,0 +1,8 @@
+services:
+  web:
+    image: nginx:alpine
+    ports:
+      - "80"
+  db:
+    # the image exposes port 80, the service does not publish it
+    image: nginx:alpine
