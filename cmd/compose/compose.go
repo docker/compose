@@ -30,6 +30,7 @@ import (
 	"syscall"
 
 	"github.com/compose-spec/compose-go/v2/cli"
+	"github.com/compose-spec/compose-go/v2/consts"
 	"github.com/compose-spec/compose-go/v2/dotenv"
 	"github.com/compose-spec/compose-go/v2/loader"
 	composepaths "github.com/compose-spec/compose-go/v2/paths"
@@ -281,7 +282,8 @@ func defaultStringArrayVar(env string) []string {
 func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cli, services ...string) (*types.Project, string, error) {
 	name := o.ProjectName
 	var project *types.Project
-	if len(o.ConfigPaths) > 0 || o.ProjectName == "" {
+	// COMPOSE_FILE is the environment equivalent of -f
+	if len(o.ConfigPaths) > 0 || os.Getenv(consts.ComposeFilePath) != "" || o.ProjectName == "" {
 		backend, err := compose.NewComposeService(dockerCli)
 		if err != nil {
 			return nil, "", err
@@ -299,9 +301,12 @@ func (o *ProjectOptions) projectOrName(ctx context.Context, dockerCli command.Cl
 			if jobErr, replaced := jobTargetErr(ctx, dockerCli, o, services, err); replaced {
 				return nil, "", jobErr
 			}
-			envProjectName := os.Getenv(ComposeProjectName)
-			if envProjectName != "" {
-				return nil, envProjectName, nil
+			if envProjectName := os.Getenv(ComposeProjectName); envProjectName != "" {
+				// -p takes precedence over COMPOSE_PROJECT_NAME
+				if name == "" {
+					name = envProjectName
+				}
+				return nil, name, nil
 			}
 			return nil, "", err
 		}
