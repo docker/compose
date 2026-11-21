@@ -54,6 +54,11 @@ type ProjectLoadOptions struct {
 	EnvFiles []string
 	// Profiles to activate
 	Profiles []string
+	// ExcludedProfiles excludes, once Profiles and Services have been
+	// applied, every service and job attached to one of these profiles, even
+	// if it is also attached to an active profile. When empty, the
+	// COMPOSE_EXCLUDED_PROFILES environment variable is used instead.
+	ExcludedProfiles []string
 	// Services narrows the loaded project to the named services and their
 	// dependencies, and enables the profiles they require (empty = all).
 	// This is where an operation's scope is decided: the Services fields of
