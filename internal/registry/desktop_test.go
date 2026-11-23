@@ -159,6 +159,7 @@ func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 				return hub, nil
 			},
 			timeout:          time.Second,
+			pingTimeout:      time.Second,
 			authorizeTimeout: time.Second,
 			now:              tp.clock.now,
 		},
@@ -169,6 +170,7 @@ func newTestProvider(hub hubSessions, connectErr error) *testProvider {
 				return tp.staging, nil
 			},
 			timeout:          time.Second,
+			pingTimeout:      time.Second,
 			authorizeTimeout: time.Second,
 			now:              tp.clock.now,
 		},
@@ -196,6 +198,11 @@ func TestNewDesktopAuthProvider_SharesOneSessionPerEnvironment(t *testing.T) {
 	assert.Assert(t, a.hub != a.stagingHub, "production and staging sessions must be separate")
 	assert.Equal(t, a.hub.serverAddress, IndexServer)
 	assert.Equal(t, a.stagingHub.serverAddress, StagingIndexServer)
+	for _, s := range []*desktopSession{a.hub, a.stagingHub} {
+		assert.Equal(t, s.pingTimeout, time.Second)
+		assert.Equal(t, s.timeout, 5*time.Second)
+		assert.Equal(t, s.authorizeTimeout, time.Minute)
+	}
 }
 
 func TestDesktopAuthProvider_ProvidersOnOneSessionFetchOnce(t *testing.T) {
@@ -523,12 +530,13 @@ func TestDesktopAuthProvider_WaitsForThePromptOnlyAfterTheEngineAnswers(t *testi
 	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
 	p := newTestProvider(hub, nil)
 	p.hub.timeout = 5 * time.Second
+	p.hub.pingTimeout = time.Second
 	p.hub.authorizeTimeout = time.Minute
 
 	got, err := p.GetAuthConfig("docker.io")
 	assert.NilError(t, err)
 	assert.DeepEqual(t, got, desktopCredentials())
-	assert.Assert(t, hub.pingBudget > 0 && hub.pingBudget <= 5*time.Second, "ping budget %s", hub.pingBudget)
+	assert.Assert(t, hub.pingBudget > 0 && hub.pingBudget <= time.Second, "ping budget %s", hub.pingBudget)
 	assert.Assert(t, hub.authorizeBudget > 5*time.Second, "authorize budget %s", hub.authorizeBudget)
 }
 

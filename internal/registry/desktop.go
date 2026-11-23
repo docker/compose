@@ -37,6 +37,7 @@ const (
 	// desktopLookupTimeout limits connection time in case of hanging or
 	// unexpected request delay by the secrets engine.
 	desktopLookupTimeout    = 5 * time.Second
+	desktopPingTimeout      = time.Second
 	desktopAuthorizeTimeout = time.Minute
 	sessionExpirySkew       = 30 * time.Second
 	// sessionTTL is how long a session without an expiry claim is reused.
@@ -103,6 +104,7 @@ func newDesktopSession(name, serverAddress string, opts ...dockerhub.Option) *de
 			return connectDesktop(opts...)
 		},
 		timeout:          desktopLookupTimeout,
+		pingTimeout:      desktopPingTimeout,
 		authorizeTimeout: desktopAuthorizeTimeout,
 		now:              time.Now,
 	}
@@ -168,6 +170,7 @@ type desktopSession struct {
 	serverAddress    string
 	connect          func() (hubSessions, error)
 	timeout          time.Duration
+	pingTimeout      time.Duration
 	authorizeTimeout time.Duration
 	now              func() time.Time
 
@@ -186,7 +189,7 @@ func (s *desktopSession) authorize() error {
 		return nil
 	}
 	s.authorized, s.authorizedUntil = false, time.Time{}
-	pingCtx, cancelPing := context.WithTimeout(context.Background(), s.timeout)
+	pingCtx, cancelPing := context.WithTimeout(context.Background(), s.pingTimeout)
 	err := s.hub.Ping(pingCtx)
 	cancelPing()
 	if err != nil {
