@@ -45,12 +45,32 @@ type fakeHub struct {
 	denied         bool
 	authorizeErr   error
 	authExpiry     time.Time
+	pingErr        error
 	sessionCalls   atomic.Int32
 	authorizeCalls atomic.Int32
+	pingCalls      atomic.Int32
+
+	pingBudget      time.Duration
+	authorizeBudget time.Duration
 }
 
-func (f *fakeHub) Authorize(context.Context) (seclient.AuthorizeResponse, error) {
+func budget(ctx context.Context) time.Duration {
+	deadline, ok := ctx.Deadline()
+	if !ok {
+		return 0
+	}
+	return time.Until(deadline)
+}
+
+func (f *fakeHub) Ping(ctx context.Context) error {
+	f.pingCalls.Add(1)
+	f.pingBudget = budget(ctx)
+	return f.pingErr
+}
+
+func (f *fakeHub) Authorize(ctx context.Context) (seclient.AuthorizeResponse, error) {
 	f.authorizeCalls.Add(1)
+	f.authorizeBudget = budget(ctx)
 	if f.authorizeErr != nil {
 		return seclient.AuthorizeResponse{}, f.authorizeErr
 	}
@@ -426,18 +446,50 @@ func connectError(reason seclient.ConnectReason) error {
 	}
 }
 
-type recordingAuthorizer struct {
-	patterns []secrets.Pattern
+type recordingEngine struct {
+	patterns    []secrets.Pattern
+	versionErr  error
+	versionCall int
 }
 
-func (a *recordingAuthorizer) Authorize(_ context.Context, patterns ...secrets.Pattern) (seclient.AuthorizeResponse, error) {
+func (a *recordingEngine) Authorize(_ context.Context, patterns ...secrets.Pattern) (seclient.AuthorizeResponse, error) {
 	a.patterns = append(a.patterns, patterns...)
 	return seclient.AuthorizeResponse{Allow: true}, nil
 }
 
+func (a *recordingEngine) Version(context.Context) (seclient.DaemonVersion, error) {
+	a.versionCall++
+	return seclient.DaemonVersion{}, a.versionErr
+}
+
+func TestDesktopHub_PingAsksForTheVersion(t *testing.T) {
+	e := &recordingEngine{}
+	assert.NilError(t, desktopHub{engine: e}.Ping(t.Context()))
+	assert.Equal(t, e.versionCall, 1)
+
+	e.versionErr = connectError(seclient.ReasonNotRunning)
+	assert.ErrorIs(t, desktopHub{engine: e}.Ping(t.Context()), seclient.ErrSecretsEngineNotRunning)
+}
+
+func TestDesktopHub_PingReportsATimeoutAsTheEngineNotResponding(t *testing.T) {
+	e := &recordingEngine{versionErr: fmt.Errorf("deadline_exceeded: %w", context.DeadlineExceeded)}
+	err := desktopHub{engine: e, socketPath: "/run/engine.sock"}.Ping(t.Context())
+
+	assert.ErrorIs(t, err, seclient.ErrSecretsEngineTimeout)
+	assert.ErrorIs(t, err, context.DeadlineExceeded)
+	assert.ErrorContains(t, err, "secrets engine did not respond in time at /run/engine.sock")
+	assert.Assert(t, isSessionUnavailable(err), err)
+}
+
+func TestDesktopHub_PingKeepsOtherErrors(t *testing.T) {
+	boom := errors.New("boom")
+	e := &recordingEngine{versionErr: boom}
+	assert.Equal(t, desktopHub{engine: e}.Ping(t.Context()), boom)
+}
+
 func TestDesktopHub_AuthorizesDockerAuthRealm(t *testing.T) {
-	a := &recordingAuthorizer{}
-	resp, err := desktopHub{authorizer: a}.Authorize(t.Context())
+	a := &recordingEngine{}
+	resp, err := desktopHub{engine: a}.Authorize(t.Context())
 	assert.NilError(t, err)
 	assert.Assert(t, resp.Allow)
 	assert.Equal(t, len(a.patterns), 1)
@@ -464,6 +516,41 @@ func TestDesktopAuthProvider_AuthorizesOnceBeforeReadingSessions(t *testing.T) {
 	}
 	assert.Equal(t, hub.sessionCalls.Load(), int32(3))
 	assert.Equal(t, hub.authorizeCalls.Load(), int32(1))
+	assert.Equal(t, hub.pingCalls.Load(), int32(1))
+}
+
+func TestDesktopAuthProvider_WaitsForThePromptOnlyAfterTheEngineAnswers(t *testing.T) {
+	hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour))}
+	p := newTestProvider(hub, nil)
+	p.hub.timeout = 5 * time.Second
+	p.hub.authorizeTimeout = time.Minute
+
+	got, err := p.GetAuthConfig("docker.io")
+	assert.NilError(t, err)
+	assert.DeepEqual(t, got, desktopCredentials())
+	assert.Assert(t, hub.pingBudget > 0 && hub.pingBudget <= 5*time.Second, "ping budget %s", hub.pingBudget)
+	assert.Assert(t, hub.authorizeBudget > 5*time.Second, "authorize budget %s", hub.authorizeBudget)
+}
+
+func TestDesktopAuthProvider_FallsBackWhenTheEngineDoesNotAnswer(t *testing.T) {
+	for name, pingErr := range map[string]error{
+		"not running":     connectError(seclient.ReasonNotRunning),
+		"does not answer": connectError(seclient.ReasonTimeout),
+	} {
+		t.Run(name, func(t *testing.T) {
+			hub := &fakeHub{session: hubSession("hubuser", testNow.Add(time.Hour)), pingErr: pingErr}
+			p := newTestProvider(hub, nil)
+
+			for range 2 {
+				got, err := p.GetAuthConfig("docker.io")
+				assert.NilError(t, err)
+				assert.DeepEqual(t, got, cliCredentials("docker.io"))
+			}
+			assert.Equal(t, hub.pingCalls.Load(), int32(1), "Desktop must not be asked again within retryInterval")
+			assert.Equal(t, hub.authorizeCalls.Load(), int32(0), "authorization must not wait on an engine that does not answer")
+			assert.Equal(t, hub.sessionCalls.Load(), int32(0))
+		})
+	}
 }
 
 func TestDesktopAuthProvider_AuthorizesAgainAfterDecisionExpires(t *testing.T) {
@@ -514,6 +601,7 @@ func TestDesktopAuthProvider_FallsBackWhenNotAuthorized(t *testing.T) {
 				assert.NilError(t, err)
 				assert.DeepEqual(t, got, cliCredentials("docker.io"))
 			}
+			assert.Equal(t, tc.hub.pingCalls.Load(), int32(1), "Desktop must not be asked again within retryInterval")
 			assert.Equal(t, tc.hub.authorizeCalls.Load(), int32(1), "Desktop must not be asked again within retryInterval")
 			assert.Equal(t, tc.hub.sessionCalls.Load(), int32(0), "the session must not be read without authorization")
 		})

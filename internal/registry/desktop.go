@@ -51,6 +51,7 @@ var (
 )
 
 type hubSessions interface {
+	Ping(ctx context.Context) error
 	Authorize(ctx context.Context) (seclient.AuthorizeResponse, error)
 	GetDefaultSession(ctx context.Context) (dockerhub.UserSession, error)
 	GetDefaultProfile(ctx context.Context) (dockerhub.Profile, error)
@@ -58,13 +59,33 @@ type hubSessions interface {
 
 var dockerAuthRealm = secrets.MustParsePattern("docker/auth/**")
 
+type secretsEngine interface {
+	resolver.Authorizer
+	Version(ctx context.Context) (seclient.DaemonVersion, error)
+}
+
 type desktopHub struct {
 	dockerhub.ClientAuth
-	authorizer resolver.Authorizer
+	engine     secretsEngine
+	socketPath string
+}
+
+func (h desktopHub) Ping(ctx context.Context) error {
+	_, err := h.engine.Version(ctx)
+	if err == nil {
+		return nil
+	}
+	if _, ok := errors.AsType[*seclient.ConnectError](err); ok {
+		return err
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &seclient.ConnectError{Reason: seclient.ReasonTimeout, SocketPath: h.socketPath, Err: err}
+	}
+	return err
 }
 
 func (h desktopHub) Authorize(ctx context.Context) (seclient.AuthorizeResponse, error) {
-	return h.authorizer.Authorize(ctx, dockerAuthRealm)
+	return h.engine.Authorize(ctx, dockerAuthRealm)
 }
 
 var _ hubSessions = desktopHub{}
@@ -98,11 +119,12 @@ func NewDesktopAuthProvider(fallback AuthProvider) AuthProvider {
 }
 
 func connectDesktop(opts ...dockerhub.Option) (hubSessions, error) {
-	c, err := seclient.New(seclient.WithSocketPath(config.DesktopSocketPath()))
+	socketPath := config.DesktopSocketPath()
+	c, err := seclient.New(seclient.WithSocketPath(socketPath))
 	if err != nil {
 		return nil, err
 	}
-	return desktopHub{ClientAuth: c.HubAuth(opts...), authorizer: c}, nil
+	return desktopHub{ClientAuth: c.HubAuth(opts...), engine: c, socketPath: socketPath}, nil
 }
 
 type desktopAuthProvider struct {
@@ -163,6 +185,14 @@ func (s *desktopSession) authorize() error {
 	if s.authorized && (s.authorizedUntil.IsZero() || s.now().Before(s.authorizedUntil)) {
 		return nil
 	}
+	s.authorized, s.authorizedUntil = false, time.Time{}
+	pingCtx, cancelPing := context.WithTimeout(context.Background(), s.timeout)
+	err := s.hub.Ping(pingCtx)
+	cancelPing()
+	if err != nil {
+		return fmt.Errorf("checking the secrets engine: %w", err)
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), s.authorizeTimeout)
 	defer cancel()
 
