@@ -26,8 +26,8 @@ import (
 
 	clitypes "github.com/docker/cli/cli/config/types"
 	seclient "github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
-	"github.com/docker/secrets-engine/x/api"
 	"github.com/sirupsen/logrus"
 )
 
@@ -83,7 +83,7 @@ func NewDesktopAuthProvider(fallback AuthProvider) AuthProvider {
 
 func connectDesktop(opts ...dockerhub.Option) (hubSessions, error) {
 	c, err := seclient.New(
-		seclient.WithSocketPath(api.DesktopSocketPath()),
+		seclient.WithSocketPath(config.DesktopSocketPath()),
 		seclient.WithTimeout(desktopLookupTimeout),
 	)
 	if err != nil {
