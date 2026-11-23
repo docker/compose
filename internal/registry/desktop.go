@@ -26,16 +26,19 @@ import (
 
 	clitypes "github.com/docker/cli/cli/config/types"
 	seclient "github.com/docker/secrets-engine/client"
+	"github.com/docker/secrets-engine/client/api/resolver"
 	"github.com/docker/secrets-engine/client/config"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/sirupsen/logrus"
 )
 
 const (
 	// desktopLookupTimeout limits connection time in case of hanging or
 	// unexpected request delay by the secrets engine.
-	desktopLookupTimeout = 5 * time.Second
-	sessionExpirySkew    = 30 * time.Second
+	desktopLookupTimeout    = 5 * time.Second
+	desktopAuthorizeTimeout = time.Minute
+	sessionExpirySkew       = 30 * time.Second
 	// sessionTTL is how long a session without an expiry claim is reused.
 	sessionTTL = time.Minute
 	// retryInterval is how long Desktop is not asked again after a failed lookup.
@@ -48,11 +51,23 @@ var (
 )
 
 type hubSessions interface {
+	Authorize(ctx context.Context) (seclient.AuthorizeResponse, error)
 	GetDefaultSession(ctx context.Context) (dockerhub.UserSession, error)
 	GetDefaultProfile(ctx context.Context) (dockerhub.Profile, error)
 }
 
-var _ hubSessions = dockerhub.ClientAuth(nil)
+var dockerAuthRealm = secrets.MustParsePattern("docker/auth/**")
+
+type desktopHub struct {
+	dockerhub.ClientAuth
+	authorizer resolver.Authorizer
+}
+
+func (h desktopHub) Authorize(ctx context.Context) (seclient.AuthorizeResponse, error) {
+	return h.authorizer.Authorize(ctx, dockerAuthRealm)
+}
+
+var _ hubSessions = desktopHub{}
 
 var (
 	sharedHubSession        = newDesktopSession("Docker Hub", IndexServer)
@@ -66,8 +81,9 @@ func newDesktopSession(name, serverAddress string, opts ...dockerhub.Option) *de
 		connect: func() (hubSessions, error) {
 			return connectDesktop(opts...)
 		},
-		timeout: desktopLookupTimeout,
-		now:     time.Now,
+		timeout:          desktopLookupTimeout,
+		authorizeTimeout: desktopAuthorizeTimeout,
+		now:              time.Now,
 	}
 }
 
@@ -82,14 +98,11 @@ func NewDesktopAuthProvider(fallback AuthProvider) AuthProvider {
 }
 
 func connectDesktop(opts ...dockerhub.Option) (hubSessions, error) {
-	c, err := seclient.New(
-		seclient.WithSocketPath(config.DesktopSocketPath()),
-		seclient.WithTimeout(desktopLookupTimeout),
-	)
+	c, err := seclient.New(seclient.WithSocketPath(config.DesktopSocketPath()))
 	if err != nil {
 		return nil, err
 	}
-	return c.HubAuth(opts...), nil
+	return desktopHub{ClientAuth: c.HubAuth(opts...), authorizer: c}, nil
 }
 
 type desktopAuthProvider struct {
@@ -129,18 +142,39 @@ func registryHost(registryHostname string) string {
 
 // desktopSession caches the Desktop session of one Docker Hub environment.
 type desktopSession struct {
-	name          string
-	serverAddress string
-	connect       func() (hubSessions, error)
-	timeout       time.Duration
-	now           func() time.Time
+	name             string
+	serverAddress    string
+	connect          func() (hubSessions, error)
+	timeout          time.Duration
+	authorizeTimeout time.Duration
+	now              func() time.Time
 
 	// mu serializes lookups so concurrent pulls share one request.
-	mu         sync.Mutex
-	hub        hubSessions
-	retryAt    time.Time
-	cached     *clitypes.AuthConfig
-	validUntil time.Time
+	mu              sync.Mutex
+	hub             hubSessions
+	authorized      bool
+	authorizedUntil time.Time
+	retryAt         time.Time
+	cached          *clitypes.AuthConfig
+	validUntil      time.Time
+}
+
+func (s *desktopSession) authorize() error {
+	if s.authorized && (s.authorizedUntil.IsZero() || s.now().Before(s.authorizedUntil)) {
+		return nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), s.authorizeTimeout)
+	defer cancel()
+
+	resp, err := s.hub.Authorize(ctx)
+	if err != nil {
+		return fmt.Errorf("authorizing access to the session: %w", err)
+	}
+	if !resp.Allow {
+		return secrets.ErrAccessDenied
+	}
+	s.authorized, s.authorizedUntil = true, resp.Expiry
+	return nil
 }
 
 func (s *desktopSession) auth() (clitypes.AuthConfig, bool) {
@@ -173,6 +207,10 @@ func (s *desktopSession) fetch() (clitypes.AuthConfig, time.Time, error) {
 			return clitypes.AuthConfig{}, time.Time{}, err
 		}
 		s.hub = hub
+	}
+
+	if err := s.authorize(); err != nil {
+		return clitypes.AuthConfig{}, time.Time{}, err
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.timeout)
