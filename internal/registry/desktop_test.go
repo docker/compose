@@ -29,6 +29,7 @@ import (
 	clitypes "github.com/docker/cli/cli/config/types"
 	seclient "github.com/docker/secrets-engine/client"
 	"github.com/docker/secrets-engine/client/dockerhub"
+	"github.com/docker/secrets-engine/secrets"
 	"github.com/moby/moby/api/pkg/authconfig"
 	"gotest.tools/v3/assert"
 )
@@ -312,7 +313,7 @@ func TestDesktopAuthProvider_FallsBackWithoutUsableSession(t *testing.T) {
 		},
 		{
 			name: "access denied",
-			hub:  &fakeHub{sessionErr: seclient.ErrAccessDenied},
+			hub:  &fakeHub{sessionErr: secrets.ErrAccessDenied},
 		},
 		{
 			name: "no username",
@@ -394,7 +395,7 @@ func TestIsSessionUnavailable(t *testing.T) {
 		assert.Assert(t, isSessionUnavailable(err), err)
 	}
 	for _, err := range []error{
-		seclient.ErrAccessDenied,
+		secrets.ErrAccessDenied,
 		errNoUsername,
 		context.DeadlineExceeded,
 	} {
