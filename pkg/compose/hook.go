@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -40,6 +41,29 @@ const (
 	hookOutputTailLines = 10
 	hookOutputTailBytes = 2048
 )
+
+// runPreStopHooks runs the pre_stop hooks of service in ctr. gone reports that
+// ctr was already removed, so there is nothing left to stop. A stopped or paused
+// container rejects the hooks with a conflict: they have no process to run in,
+// so they are skipped and the caller still stops or restarts the container.
+func (s *composeService) runPreStopHooks(ctx context.Context, ctr container.Summary, service *types.ServiceConfig, listener api.ContainerEventListener) (gone bool, err error) {
+	if service == nil || isRelayContainer(ctr) {
+		return false, nil
+	}
+	for _, hook := range service.PreStop {
+		err := s.runHook(ctx, ctr, *service, hook, listener)
+		switch {
+		case err == nil:
+		case errdefs.IsNotFound(err):
+			return true, nil
+		case errdefs.IsConflict(err):
+			return false, nil
+		default:
+			return false, err
+		}
+	}
+	return false, nil
+}
 
 func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
 	// A dry-run must have no side effects, and the dry-run client cannot

@@ -79,6 +79,36 @@ func TestPreStopHookSuccessWithPreviousStop(t *testing.T) {
 			ServiceState("test", "running"))
 }
 
+// Regression for #14545: restart ran the pre_stop hook in the stopped container,
+// the engine refused the exec, and the service was left stopped.
+func TestPreStopHookRestartAfterStop(t *testing.T) {
+	NewScenario(t, "restart must start a stopped service that has a pre_stop hook").
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("sample", "running")).
+		Step("stop halts it",
+			ComposeCmd("stop"),
+			ServiceState("sample", "exited")).
+		Step("restart starts it again, though its pre_stop hook has no process to run in",
+			ComposeCmd("restart"),
+			ServiceState("sample", "running"))
+}
+
+// Regression for #14545: stop gave up on a paused container when the engine
+// refused its pre_stop exec, and exited 0 with the container still paused.
+func TestPreStopHookStopPaused(t *testing.T) {
+	NewScenario(t, "stop must stop a paused service that has a pre_stop hook").
+		Step("up starts the service",
+			ComposeCmd("up", "-d"),
+			ServiceState("sample", "running")).
+		Step("pause freezes it",
+			ComposeCmd("pause"),
+			ServiceState("sample", "paused")).
+		Step("stop halts it, though its pre_stop hook has no process to run in",
+			ComposeCmd("stop"),
+			ServiceState("sample", "exited"))
+}
+
 func TestPostStartAndPreStopHook(t *testing.T) {
 	NewScenario(t, "post_start and pre_stop hooks in one project must not interfere with up").
 		Step("up starts both services and runs the post_start hook",

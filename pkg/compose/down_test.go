@@ -1689,6 +1689,46 @@ func TestStopContainerSkipsPreStopInDryRun(t *testing.T) {
 	assert.NilError(t, err)
 }
 
+// A paused container rejects the pre_stop exec with a conflict: the hook has
+// no process to run in, but the container must still be stopped.
+func TestStopContainerStopsWhenPreStopConflicts(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:    "db",
+		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+	}
+	ctr := serviceContainer("db")
+	ctr.State = container.StatePaused
+
+	apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ExecCreateResult{}, errdefs.ErrConflict.WithMessage("container is paused, unpause the container before exec"))
+	apiClient.EXPECT().ContainerStop(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ContainerStopResult{}, nil)
+
+	err := svc.stopContainer(t.Context(), &service, ctr, nil, nil)
+	assert.NilError(t, err)
+}
+
+// A container removed meanwhile has nothing left to stop. No ContainerStop
+// expectation is set: per newStartTestService, gomock fails the test if the
+// stop still runs.
+func TestStopContainerSkipsStopWhenPreStopFindsNoContainer(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:    "db",
+		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+	}
+	ctr := serviceContainer("db")
+
+	apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ExecCreateResult{}, errdefs.ErrNotFound.WithMessage("No such container"))
+
+	err := svc.stopContainer(t.Context(), &service, ctr, nil, nil)
+	assert.NilError(t, err)
+}
+
 // runningOneOff builds a RUNNING `compose run` container of the given service.
 func runningOneOff(service, id string) container.Summary {
 	c := testContainer(service, id, true)

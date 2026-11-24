@@ -111,13 +111,8 @@ func (s *composeService) prepareRestartProject(ctx context.Context, containers C
 // standing in for the service: it has no process for a hook to act on.
 func (s *composeService) restartContainer(ctx context.Context, def types.ServiceConfig, ctr container.Summary, options api.RestartOptions) error {
 	relay := isRelayContainer(ctr)
-	if !relay {
-		for _, hook := range def.PreStop {
-			err := s.runHook(ctx, ctr, def, hook, nil)
-			if err != nil {
-				return err
-			}
-		}
+	if _, err := s.runPreStopHooks(ctx, ctr, &def, nil); err != nil {
+		return err
 	}
 	eventName := getContainerProgressName(ctr)
 	s.events.On(progress.New(eventName, api.Working, api.StatusRestarting))

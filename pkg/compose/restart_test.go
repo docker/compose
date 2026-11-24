@@ -26,6 +26,7 @@ import (
 	"time"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 	"go.uber.org/mock/gomock"
@@ -187,6 +188,27 @@ func TestRestartContainerSkipsHooksInDryRun(t *testing.T) {
 	}
 	ctr := serviceContainer("web")
 
+	apiClient.EXPECT().ContainerRestart(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ContainerRestartResult{}, nil)
+
+	err := svc.restartContainer(t.Context(), service, ctr, api.RestartOptions{})
+	assert.NilError(t, err)
+}
+
+// A stopped container rejects the pre_stop exec with a conflict: the hook has
+// no process to run in, but restart must still start the container.
+func TestRestartContainerRestartsWhenPreStopConflicts(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+
+	service := types.ServiceConfig{
+		Name:    "web",
+		PreStop: []types.ServiceHook{{Command: types.ShellCommand{"quiesce"}}},
+	}
+	ctr := serviceContainer("web")
+	ctr.State = container.StateExited
+
+	apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ExecCreateResult{}, errdefs.ErrConflict.WithMessage("container is not running"))
 	apiClient.EXPECT().ContainerRestart(gomock.Any(), ctr.ID, gomock.Any()).
 		Return(client.ContainerRestartResult{}, nil)
 
