@@ -40,6 +40,7 @@ import (
 	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/projectloader"
 	"github.com/docker/compose/v5/internal/registry"
+	"github.com/docker/compose/v5/internal/status"
 	"github.com/docker/compose/v5/pkg/api"
 	"github.com/docker/compose/v5/pkg/dryrun"
 )
@@ -202,10 +203,18 @@ func AlwaysOkPrompt() Prompt {
 }
 
 // WithEventProcessor configure component to get notified on Compose operation and progress events.
-// Typically used to configure a progress UI
+// Typically used to configure a progress UI.
+//
+// Compose keeps the status of what it operates on (see [status.Tracker]) and
+// reports to bus through it. A bus that is an [api.StatusRenderer] draws from
+// the status; any other receives the events as they are reported.
 func WithEventProcessor(bus api.EventProcessor) Option {
 	return func(s *composeService) error {
-		s.events = bus
+		if t, ok := bus.(*status.Tracker); ok {
+			s.events = t
+			return nil
+		}
+		s.events = status.New(bus)
 		return nil
 	}
 }
