@@ -141,7 +141,7 @@ func (t *Tracker) fold(e api.Resource) bool {
 		t.notices = append(t.notices, msg)
 		return true
 	}
-	if kind, name, ok := splitID(e.ID); ok {
+	if kind, name, ok := SplitID(e.ID); ok {
 		return t.setResource(api.ResourceStatus{Kind: kind, Name: name, State: e.Text, Level: e.Status, Message: e.Details})
 	}
 	key := taskKey{id: e.ID, parent: e.ParentID}
@@ -158,8 +158,9 @@ func (t *Tracker) fold(e api.Resource) bool {
 	return true
 }
 
-// splitID tells the kind and the name of the resource an event ID designates.
-func splitID(id string) (kind, name string, ok bool) {
+// SplitID tells the kind and the name of the resource an event ID designates
+// ("Container app-web-1"), and whether it designates one.
+func SplitID(id string) (kind, name string, ok bool) {
 	for _, k := range []string{api.KindContainer, api.KindNetwork, api.KindVolume} {
 		if name, found := strings.CutPrefix(id, k+" "); found && name != "" {
 			return k, name, true

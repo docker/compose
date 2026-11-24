@@ -228,6 +228,13 @@ func (gt *groupTracker) onNodeAborted(node *planning.PlanNode, events api.EventP
 	})
 }
 
+// kindOf is the kind of group a node belongs to; its group must exist.
+func (gt *groupTracker) kindOf(node *planning.PlanNode) groupKind {
+	gt.mu.Lock()
+	defer gt.mu.Unlock()
+	return gt.groups[node.Group].kind
+}
+
 // resourceName is the name a node's resource goes by in the progress output.
 func (gt *groupTracker) resourceName(node *planning.PlanNode) string {
 	if node.Group != "" {
