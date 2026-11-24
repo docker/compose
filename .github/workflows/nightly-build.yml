@@ -1,0 +1,288 @@
+name: nightly-build
+
+# Compose runs on top of the Docker engine and drives `docker buildx bake` for
+# every image it builds, so a regression in either one is a regression in
+# Compose. This workflow runs the e2e suite every night against a Moby engine
+# and a Buildx plugin, both built from the head of their repository, to catch
+# such a regression before it is released. Only the engine and the Buildx
+# plugin differ from the `ci` workflow: Compose and the tests are the ones of
+# the default branch.
+
+permissions:
+  contents: read # to fetch code (actions/checkout)
+
+concurrency:
+  # runs of different refs of Moby or Buildx (manual dispatches) do not cancel each other
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.moby_ref || 'master' }}-${{ inputs.buildx_ref || 'master' }}
+  cancel-in-progress: true
+
+on:
+  schedule:
+    - cron: '30 2 * * *' # every night at 02:30 UTC
+  workflow_dispatch:
+    inputs:
+      moby_ref:
+        description: 'Moby git ref to build (a branch, a tag or a commit of moby/moby)'
+        required: false
+        default: 'master'
+      buildx_ref:
+        description: 'Buildx git ref to build (a branch, a tag or a commit of docker/buildx)'
+        required: false
+        default: 'master'
+
+env:
+  MOBY_REPOSITORY: moby/moby
+  BUILDX_REPOSITORY: docker/buildx
+
+jobs:
+  # setup-docker-action only installs published engines, so the engine is built
+  # here, once, and handed to the e2e jobs as a bundle of static binaries
+  # (dockerd and the tools it needs: containerd, runc, docker-init...).
+  moby:
+    # scheduled workflows also run on forks, where nobody reads their result
+    if: github.repository == 'docker/compose'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Moby
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.MOBY_REPOSITORY }}
+          ref: ${{ inputs.moby_ref || 'master' }}
+          path: moby
+          persist-credentials: false
+
+      # a released Buildx, not the head one: a failure here is a Moby one
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Build Moby
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: moby
+          targets: all
+          set: |
+            *.cache-from=type=gha,scope=nightly-moby
+            *.cache-to=type=gha,scope=nightly-moby,mode=max
+
+      - name: Report the Moby under test
+        working-directory: moby
+        run: |
+          commit=$(git rev-parse HEAD)
+          echo "Moby ${commit}"
+          ls -l bundles/binary
+          {
+            echo "### Moby under test"
+            echo
+            echo "Built from \`${MOBY_REPOSITORY}\` at \`${commit}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Moby
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: moby
+          path: moby/bundles/binary/
+          if-no-files-found: error
+          retention-days: 1
+
+  # Built here rather than by setup-buildx-action, which builds from a clone
+  # without tags: the plugin would then report a commit hash as its version,
+  # and Compose refuses a Buildx whose version it cannot read.
+  buildx:
+    # scheduled workflows also run on forks, where nobody reads their result
+    if: github.repository == 'docker/compose'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout Buildx
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ env.BUILDX_REPOSITORY }}
+          ref: ${{ inputs.buildx_ref || 'master' }}
+          path: buildx
+          fetch-depth: 0 # the tags give the version of the plugin
+          persist-credentials: false
+
+      # a released Buildx, not the head one: a failure here is a Buildx one
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Build Buildx
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: buildx
+          targets: binaries
+          set: |
+            *.cache-from=type=gha,scope=nightly-buildx
+            *.cache-to=type=gha,scope=nightly-buildx,mode=max
+
+      - name: Report the Buildx under test
+        working-directory: buildx
+        run: |
+          ls -l bin/build
+          chmod +x bin/build/*
+          version=$(bin/build/buildx version)
+          echo "${version}"
+          {
+            echo "### Buildx under test"
+            echo
+            echo "Built from \`${BUILDX_REPOSITORY}\`: \`${version}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload Buildx
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: buildx
+          path: buildx/bin/build/
+          if-no-files-found: error
+          retention-days: 1
+
+  e2e:
+    needs:
+      - moby
+      - buildx
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    name: e2e (moby head, buildx head, ${{ matrix.store }})
+    strategy:
+      fail-fast: false
+      matrix:
+        # the way an image is built and loaded depends on the image store
+        store:
+          - graphdriver
+          - containerd
+    env:
+      STORE: ${{ matrix.store }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Download Moby
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: moby
+          path: ${{ runner.temp }}/moby
+
+      # The engine of the runner is stopped and the one under test takes its
+      # place, with its own socket and data. The Docker CLI is the runner's one.
+      - name: Start the Docker daemon built from the head of Moby
+        run: |
+          sudo systemctl stop docker.socket docker.service containerd.service || true
+
+          moby="${RUNNER_TEMP}/moby"
+          run_dir="${RUNNER_TEMP}/dockerd"
+          chmod +x "${moby}"/*
+          mkdir -p "${run_dir}"
+
+          snapshotter=false
+          if [ "${STORE}" = "containerd" ]; then snapshotter=true; fi
+          echo "{\"features\": {\"containerd-snapshotter\": ${snapshotter}}}" > "${run_dir}/daemon.json"
+
+          # dockerd starts the containerd and the runc it finds in its PATH;
+          # its log is written by the runner user, which owns the directory
+          # shellcheck disable=SC2024
+          sudo env "PATH=${moby}:${PATH}" "${moby}/dockerd" \
+            --host="unix://${run_dir}/docker.sock" \
+            --group="$(id -gn)" \
+            --config-file="${run_dir}/daemon.json" \
+            --exec-root="${run_dir}/execroot" \
+            --data-root="${run_dir}/data" \
+            --pidfile="${run_dir}/docker.pid" \
+            > "${run_dir}/dockerd.log" 2>&1 &
+
+          export DOCKER_HOST="unix://${run_dir}/docker.sock"
+          for _ in $(seq 1 60); do
+            docker info > /dev/null 2>&1 && break
+            sleep 1
+          done
+          if ! docker info > /dev/null 2>&1; then
+            sudo cat "${run_dir}/dockerd.log"
+            exit 1
+          fi
+          # the e2e framework forwards DOCKER_HOST to the commands it runs
+          echo "DOCKER_HOST=${DOCKER_HOST}" >> "$GITHUB_ENV"
+
+      - name: Check Docker Version
+        run: docker version
+
+      - name: Check containerd image store
+        if: ${{ matrix.store == 'containerd' }}
+        run: docker info -f '{{json .DriverStatus}}' | grep -q io.containerd.snapshotter.v1
+
+      # ~/.docker/cli-plugins is where the e2e framework looks for the plugin it
+      # hands to the commands under test, and it takes precedence over the
+      # plugin of the runner.
+      - name: Download Buildx
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: buildx
+          path: ${{ runner.temp }}/buildx
+
+      - name: Install the Buildx built from the head of docker/buildx
+        run: |
+          mkdir -p ~/.docker/cli-plugins
+          install -m 0755 "${RUNNER_TEMP}/buildx/buildx" ~/.docker/cli-plugins/docker-buildx
+          docker buildx version
+
+      # no version: the plugin installed above is the one the action uses
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@594f3bf4285d9ea8dc53c9a0c9c4092420091003 # v4.4.0
+
+      - name: Report the engine and the Buildx under test
+        run: |
+          engine=$(docker version -f '{{.Server.Version}}')
+          buildx=$(docker buildx version)
+          echo "Engine ${engine}"
+          echo "Buildx ${buildx}"
+          {
+            echo "### Engine and Buildx under test (${STORE})"
+            echo
+            echo "Engine: \`${engine}\`"
+            echo
+            echo "Buildx: \`${buildx}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Set up Docker Model
+        run: |
+          curl -fsSL https://get.docker.com -o get-docker.sh
+          sudo sh ./get-docker.sh --setup-repo
+          sudo apt-get install docker-model-plugin
+          docker model version
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: '.go-version'
+          check-latest: true
+          cache: true
+
+      - name: Build example provider
+        run: make example-provider
+
+      # Built with the engine and the Buildx under test: one that cannot build
+      # Compose itself fails here, before the e2e suite.
+      - name: Build
+        uses: docker/bake-action@59cb1203cd42bcefd40a1b6d73b589e48c86040e # v7.5.0
+        with:
+          source: .
+          targets: binary
+          set: |
+            *.cache-from=type=gha,scope=binary-linux-amd64
+            *.cache-from=type=gha,scope=binary-e2e-plugin
+        env:
+          BUILD_TAGS: e2e
+
+      - name: Test plugin mode
+        run: make e2e-compose TEST_FLAGS="-v"
+
+      - name: e2e Test Summary
+        uses: test-summary/action@37b508cfee6d4d080eedd00b5bb240a6a784a6a5 # v2.6
+        with:
+          paths: /tmp/report/report.xml
+        if: always()
+
+      - name: Docker daemon logs
+        if: always()
+        run: sudo cat "${RUNNER_TEMP}/dockerd/dockerd.log"
