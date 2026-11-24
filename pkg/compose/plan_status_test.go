@@ -142,3 +142,42 @@ func TestPlannedActionsAndReasons(t *testing.T) {
 	assert.Equal(t, operationName(planning.OpCreateHookContainer), "create_hook_container")
 	assert.Equal(t, operationName(planning.OpWaitCondition), "wait_condition")
 }
+
+// capturePublisher records what a plan publishes.
+type capturePublisher struct {
+	steps []api.PlanStep
+	rows  []api.ResourceStatus
+}
+
+func (c *capturePublisher) Plan(steps []api.PlanStep, rows []api.ResourceStatus) {
+	c.steps, c.rows = steps, rows
+}
+func (c *capturePublisher) Step(int, api.StepState, string) {}
+
+func TestPublishPlanNamesWhatEachResourceWillGoThrough(t *testing.T) {
+	svc, _ := newTestService(t)
+	web := types.ServiceConfig{Name: "web"}
+	project := &types.Project{Name: "test", Services: types.Services{"web": web}}
+
+	plan := &planning.Plan{}
+	network := plan.AddNode(planning.Operation{Type: planning.OpCreateNetwork, ResourceID: "network:default", Name: "test_default"}, "")
+	create := plan.AddNode(planning.Operation{
+		Type: planning.OpCreateContainer, ResourceID: "service:web:1", Name: "test-web-1", Service: &web, Cause: "no existing container",
+	}, "", network)
+	plan.AddNode(planning.Operation{
+		Type: planning.OpStartContainer, ResourceID: "service:web:1", Service: &web, CreateNodeID: create.ID, Cause: "start",
+	}, "start:service:web:1", create)
+
+	pub := &capturePublisher{}
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
+	publishPlan(pub, plan, exec.buildGroupTracker(plan))
+
+	assert.DeepEqual(t, pub.rows, []api.ResourceStatus{
+		{Kind: api.KindNetwork, Name: "test_default", Message: "create"},
+		{Kind: api.KindContainer, Name: "test-web-1", Service: "web", Message: "create, start"},
+	})
+	assert.Equal(t, len(pub.steps), 3)
+	assert.Equal(t, pub.steps[2].Operation, "start_container")
+	assert.Equal(t, pub.steps[2].Resource, "Container test-web-1")
+	assert.DeepEqual(t, pub.steps[2].DependsOn, []int{create.ID})
+}

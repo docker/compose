@@ -58,6 +58,11 @@ func publishPlan(pub statusPublisher, plan *planning.Plan, groups *groupTracker)
 	actions := map[string][]string{}
 	reasons := map[string]string{}
 
+	nodes := make(map[int]*planning.PlanNode, len(plan.Nodes))
+	for _, node := range plan.Nodes {
+		nodes[node.ID] = node
+	}
+
 	for _, node := range plan.Nodes {
 		op := node.Operation
 		id := progressName(op)
@@ -65,6 +70,12 @@ func publishPlan(pub statusPublisher, plan *planning.Plan, groups *groupTracker)
 			id = groups.resourceName(node)
 		}
 		kind, name, hasRow := status.SplitID(id)
+		if created := nodes[op.CreateNodeID]; !hasRow && created != nil {
+			// a start-phase operation on a replica the plan itself creates acts
+			// on the row of its creation
+			kind, name, hasRow = status.SplitID(progressName(created.Operation))
+			id = progressName(created.Operation)
+		}
 		service := ""
 		if op.Service != nil {
 			service = op.Service.Name
