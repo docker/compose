@@ -26,6 +26,7 @@ import (
 	"gotest.tools/v3/assert"
 
 	"github.com/docker/compose/v5/internal/planning"
+	"github.com/docker/compose/v5/internal/progress"
 	"github.com/docker/compose/v5/internal/status"
 	"github.com/docker/compose/v5/pkg/api"
 )
@@ -227,4 +228,32 @@ func TestPublishPlanKeepsARecreatedContainerOnItsOwnRow(t *testing.T) {
 	assert.Equal(t, pub.rows[0].ID(), oldRow)
 	assert.Equal(t, pub.rows[0].Message, "recreate: config hash diverged")
 	assert.Equal(t, pub.steps[2].Resource, oldRow)
+}
+
+// statusEvents is an event processor that keeps a status, as the tracker of the
+// backend does, recording what is published to it.
+type statusEvents struct {
+	progress.Noop
+	capturePublisher
+	published bool
+}
+
+func (s *statusEvents) Plan(steps []api.PlanStep, rows []api.ResourceStatus) {
+	s.published = true
+	s.capturePublisher.Plan(steps, rows)
+}
+
+func TestDownOfSomeServicesIsNotAnnounced(t *testing.T) {
+	project := &types.Project{Name: "prj", Services: types.Services{"web": {Name: "web"}, "db": {Name: "db"}}}
+	containers := Containers{testContainer("web", "c1", false), testContainer("db", "c2", false)}
+
+	events := &statusEvents{}
+	svc := &composeService{events: events}
+
+	svc.publishRemovals(project, containers, api.DownOptions{Services: []string{"web"}})
+	assert.Assert(t, !events.published, "which containers go with some services depends on what depends on them")
+
+	svc.publishRemovals(project, containers, api.DownOptions{})
+	assert.Assert(t, events.published)
+	assert.Equal(t, len(events.rows), 2)
 }

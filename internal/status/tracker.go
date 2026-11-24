@@ -57,7 +57,11 @@ type Tracker struct {
 	byTask    map[taskKey]int
 	notices   []string
 	// depth is the number of operations in progress: Start without its Done.
+	// open tells whether a display is between a Start and a Done: like the
+	// display itself it is closed by any Done, so for a nested operation it is
+	// closed while depth is not.
 	depth   int
+	open    bool
 	changed chan struct{}
 }
 
@@ -85,10 +89,17 @@ func New(sink api.EventProcessor) *Tracker {
 	return t
 }
 
-// Start opens an operation.
+// Start opens an operation. The tasks of the previous one are forgotten when
+// it is the outermost: they belong to what it did, and a build that never
+// reported its end must not keep a display silent for the next operation.
 func (t *Tracker) Start(ctx context.Context, operation string) {
 	t.mu.Lock()
 	t.depth++
+	t.open = true
+	if t.depth == 1 && len(t.tasks) > 0 {
+		t.tasks, t.byTask = nil, map[taskKey]int{}
+		t.bump()
+	}
 	t.mu.Unlock()
 	if t.sink != nil {
 		t.sink.Start(ctx, operation)
@@ -103,13 +114,14 @@ func (t *Tracker) Done(operation string, success bool) {
 	if t.depth <= 1 && t.settle(success) {
 		t.bump()
 	}
+	// closed before the display is: whatever is reported from now on is its to
+	// be told, and not left to a status nobody reads
+	t.depth = max(t.depth-1, 0)
+	t.open = false
 	t.mu.Unlock()
 	if t.sink != nil {
 		t.sink.Done(operation, success)
 	}
-	t.mu.Lock()
-	t.depth = max(t.depth-1, 0)
-	t.mu.Unlock()
 }
 
 // settle ends what is still pending: resources and operations that no work is
@@ -149,7 +161,7 @@ func (t *Tracker) On(events ...api.Resource) {
 	if changed {
 		t.bump()
 	}
-	forward := t.sink != nil && (t.renderer == nil || t.depth == 0)
+	forward := t.sink != nil && (t.renderer == nil || !t.open)
 	t.mu.Unlock()
 	if forward {
 		t.sink.On(events...)
@@ -160,7 +172,7 @@ func (t *Tracker) On(events ...api.Resource) {
 // lock is held.
 func (t *Tracker) fold(e api.Resource) bool {
 	if e.ID == api.ResourceCompose {
-		if t.depth == 0 {
+		if !t.open {
 			// nothing is drawing the status: the sink prints it
 			return false
 		}

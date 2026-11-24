@@ -200,3 +200,41 @@ func TestWriterDrawsFromTheTrackerOfTheBackend(t *testing.T) {
 	assert.Assert(t, strings.Contains(stripAnsi(out.String()), "Created"), out.String())
 	assert.Equal(t, w.tree.nodes["Network app_default"].text, api.StatusCreated)
 }
+
+func TestStartLooksAtTheStatusAgain(t *testing.T) {
+	w, _, _ := newTermWriter(100, 20)
+	src := &fakeSource{}
+	w.Attach(src)
+
+	src.set(pendingRow(api.KindContainer, "app-db-1", "start"))
+	w.operation = "up"
+	w.sync()
+	assert.Equal(t, len(w.tree.nodes), 0, "held back while attached")
+
+	// the status did not change, but the operation did: starting is what it is about
+	w.Start(t.Context(), "start")
+	defer w.Done("start", true)
+	w.mu.Lock()
+	w.sync()
+	w.mu.Unlock()
+	assert.Equal(t, len(w.tree.nodes), 1)
+}
+
+func TestWhatWasNeverShownIsNotShownWhenSettled(t *testing.T) {
+	w, _, _ := newTermWriter(100, 20)
+	w.operation = "up"
+	src := &fakeSource{}
+	w.Attach(src)
+
+	src.set(pendingRow(api.KindContainer, "app-db-1", "start"), pendingRow(api.KindContainer, "app-web-1", "create"))
+	w.sync()
+	assert.Equal(t, len(w.tree.nodes), 1)
+
+	src.set(
+		api.ResourceStatus{Kind: api.KindContainer, Name: "app-db-1", State: api.StateSkipped, Level: api.Done, Message: "nothing to do"},
+		api.ResourceStatus{Kind: api.KindContainer, Name: "app-web-1", State: api.StateSkipped, Level: api.Warning, Message: "not reached"},
+	)
+	w.sync()
+	assert.Equal(t, len(w.tree.nodes), 1, "the held back row stays out")
+	assert.Equal(t, w.tree.nodes["Container app-web-1"].text, api.StateSkipped, "the one that was shown is settled")
+}

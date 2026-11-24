@@ -136,6 +136,8 @@ func (w *termWriter) Start(ctx context.Context, operation string) {
 		w.unsuspend()
 	}
 	w.operation = operation
+	// what is shown depends on the operation: look at the status again
+	w.seen = 0
 	// The refresh goroutine is bound to a derived context: parent
 	// cancellation (Ctrl-C) and Done both stop it by cancelling, which can
 	// never block — there is no channel handshake to miss.
@@ -220,6 +222,11 @@ func (w *termWriter) sync() {
 	}
 	for _, r := range st.Resources {
 		if w.hidden(r) {
+			continue
+		}
+		if r.State == api.StateSkipped && w.tree.nodes[r.ID()] == nil {
+			// settled without ever having been shown: it was held back, and
+			// there is nothing to say about a resource that was not
 			continue
 		}
 		w.tree.apply(api.Resource{ID: r.ID(), Status: r.Level, Text: r.State, Details: r.Message}, w.now())

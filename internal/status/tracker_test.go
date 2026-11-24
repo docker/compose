@@ -18,6 +18,7 @@ package status
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -27,13 +28,18 @@ import (
 	"github.com/docker/compose/v5/pkg/api"
 )
 
-// recorder is a sink that is fed events.
+// recorder is a sink that is fed events. Like a display, it guards itself.
 type recorder struct {
 	progress.Noop
+	mu     sync.Mutex
 	events []api.Resource
 }
 
-func (r *recorder) On(events ...api.Resource) { r.events = append(r.events, events...) }
+func (r *recorder) On(events ...api.Resource) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.events = append(r.events, events...)
+}
 
 // renderer is a sink that draws from the status.
 type renderer struct {
@@ -44,6 +50,8 @@ type renderer struct {
 
 func (r *renderer) Attach(source api.StatusSource) { r.source = source }
 func (r *renderer) Start(_ context.Context, op string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	r.starts = append(r.starts, op)
 }
 
@@ -278,4 +286,86 @@ func TestWhatThePlanNeverReachedIsSettledWhenTheOperationEnds(t *testing.T) {
 		tr.Done("up", true)
 		assert.Equal(t, sink.source.Status().Resources[1].State, api.StateSkipped)
 	})
+}
+
+func TestAnEventAfterAnInnerDoneIsToldToTheDisplay(t *testing.T) {
+	sink := &renderer{}
+	tr := New(sink)
+	tr.Start(t.Context(), "up")
+	tr.Start(t.Context(), "build") // a nested operation
+	tr.Done("build", true)
+	// the display ended its operation with the first Done: it is told what
+	// comes next, as it was before it drew from the status
+	tr.On(progress.Created("Container app-web-1"))
+	assert.Equal(t, len(sink.events), 1)
+	tr.On(api.Resource{ID: api.ResourceCompose, Details: "Gracefully Stopping..."})
+	assert.Equal(t, len(sink.events), 2)
+	assert.Equal(t, len(tr.Status().Notices), 0)
+	tr.Done("up", true)
+}
+
+func TestAnEventRightAfterDoneIsNotLost(t *testing.T) {
+	sink := &renderer{}
+	tr := New(sink)
+	tr.Start(t.Context(), "up")
+	tr.Done("up", true)
+	tr.On(progress.Created("Container late-1"))
+	assert.DeepEqual(t, sink.events, []api.Resource{progress.Created("Container late-1")})
+}
+
+func TestTasksOfAnOperationAreForgottenByTheNextOne(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "build")
+	tr.On(api.Resource{ID: "Image web", Status: api.Working, Text: api.StatusBuilding})
+	tr.Done("build", false) // canceled: no end was ever reported
+	assert.Equal(t, len(tr.Status().Tasks), 1)
+
+	v := tr.Status().Version
+	tr.Start(t.Context(), "up")
+	st := tr.Status()
+	assert.Equal(t, len(st.Tasks), 0)
+	assert.Assert(t, st.Version > v)
+
+	// a nested operation does not forget the tasks of the one it is part of
+	tr.On(api.Resource{ID: "Image web", Status: api.Done, Text: api.StatusPulled})
+	tr.Start(t.Context(), "nested")
+	assert.Equal(t, len(tr.Status().Tasks), 1)
+}
+
+func TestTrackerIsSafeForConcurrentUse(t *testing.T) {
+	sink := &renderer{}
+	tr := New(sink)
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+
+	done := make(chan struct{})
+	go func() { // a display reading
+		defer close(done)
+		var after uint64
+		for ctx.Err() == nil {
+			st, _ := tr.Wait(ctx, after)
+			after = st.Version
+		}
+	}()
+
+	var wg sync.WaitGroup
+	for i := range 8 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			name := "Container c" + string(rune('a'+i))
+			for range 200 {
+				tr.Start(ctx, "up")
+				tr.Plan([]api.PlanStep{{ID: i}}, []api.ResourceStatus{{Kind: api.KindContainer, Name: name[len("Container "):]}})
+				tr.On(progress.Creating(name), api.Resource{ID: "Image x", ParentID: name, Status: api.Working})
+				tr.Step(i, api.StepRunning, "")
+				_ = tr.Status()
+				tr.On(progress.Created(name))
+				tr.Done("up", true)
+			}
+		}()
+	}
+	wg.Wait()
+	cancel()
+	<-done
 }
