@@ -49,6 +49,16 @@ not guessable from local reading.
   (`s.create`, `s.start`, …) are building blocks without their own event
   cycle — calling an exported method from another operation nests event
   cycles.
+- **Progress is a status, not a log.** `WithEventProcessor` wraps the
+  processor in a `status.Tracker` (`internal/status`), which keeps the status
+  of the running operation — resources and their state, the reconciliation
+  plan, tasks such as pulls and builds (`api.ProjectStatus`). The plan
+  executor publishes its plan before running it (resources pending, with the
+  action and why) and the outcome of each operation; events reported through
+  `On` are folded into the same status. A display that is an
+  `api.StatusRenderer` (the terminal one) reads the status on each refresh and
+  is not fed events during an operation; any other processor (plain, JSON, SDK
+  consumers) still receives the events unchanged.
 - **Output conventions**: progress/status rendering goes to **stderr**
   (`dockerCli.Err()`); stdout is reserved for command payload (`ps`,
   `config`, container logs' stdout stream). TTY detection for the renderer

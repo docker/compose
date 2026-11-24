@@ -95,14 +95,44 @@ func (t *Tracker) Start(ctx context.Context, operation string) {
 	}
 }
 
-// Done closes an operation.
+// Done closes an operation. When it is the outermost one, what the plan listed
+// and never reached will not be: it is settled before the display is told, so
+// that the last thing it draws is final.
 func (t *Tracker) Done(operation string, success bool) {
+	t.mu.Lock()
+	if t.depth <= 1 && t.settle(success) {
+		t.bump()
+	}
+	t.mu.Unlock()
 	if t.sink != nil {
 		t.sink.Done(operation, success)
 	}
 	t.mu.Lock()
 	t.depth = max(t.depth-1, 0)
 	t.mu.Unlock()
+}
+
+// settle ends what is still pending: resources and operations that no work is
+// going to reach. It tells whether anything changed. The lock is held.
+func (t *Tracker) settle(success bool) bool {
+	message, level := "not reached", api.Warning
+	if success {
+		message, level = "nothing to do", api.Done
+	}
+	changed := false
+	for i := range t.resources {
+		if r := &t.resources[i]; r.Pending() {
+			r.State, r.Level, r.Message = api.StateSkipped, level, message
+			changed = true
+		}
+	}
+	for i := range t.plan {
+		if st := &t.plan[i]; st.State == api.StepPending {
+			st.State, st.Message = api.StepSkipped, message
+			changed = true
+		}
+	}
+	return changed
 }
 
 // On folds events into the status. Events are handed to the sink as they come,

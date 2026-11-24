@@ -224,3 +224,58 @@ func TestPlanBringsAKnownResourceBackToPending(t *testing.T) {
 	assert.Equal(t, r.State, api.StatePending)
 	assert.Equal(t, r.Message, "recreate: config hash changed")
 }
+
+func TestWhatThePlanNeverReachedIsSettledWhenTheOperationEnds(t *testing.T) {
+	plan := func(tr *Tracker) {
+		tr.Plan(
+			[]api.PlanStep{{ID: 1}, {ID: 2}},
+			[]api.ResourceStatus{{Kind: api.KindContainer, Name: "a", Message: "create"}, {Kind: api.KindContainer, Name: "b", Message: "create"}},
+		)
+		tr.On(progress.Created("Container a"))
+		tr.Step(1, api.StepSucceeded, "")
+	}
+
+	t.Run("failure", func(t *testing.T) {
+		tr := New(nil)
+		tr.Start(t.Context(), "up")
+		plan(tr)
+		tr.Done("up", false)
+		st := tr.Status()
+		assert.Equal(t, st.Resources[0].State, api.StatusCreated)
+		assert.DeepEqual(t, st.Resources[1], api.ResourceStatus{Kind: api.KindContainer, Name: "b", State: api.StateSkipped, Level: api.Warning, Message: "not reached"})
+		assert.Equal(t, st.Plan[0].State, api.StepSucceeded)
+		assert.Equal(t, st.Plan[1].State, api.StepSkipped)
+		assert.Equal(t, st.Plan[1].Message, "not reached")
+	})
+
+	t.Run("success", func(t *testing.T) {
+		tr := New(nil)
+		tr.Start(t.Context(), "down")
+		plan(tr)
+		tr.Done("down", true)
+		r := tr.Status().Resources[1]
+		assert.Equal(t, r.State, api.StateSkipped)
+		assert.Equal(t, r.Level, api.Done)
+		assert.Equal(t, r.Message, "nothing to do")
+	})
+
+	t.Run("a nested operation ending settles nothing", func(t *testing.T) {
+		tr := New(nil)
+		tr.Start(t.Context(), "up")
+		tr.Start(t.Context(), "start")
+		plan(tr)
+		tr.Done("start", true)
+		assert.Assert(t, tr.Status().Resources[1].Pending())
+		tr.Done("up", true)
+		assert.Equal(t, tr.Status().Resources[1].State, api.StateSkipped)
+	})
+
+	t.Run("the display is told after the settling", func(t *testing.T) {
+		sink := &renderer{}
+		tr := New(sink)
+		tr.Start(t.Context(), "up")
+		plan(tr)
+		tr.Done("up", true)
+		assert.Equal(t, sink.source.Status().Resources[1].State, api.StateSkipped)
+	})
+}

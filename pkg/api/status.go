@@ -27,8 +27,12 @@ const (
 )
 
 // StatePending is the state of a resource the reconciliation plan is going to
-// change and has not reached yet.
-const StatePending = "Pending"
+// change and has not reached yet. StateSkipped is the one it ends in when the
+// operation ends without the plan reaching it.
+const (
+	StatePending = "Pending"
+	StateSkipped = "Skipped"
+)
 
 // ProjectStatus is what a progress display consults to show an application: the
 // resources it is made of and their state, and the plan that is being run to

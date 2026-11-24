@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"slices"
 	"strings"
 	"unicode"
 
@@ -65,16 +66,14 @@ func publishPlan(pub statusPublisher, plan *planning.Plan, groups *groupTracker)
 
 	for _, node := range plan.Nodes {
 		op := node.Operation
-		id := progressName(op)
-		if node.Group != "" {
-			id = groups.resourceName(node)
-		}
+		id := planRowID(node, groups)
 		kind, name, hasRow := status.SplitID(id)
 		if created := nodes[op.CreateNodeID]; !hasRow && created != nil {
 			// a start-phase operation on a replica the plan itself creates acts
-			// on the row of its creation
-			kind, name, hasRow = status.SplitID(progressName(created.Operation))
-			id = progressName(created.Operation)
+			// on the row of its creation: the one of the container it replaces
+			// for a recreate, whose replacement only has a temporary name
+			id = planRowID(created, groups)
+			kind, name, hasRow = status.SplitID(id)
 		}
 		service := ""
 		if op.Service != nil {
@@ -101,9 +100,18 @@ func publishPlan(pub statusPublisher, plan *planning.Plan, groups *groupTracker)
 	}
 	for i := range rows {
 		id := rows[i].ID()
-		rows[i].Message = describePending(actions[id], reasons[id])
+		rows[i].Message = describePending(normalizeActions(actions[id]), reasons[id])
 	}
 	pub.Plan(steps, rows)
+}
+
+// planRowID is the ID of the row a node of the plan changes: the one of its
+// group when it has one, else the one of its resource.
+func planRowID(node *planning.PlanNode, groups *groupTracker) string {
+	if node.Group != "" {
+		return groups.resourceName(node)
+	}
+	return progressName(node.Operation)
 }
 
 // plannedAction names what an operation does to its resource, in the words a
@@ -141,6 +149,15 @@ func appendAction(actions []string, action string) []string {
 		}
 	}
 	return append(actions, action)
+}
+
+// normalizeActions drops what a recreate implies: a replaced container is
+// created and started again, which "recreate" already says.
+func normalizeActions(actions []string) []string {
+	if slices.Contains(actions, "recreate") {
+		return []string{"recreate"}
+	}
+	return actions
 }
 
 // describePending says what a pending resource is waiting for.

@@ -181,3 +181,50 @@ func TestPublishPlanNamesWhatEachResourceWillGoThrough(t *testing.T) {
 	assert.Equal(t, pub.steps[2].Resource, "Container test-web-1")
 	assert.DeepEqual(t, pub.steps[2].DependsOn, []int{create.ID})
 }
+
+func TestContainersToRemoveListsWhatDownWillStopAndRemove(t *testing.T) {
+	project := &types.Project{Name: "prj", Services: types.Services{"web": {Name: "web"}, "db": {Name: "db"}}}
+	running := testContainer("web", "c1", false)
+	running.State = "running"
+	exited := testContainer("db", "c2", false)
+	exited.State = "exited"
+	orphan := testContainer("gone", "c3", false)
+	orphan.State = "exited"
+	containers := Containers{running, exited, orphan}
+
+	rows := containersToRemove(project, containers, false)
+	assert.Equal(t, len(rows), 2, "an orphan is left alone without --remove-orphans: %v", rows)
+	byService := map[string]api.ResourceStatus{}
+	for _, r := range rows {
+		assert.Equal(t, r.Kind, api.KindContainer)
+		byService[r.Service] = r
+	}
+	assert.Equal(t, byService["web"].Message, "stop, remove")
+	assert.Equal(t, byService["db"].Message, "remove")
+
+	assert.Equal(t, len(containersToRemove(project, containers, true)), 3)
+}
+
+func TestPublishPlanKeepsARecreatedContainerOnItsOwnRow(t *testing.T) {
+	svc, _ := newTestService(t)
+	web := types.ServiceConfig{Name: "web"}
+	project := &types.Project{Name: "test", Services: types.Services{"web": web}}
+	old := testContainer("web", "old", false)
+
+	plan := &planning.Plan{}
+	create := plan.AddNode(planning.Operation{
+		Type: planning.OpCreateContainer, ResourceID: "service:web:1", Name: "abcdef123456_test-web-1", Service: &web, Cause: "config hash diverged",
+	}, "recreate:web:1")
+	stop := plan.AddNode(planning.Operation{Type: planning.OpStopContainer, ResourceID: "service:web:1", Container: &old, Service: &web}, "recreate:web:1", create)
+	plan.AddNode(planning.Operation{Type: planning.OpStartContainer, ResourceID: "service:web:1", Service: &web, CreateNodeID: create.ID}, "start:service:web:1", stop)
+
+	pub := &capturePublisher{}
+	exec := svc.newPlanExecutor(project, emptyObservedState("test"))
+	publishPlan(pub, plan, exec.buildGroupTracker(plan))
+
+	oldRow := getContainerProgressName(old)
+	assert.Equal(t, len(pub.rows), 1, "the temporary name of the replacement has no row of its own: %v", pub.rows)
+	assert.Equal(t, pub.rows[0].ID(), oldRow)
+	assert.Equal(t, pub.rows[0].Message, "recreate: config hash diverged")
+	assert.Equal(t, pub.steps[2].Resource, oldRow)
+}
