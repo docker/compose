@@ -21,6 +21,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
 
@@ -113,6 +114,10 @@ func (s *composeService) restartContainer(ctx context.Context, def types.Service
 	relay := isRelayContainer(ctr)
 	if !relay {
 		if err := s.runPreStopHooks(ctx, ctr, def, nil); err != nil {
+			// Ignore the error of a container that was removed meanwhile.
+			if errdefs.IsNotFound(err) {
+				return nil
+			}
 			return err
 		}
 	}

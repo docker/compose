@@ -142,3 +142,14 @@ func TestStopContainerRemovedMeanwhileIsNotAnError(t *testing.T) {
 	err := svc.stopContainer(t.Context(), &service, ctr, nil, nil)
 	assert.NilError(t, err)
 }
+
+// Same for a restart: a container removed since it was listed is left alone.
+func TestRestartContainerRemovedMeanwhileIsNotAnError(t *testing.T) {
+	svc, apiClient, _ := newStartTestService(t)
+	ctr := serviceContainer("web")
+	apiClient.EXPECT().ExecCreate(gomock.Any(), ctr.ID, gomock.Any()).
+		Return(client.ExecCreateResult{}, fmt.Errorf("no such container: %w", errdefs.ErrNotFound))
+
+	err := svc.restartContainer(t.Context(), preStopService("quiesce"), ctr, api.RestartOptions{})
+	assert.NilError(t, err)
+}
