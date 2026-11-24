@@ -496,15 +496,12 @@ func (s *composeService) stopContainer(ctx context.Context, service *types.Servi
 	s.events.On(progress.New(eventName, api.Working, api.StatusStopping))
 
 	if service != nil && !isRelayContainer(ctr) {
-		for _, hook := range service.PreStop {
-			err := s.runHook(ctx, ctr, *service, hook, listener)
-			if err != nil {
-				// Ignore errors indicating that some containers were already stopped or removed.
-				if errdefs.IsNotFound(err) || errdefs.IsConflict(err) {
-					return nil
-				}
-				return err
+		if err := s.runPreStopHooks(ctx, ctr, *service, listener); err != nil {
+			// Ignore the error of a container that was removed meanwhile.
+			if errdefs.IsNotFound(err) {
+				return nil
 			}
+			return err
 		}
 	}
 

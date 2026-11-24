@@ -24,6 +24,7 @@ import (
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
+	"github.com/containerd/errdefs"
 	"github.com/moby/moby/api/pkg/stdcopy"
 	"github.com/moby/moby/api/types/container"
 	"github.com/moby/moby/client"
@@ -40,6 +41,37 @@ const (
 	hookOutputTailLines = 10
 	hookOutputTailBytes = 2048
 )
+
+// runPreStopHooks runs the pre_stop hooks of a service in one of its
+// containers, ahead of stopping or restarting it.
+//
+// A hook acts on the process of a container. A container that has none — it is
+// stopped, paused or restarting — has nothing to prepare for stopping, and the
+// engine refuses the exec with a conflict: the hooks are skipped, and so are
+// the remaining ones when that is only found out by the engine's answer (the
+// container left the running state since it was listed). Neither is a failure
+// of the stop or the restart, which the caller goes on with and which the
+// engine handles for a container in any state. Any other error, a hook that
+// exits with a failure included, is returned.
+func (s *composeService) runPreStopHooks(ctx context.Context, ctr container.Summary, service types.ServiceConfig, listener api.ContainerEventListener) error {
+	if len(service.PreStop) == 0 {
+		return nil
+	}
+	if ctr.State != container.StateRunning {
+		logrus.Debugf("skipping pre_stop hooks of service %s: container %s is %s", service.Name, ctr.ID, ctr.State)
+		return nil
+	}
+	for _, hook := range service.PreStop {
+		if err := s.runHook(ctx, ctr, service, hook, listener); err != nil {
+			if errdefs.IsConflict(err) {
+				logrus.Debugf("skipping pre_stop hooks of service %s: container %s cannot run them: %v", service.Name, ctr.ID, err)
+				return nil
+			}
+			return err
+		}
+	}
+	return nil
+}
 
 func (s *composeService) runHook(ctx context.Context, ctr container.Summary, service types.ServiceConfig, hook types.ServiceHook, listener api.ContainerEventListener) error {
 	// A dry-run must have no side effects, and the dry-run client cannot
