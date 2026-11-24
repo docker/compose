@@ -1,0 +1,15 @@
+services:
+  hooked:
+    image: alpine
+    init: true
+    command: sleep infinity
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo "pre_stop ran" >> /data/log.txt'
+  plain:
+    image: alpine
+    init: true
+    command: sleep infinity
+volumes:
+  data:
