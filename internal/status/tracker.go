@@ -157,7 +157,7 @@ func (t *Tracker) settleDeferred() bool {
 // that the last thing it draws is final.
 func (t *Tracker) Done(operation string, success bool) {
 	t.mu.Lock()
-	if t.depth <= 1 && t.settle(success) {
+	if t.depth == 1 && t.settle(success) {
 		t.bump()
 	}
 	// closed before the display is: whatever is reported once the last operation

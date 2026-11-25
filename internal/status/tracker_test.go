@@ -247,6 +247,16 @@ func TestWhatThePlanNeverReachedIsSettledWhenTheOperationEnds(t *testing.T) {
 		assert.Equal(t, tr.Status().Resources[1].State, api.StateSkipped)
 	})
 
+	t.Run("a Done that matches no Start settles nothing", func(t *testing.T) {
+		tr := New(nil)
+		tr.Start(t.Context(), "up")
+		plan(tr)
+		tr.Done("up", true)
+		tr.Plan(nil, []api.ResourceStatus{{Kind: api.KindContainer, Name: "c", Message: "create"}})
+		tr.Done("up", true)
+		assert.Assert(t, tr.Status().Resources[2].Pending())
+	})
+
 	t.Run("the display is told after the settling", func(t *testing.T) {
 		sink := &renderer{}
 		tr := New(sink)
