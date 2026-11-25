@@ -135,8 +135,8 @@ github.com/klauspost/compress v1.20.5 h1:rJj5VjH4xQxbnLphg6eqUcDxRFCw1jpMdDY9qXl
 github.com/klauspost/compress v1.20.5/go.mod h1:LUdAzn7YLVvxLpc7y3V1m40wESHTgc1422pwwBSKYuI=
 github.com/mattn/go-runewidth v0.0.31 h1:1oCV4ReTlosDBc6rYRw5cL8S/4y8iv5oRl4SJ5IBgwo=
 github.com/mattn/go-runewidth v0.0.31/go.mod h1:3qAiGCV4Koz/yuveO58qUefmUTRm8r0IGEXZ9jeHp/8=
-github.com/mattn/go-shellwords v1.0.16 h1:RRxAaRzU1YbzOSCj9NJqg2/VIbSWv0dnPoD3EwE8kxI=
-github.com/mattn/go-shellwords v1.0.16/go.mod h1:EZzvwXDESEeg03EKmM+RmDnNOPKG4lLtQsUlTZDWQ8Y=
+github.com/mattn/go-shellwords v1.0.17 h1:aaZ6xZkEejIjJLRx2mo9CMpMas4Zz5u8I9Z57vC/rJY=
+github.com/mattn/go-shellwords v1.0.17/go.mod h1:EZzvwXDESEeg03EKmM+RmDnNOPKG4lLtQsUlTZDWQ8Y=
 github.com/mitchellh/go-ps v1.0.0 h1:i6ampVEEF4wQFF+bkYfwYgY+F/uYJDktmvLPf7qIgjc=
 github.com/mitchellh/go-ps v1.0.0/go.mod h1:J4lOc8z8yJs6vUwklHw2XEIiT4z4C40KtWVN3nvg8Pg=
 github.com/moby/buildkit v0.33.1 h1:UUrdifmRdRadykO+f5l8BT1CseUXst2sJHV7AmkjjxE=
