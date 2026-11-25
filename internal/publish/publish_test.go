@@ -162,7 +162,7 @@ func Test_preChecks_sensitive_data_detected_decline(t *testing.T) {
 	}
 	svc := &Service{backend: &fakeBackend{prompt: declined}}
 
-	accept, err := svc.preChecks(t.Context(), project, api.PublishOptions{})
+	accept, err := svc.preChecks(project, api.PublishOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, accept, false)
 }
@@ -250,7 +250,7 @@ func Test_checkForSensitiveData_optional_env_file_missing(t *testing.T) {
 	}
 
 	svc := &Service{}
-	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	findings, err := svc.checkForSensitiveData(project)
 	assert.NilError(t, err, "optional missing env file should not cause error during scan")
 	assert.Equal(t, len(findings), 0)
 }
@@ -274,7 +274,7 @@ func Test_checkForSensitiveData_optional_env_file_present(t *testing.T) {
 	}
 
 	svc := &Service{}
-	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	findings, err := svc.checkForSensitiveData(project)
 	assert.NilError(t, err)
 	assert.Assert(t, len(findings) > 0, "present optional env file should still be scanned for secrets")
 }
@@ -295,8 +295,27 @@ func Test_checkForSensitiveData_required_env_file_missing(t *testing.T) {
 	}
 
 	svc := &Service{}
-	_, err := svc.checkForSensitiveData(t.Context(), project)
+	_, err := svc.checkForSensitiveData(project)
 	assert.ErrorContains(t, err, "not found", "required missing env file should fail")
+}
+
+// Regression test for https://github.com/docker/compose/issues/13672:
+// a valid compose file using interpolation in short-form ports must not fail
+// the publish pre-checks.
+func Test_checkForSensitiveData_interpolatedShortSyntaxPorts(t *testing.T) {
+	project := loadProjectForTest(t, map[string]string{
+		"compose.yaml": `name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+`,
+	})
+
+	svc := &Service{}
+	_, err := svc.checkForSensitiveData(project)
+	assert.NilError(t, err)
 }
 
 // --- collectEnvCheckFindings: pure detection logic ---
@@ -566,6 +585,47 @@ services:
 			},
 		},
 		{
+			// Regression test for https://github.com/docker/compose/issues/13672:
+			// interpolation placeholders in non-string fields (ports, durations,
+			// replicas, …) make compose-go's typed decoding of the unresolved
+			// file fail; the env check must inspect the file as written instead.
+			name: "interpolated short-syntax ports do not break the scan",
+			files: map[string]string{
+				"compose.yaml": `name: test
+services:
+  whoami:
+    image: docker.io/traefik/whoami:v1.11
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+    environment:
+      DB_PASSWORD: toto
+`,
+			},
+			wantSuspicious: map[string][]string{
+				"whoami": {"DB_PASSWORD"},
+			},
+		},
+		{
+			name: "interpolated numeric and duration fields do not break the scan",
+			files: map[string]string{
+				"compose.yaml": `name: test
+services:
+  web:
+    image: alpine
+    stop_grace_period: ${SGP:-5s}
+    mem_limit: ${MEM:-50m}
+    shm_size: ${SHM:-64m}
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: ${INTERVAL:-5s}
+    deploy:
+      replicas: ${REPLICAS:-2}
+    ulimits:
+      nofile: ${NOFILE:-65535}
+`,
+			},
+		},
+		{
 			// Jobs carry environment/env_file like services: same leak
 			// surface, so they must be scanned too, not just project.Services.
 			name: "job literal on suspicious key is flagged like a service's",
@@ -597,7 +657,7 @@ jobs:
 		t.Run(tt.name, func(t *testing.T) {
 			project := loadProjectForTest(t, tt.files)
 
-			findings, err := collectEnvCheckFindings(t.Context(), project)
+			findings, err := collectEnvCheckFindings(project)
 			assert.NilError(t, err)
 
 			gotSuspicious := map[string][]string{}
@@ -654,7 +714,7 @@ services:
 	prompt := &fakePrompt{}
 	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
-	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
+	err := svc.checkEnvironmentVariables(project, api.PublishOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, len(prompt.prompts), 0, "no prompt expected for benign config")
 }
@@ -673,7 +733,7 @@ services:
 	prompt := &fakePrompt{answers: []bool{true}}
 	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
-	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
+	err := svc.checkEnvironmentVariables(project, api.PublishOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, len(prompt.prompts), 1, "exactly one env-related prompt")
 	assert.Assert(t, strings.Contains(prompt.prompts[0], `"db"`))
@@ -694,7 +754,7 @@ services:
 	prompt := &fakePrompt{answers: []bool{false}}
 	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
-	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
+	err := svc.checkEnvironmentVariables(project, api.PublishOptions{})
 	assert.Assert(t, errors.Is(err, api.ErrCanceled),
 		"decline should return api.ErrCanceled, got: %v", err)
 }
@@ -724,7 +784,7 @@ configs:
 	prompt := &fakePrompt{answers: []bool{true}}
 	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
-	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{WithEnvironment: true})
+	err := svc.checkEnvironmentVariables(project, api.PublishOptions{WithEnvironment: true})
 	assert.NilError(t, err)
 	assert.Equal(t, len(prompt.prompts), 1, "only the config.content prompt should fire")
 	assert.Assert(t, strings.Contains(prompt.prompts[0], `config "cfg"`))
@@ -748,7 +808,7 @@ configs:
 	prompt := &fakePrompt{answers: []bool{true, true}}
 	svc := &Service{backend: &fakeBackend{prompt: prompt.handler}}
 
-	err := svc.checkEnvironmentVariables(t.Context(), project, api.PublishOptions{})
+	err := svc.checkEnvironmentVariables(project, api.PublishOptions{})
 	assert.NilError(t, err)
 	assert.Equal(t, len(prompt.prompts), 2, "expected env prompt then config.content prompt")
 }
@@ -942,7 +1002,7 @@ func Test_checkForSensitiveData_jobEnvFile(t *testing.T) {
 	}
 
 	svc := &Service{}
-	findings, err := svc.checkForSensitiveData(t.Context(), project)
+	findings, err := svc.checkForSensitiveData(project)
 	assert.NilError(t, err)
 	assert.Assert(t, len(findings) > 0, "job env file should be scanned for secrets like a service's")
 }

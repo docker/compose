@@ -25,9 +25,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"maps"
 	"os"
+	"path/filepath"
 	"slices"
 	"strconv"
 	"strings"
@@ -86,7 +86,7 @@ func (s *Service) Publish(ctx context.Context, project *types.Project, repositor
 	if err != nil {
 		return err
 	}
-	accept, err := s.preChecks(ctx, project, options)
+	accept, err := s.preChecks(project, options)
 	if err != nil {
 		return err
 	}
@@ -381,7 +381,7 @@ func (s *Service) generateImageDigestsOverride(ctx context.Context, project *typ
 	return override.MarshalYAML()
 }
 
-func (s *Service) preChecks(ctx context.Context, project *types.Project, options api.PublishOptions) (bool, error) {
+func (s *Service) preChecks(project *types.Project, options api.PublishOptions) (bool, error) {
 	if ok, err := s.checkOnlyBuildSection(project); !ok || err != nil {
 		return false, err
 	}
@@ -404,7 +404,7 @@ func (s *Service) preChecks(ctx context.Context, project *types.Project, options
 			return false, err
 		}
 	}
-	detectedSecrets, err := s.checkForSensitiveData(ctx, project)
+	detectedSecrets, err := s.checkForSensitiveData(project)
 	if err != nil {
 		return false, err
 	}
@@ -423,7 +423,7 @@ func (s *Service) preChecks(ctx context.Context, project *types.Project, options
 			return false, err
 		}
 	}
-	err = s.checkEnvironmentVariables(ctx, project, options)
+	err = s.checkEnvironmentVariables(project, options)
 	if err != nil {
 		return false, err
 	}
@@ -482,12 +482,12 @@ func (f *envCheckFindings) hasEnvFinding() bool {
 // Interpolated values like "${SECRET}" or "$VAR" are preserved as placeholders
 // in the published YAML and don't leak the resolved value; the keyword
 // detector's value regex skips them automatically.
-func (s *Service) checkEnvironmentVariables(ctx context.Context, project *types.Project, options api.PublishOptions) error {
+func (s *Service) checkEnvironmentVariables(project *types.Project, options api.PublishOptions) error {
 	if len(project.ComposeFiles) == 0 {
 		return nil
 	}
 
-	findings, err := collectEnvCheckFindings(ctx, project)
+	findings, err := collectEnvCheckFindings(project)
 	if err != nil {
 		return err
 	}
@@ -527,7 +527,7 @@ func (s *Service) confirmOrCancel(message string) error {
 // and aggregates per-service and per-config findings. The walk mirrors
 // processExtends so coverage matches what is actually serialized into the OCI
 // artifact.
-func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envCheckFindings, error) {
+func collectEnvCheckFindings(project *types.Project) (*envCheckFindings, error) {
 	findings := &envCheckFindings{services: map[string]*serviceEnvFindings{}}
 	literalCfgs := map[string]struct{}{}
 	keywordDetector := keyword.NewDetector("0")
@@ -542,30 +542,28 @@ func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envC
 		}
 		seen[file] = struct{}{}
 
-		unresolved, err := loadUnresolvedFile(ctx, project, file)
+		unresolved, err := parseUnresolvedComposeFile(file)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load compose file %s: %w", file, err)
 		}
 
-		for _, service := range unresolved.Services {
-			recordEnvFindings(findings.services, keywordDetector, service.Name, service.ContainerSpec)
-			if parent := localExtendsParent(service); parent != "" {
+		for name, service := range unresolved.services {
+			recordEnvFindings(findings.services, keywordDetector, name, service.envValues, service.hasEnvFile)
+			if parent := localExtendsParent(service.extendsFile, file); parent != "" {
 				queue = append(queue, parent)
 			}
 		}
-		for name, job := range unresolved.Jobs {
+		for name, job := range unresolved.jobs {
 			// jobs carry environment/env_file like services: same leak surface
-			recordEnvFindings(findings.services, keywordDetector, name, job.ContainerSpec)
+			recordEnvFindings(findings.services, keywordDetector, name, job.envValues, job.hasEnvFile)
 		}
-		for name, config := range unresolved.Configs {
+		for name, content := range unresolved.configs {
 			// config.Environment is a variable *name* (only the name is
 			// published, not its resolved value) so it is not a leak. Inline
-			// config.Content is what ends up in the artifact. compose-go
+			// config content is what ends up in the artifact. compose-go
 			// enforces that file, environment, and content are mutually
-			// exclusive. The map key is the name as written in the compose
-			// file; config.Name is the project-namespaced version, which is
-			// less helpful when surfaced to the user.
-			if config.Content != "" && configContentLooksLiteral(config.Content, keywordDetector) {
+			// exclusive.
+			if configContentLooksLiteral(content, keywordDetector) {
 				literalCfgs[name] = struct{}{}
 			}
 		}
@@ -577,17 +575,14 @@ func collectEnvCheckFindings(ctx context.Context, project *types.Project) (*envC
 	return findings, nil
 }
 
-func recordEnvFindings(services map[string]*serviceEnvFindings, detector secrets.Detector, name string, spec types.ContainerSpec) {
-	envValues := map[string]string{}
-	for key, value := range spec.Environment {
-		if value == nil {
-			continue
-		}
-		envValues[key] = replaceDollarEscape(*value)
+func recordEnvFindings(services map[string]*serviceEnvFindings, detector secrets.Detector, name string, envValues map[string]string, hasEnvFile bool) {
+	scanned := make(map[string]string, len(envValues))
+	for key, value := range envValues {
+		scanned[key] = replaceDollarEscape(value)
 	}
 
-	hits, _ := detector.ScanMap(envValues)
-	if len(hits) == 0 && len(spec.EnvFiles) == 0 {
+	hits, _ := detector.ScanMap(scanned)
+	if len(hits) == 0 && !hasEnvFile {
 		return
 	}
 
@@ -596,7 +591,7 @@ func recordEnvFindings(services map[string]*serviceEnvFindings, detector secrets
 		f = &serviceEnvFindings{suspiciousKeys: map[string]struct{}{}}
 		services[name] = f
 	}
-	if len(spec.EnvFiles) > 0 {
+	if hasEnvFile {
 		f.hasEnvFile = true
 	}
 	for _, hit := range hits {
@@ -629,16 +624,22 @@ func replaceDollarEscape(value string) string {
 	return strings.ReplaceAll(value, "$$", "X")
 }
 
-// localExtendsParent returns the path of an extends parent file that exists on
-// disk, or "" when the service does not extend or extends a remote resource.
-func localExtendsParent(service types.ServiceConfig) string {
-	if service.Extends == nil || service.Extends.File == "" {
+// localExtendsParent resolves an extends.file path, as written in
+// declaringFile, to a parent file that exists on disk. It returns "" when the
+// service does not extend another file or the parent is a remote resource.
+// Relative paths are resolved against the declaring file's directory, the way
+// compose-go re-bases resource loading on extended files.
+func localExtendsParent(extendsFile string, declaringFile string) string {
+	if extendsFile == "" {
 		return ""
 	}
-	if _, err := os.Stat(service.Extends.File); err != nil {
+	if !filepath.IsAbs(extendsFile) {
+		extendsFile = filepath.Join(filepath.Dir(declaringFile), extendsFile)
+	}
+	if _, err := os.Stat(extendsFile); err != nil {
 		return ""
 	}
-	return service.Extends.File
+	return extendsFile
 }
 
 func buildEnvPromptMessage(services map[string]*serviceEnvFindings) string {
@@ -673,29 +674,6 @@ func buildConfigContentPromptMessage(configs []string) string {
 	}
 	b.WriteString("Are you ok to publish these config contents?")
 	return b.String()
-}
-
-// loadUnresolvedFile loads a single compose file with interpolation and
-// environment resolution skipped, so callers can inspect raw user-provided
-// values. Used by both checkEnvironmentVariables and composeFileAsByteReader.
-func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath string) (*types.Project, error) {
-	return loader.LoadWithContext(ctx, types.ConfigDetails{
-		WorkingDir:  project.WorkingDir,
-		Environment: project.Environment,
-		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
-	}, func(options *loader.Options) {
-		options.SkipValidation = true
-		options.SkipExtends = true
-		options.SkipConsistencyCheck = true
-		options.ResolvePaths = true
-		// SkipInclude mirrors processFile: include directives stay symbolic in
-		// the published artifact, so included content must not be inspected
-		// here either (otherwise we'd flag literals that never ship).
-		options.SkipInclude = true
-		options.SkipInterpolation = true
-		options.SkipResolveEnvironment = true
-		options.Profiles = project.Profiles
-	})
 }
 
 func envFileLayers(files map[string]string) []v1.Descriptor {
@@ -757,18 +735,21 @@ func (s *Service) checkForBindMount(project *types.Project) map[string][]types.S
 	return allFindings
 }
 
-func (s *Service) checkForSensitiveData(ctx context.Context, project *types.Project) ([]secrets.DetectedSecret, error) {
+func (s *Service) checkForSensitiveData(project *types.Project) ([]secrets.DetectedSecret, error) {
 	var allFindings []secrets.DetectedSecret
 	scan := scanner.NewDefaultScanner()
 
-	// Check all compose files
+	// Check all compose files. The raw file is scanned as written: what ships
+	// in the OCI artifact is the file content itself, and re-decoding it
+	// through compose-go would fail on valid files — interpolation
+	// placeholders in non-string fields don't survive typed decoding.
 	for _, file := range project.ComposeFiles {
-		in, err := composeFileAsByteReader(ctx, file, project)
+		data, err := os.ReadFile(file)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to read compose file %s: %w", file, err)
 		}
 
-		findings, err := scan.ScanReader(in)
+		findings, err := scan.ScanReader(bytes.NewReader(data))
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan compose file %s: %w", file, err)
 		}
@@ -854,16 +835,4 @@ func scanFiles(scan secrets.Scanner, kind string, paths []string) ([]secrets.Det
 		allFindings = append(allFindings, findings...)
 	}
 	return allFindings, nil
-}
-
-func composeFileAsByteReader(ctx context.Context, filePath string, project *types.Project) (io.Reader, error) {
-	base, err := loadUnresolvedFile(ctx, project, filePath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to load compose file %s: %w", filePath, err)
-	}
-	in, err := base.MarshalYAML()
-	if err != nil {
-		return nil, err
-	}
-	return bytes.NewBuffer(in), nil
 }
