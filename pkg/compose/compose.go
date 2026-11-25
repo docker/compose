@@ -209,12 +209,15 @@ func AlwaysOkPrompt() Prompt {
 // reports to bus through it. A bus that is an [api.StatusRenderer] draws from
 // the status; any other receives the events as they are reported.
 func WithEventProcessor(bus api.EventProcessor) Option {
+	// The status is made once, here, and not each time the option is applied:
+	// services built from the same option report to the same bus, and so to the
+	// same status, instead of each attaching a status of its own to a display.
+	tracker, ok := bus.(*status.Tracker)
+	if !ok {
+		tracker = status.New(bus)
+	}
 	return func(s *composeService) error {
-		if t, ok := bus.(*status.Tracker); ok {
-			s.events = t
-			return nil
-		}
-		s.events = status.New(bus)
+		s.events = tracker
 		return nil
 	}
 }

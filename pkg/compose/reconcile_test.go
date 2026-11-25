@@ -2328,3 +2328,87 @@ func runningContainer(t *testing.T, svc types.ServiceConfig, id string) Observed
 		},
 	}
 }
+
+// What a user is told of a recreate is why it happens, in their words, and not
+// how the plan is built.
+func TestReconcileGivesTheReasonOfWhatItRecreates(t *testing.T) {
+	web := types.ServiceConfig{Name: "web", Scale: intPtr(1), ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}}}
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services: types.Services{"web": web},
+	}
+	oc := networkAttachedContainer(t, web, "c1aabbccddee")
+	oc.ConfigHash = "stale"
+	oc.Summary.Labels[api.ConfigHashLabel] = "stale"
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{"web": {oc}},
+		Networks:    map[string][]ObservedNetwork{"frontend": {{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}}},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	reasons := map[planning.OperationType][]string{}
+	for _, node := range plan.Nodes {
+		reasons[node.Operation.Type] = append(reasons[node.Operation.Type], node.Operation.Reason)
+	}
+	assert.DeepEqual(t, reasons[planning.OpCreateContainer], []string{"config changed"})
+	assert.DeepEqual(t, reasons[planning.OpStopContainer], []string{"network frontend config changed"})
+	assert.DeepEqual(t, reasons[planning.OpCreateNetwork], []string{"config changed"})
+	assert.DeepEqual(t, reasons[planning.OpRemoveNetwork], []string{"config changed"})
+	// what only says how the plan is built is no reason
+	assert.DeepEqual(t, reasons[planning.OpRenameContainer], []string{""})
+	assert.DeepEqual(t, reasons[planning.OpDisconnectNetwork], []string{""})
+}
+
+func TestWhatIsCreatedBecauseItIsMissingHasNoReason(t *testing.T) {
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"default": {Name: "myproject_default"}},
+		Volumes:  types.Volumes{"data": {Name: "myproject_data"}},
+	}
+	observed := &ObservedState{ProjectName: "myproject", Containers: map[string][]ObservedContainer{}, Networks: map[string][]ObservedNetwork{}, Volumes: map[string][]ObservedVolume{}}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, len(plan.Nodes), 2)
+	for _, node := range plan.Nodes {
+		assert.Equal(t, node.Operation.Reason, "", "%v: the observation (%q) is not why a user would read", node.Operation.Type, node.Operation.Cause)
+	}
+}
+
+func TestRecreateReason(t *testing.T) {
+	r := &reconciler{}
+	expected := types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{CustomLabels: map[string]string{
+		api.ImageDigestLabel:       "sha256:new",
+		api.ImageVolumeDigestLabel: "vol-new",
+	}}}
+	observed := func(mod func(*ObservedContainer)) ObservedContainer {
+		oc := ObservedContainer{ConfigHash: "h", ImageDigest: "sha256:new", ImageVolumeDigest: "vol-new"}
+		mod(&oc)
+		return oc
+	}
+
+	for name, tc := range map[string]struct {
+		oc       ObservedContainer
+		parent   bool
+		policy   string
+		expected string
+	}{
+		"never":              {oc: observed(func(oc *ObservedContainer) { oc.ConfigHash = "x" }), policy: api.RecreateNever, expected: ""},
+		"force":              {oc: observed(func(*ObservedContainer) {}), policy: api.RecreateForce, expected: "recreate forced"},
+		"a parent recreated": {oc: observed(func(*ObservedContainer) {}), parent: true, expected: "a service it shares a namespace or volumes with is recreated"},
+		"config":             {oc: observed(func(oc *ObservedContainer) { oc.ConfigHash = "x" }), expected: "config changed"},
+		"image":              {oc: observed(func(oc *ObservedContainer) { oc.ImageDigest = "sha256:old" }), expected: "image changed"},
+		"image volume":       {oc: observed(func(oc *ObservedContainer) { oc.ImageVolumeDigest = "vol-old" }), expected: "image volume changed"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			got := r.recreateReason(expected, "h", tc.parent, tc.oc, tc.policy)
+			assert.Equal(t, got, tc.expected)
+			assert.Equal(t, r.mustRecreate(expected, "h", tc.parent, tc.oc, tc.policy), tc.expected != "")
+		})
+	}
+}

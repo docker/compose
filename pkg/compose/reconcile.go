@@ -280,7 +280,7 @@ func (r *reconciler) reconcileNetworks() error {
 		}
 		observed, exists := r.resolvedNetworks[key]
 		if !exists {
-			r.planCreateNetwork(key, &desired, "not found")
+			r.planCreateNetwork(key, &desired, "not found", "")
 			continue
 		}
 		expected, err := confighash.NetworkHash(&desired)
@@ -307,11 +307,12 @@ func (r *reconciler) reconcileNetworks() error {
 }
 
 // planCreateNetwork adds a single CreateNetwork node and records it for dependency tracking.
-func (r *reconciler) planCreateNetwork(key string, networkConfig *types.NetworkConfig, cause string) {
+func (r *reconciler) planCreateNetwork(key string, networkConfig *types.NetworkConfig, cause, reason string) {
 	r.networkNodes[key] = r.plan.AddNode(planning.Operation{
 		Type:       planning.OpCreateNetwork,
 		ResourceID: "network:" + key,
 		Cause:      cause,
+		Reason:     reason,
 		Name:       networkConfig.Name,
 		Network:    networkConfig,
 	}, "")
@@ -349,6 +350,7 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 					Type:       planning.OpStopContainer,
 					ResourceID: resID,
 					Cause:      fmt.Sprintf("network %s config changed", key),
+					Reason:     fmt.Sprintf("network %s config changed", key),
 					Container:  &oc.Summary,
 					Timeout:    r.options.Timeout,
 				}, "")
@@ -373,15 +375,18 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 		rename := observed.Name != desired.Name
 		removeCause := "config hash diverged"
 		createCause := "recreate after config change"
+		reason := "config changed"
 		if rename {
 			removeCause = "renamed (best-effort cleanup)"
 			createCause = "renamed"
+			reason = "renamed"
 		}
 
 		removeNode := r.plan.AddNode(planning.Operation{
 			Type:       planning.OpRemoveNetwork,
 			ResourceID: "network:" + key,
 			Cause:      removeCause,
+			Reason:     reason,
 			Name:       observed.Name,
 			BestEffort: rename,
 		}, "", disconnectNodes...)
@@ -394,6 +399,7 @@ func (r *reconciler) planRecreateNetworks(keys []string) {
 			Type:       planning.OpCreateNetwork,
 			ResourceID: "network:" + key,
 			Cause:      createCause,
+			Reason:     reason,
 			Name:       desired.Name,
 			Network:    &desired,
 		}, "", createDeps...)
@@ -440,7 +446,7 @@ func (r *reconciler) reconcileVolumes() error {
 		}
 		observed, exists := r.resolvedVolumes[key]
 		if !exists {
-			r.planCreateVolume(key, &desired, "not found")
+			r.planCreateVolume(key, &desired, "not found", "")
 			continue
 		}
 		expected, err := confighash.VolumeHash(desired)
@@ -456,7 +462,7 @@ func (r *reconciler) reconcileVolumes() error {
 			// additive — create the new volume and leave the old one (and its
 			// data) untouched — instead of prompting to delete data under a
 			// name that does not exist yet.
-			r.planCreateVolume(key, &desired, "renamed")
+			r.planCreateVolume(key, &desired, "renamed", "renamed")
 			// Rewrite the observed name to the desired one so reconcileContainers
 			// detects the mount mismatch and migrates existing containers onto
 			// the new volume within the same up, and so later runs match
@@ -488,11 +494,12 @@ func (r *reconciler) reconcileVolumes() error {
 }
 
 // planCreateVolume adds a single CreateVolume node and records it for dependency tracking.
-func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig, cause string) {
+func (r *reconciler) planCreateVolume(key string, vol *types.VolumeConfig, cause, reason string) {
 	r.volumeNodes[key] = r.plan.AddNode(planning.Operation{
 		Type:       planning.OpCreateVolume,
 		ResourceID: "volume:" + key,
 		Cause:      cause,
+		Reason:     reason,
 		Name:       vol.Name,
 		Volume:     vol,
 	}, "")
@@ -544,6 +551,7 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 				Type:       planning.OpStopContainer,
 				ResourceID: resID,
 				Cause:      "mounted volume config changed",
+				Reason:     "mounted volume config changed",
 				Container:  &oc.Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
@@ -553,6 +561,7 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 			Type:       planning.OpRemoveContainer,
 			ResourceID: resID,
 			Cause:      "mounted volume config changed",
+			Reason:     "mounted volume config changed",
 			Container:  &oc.Summary,
 		}, "", stopNode)
 		removeNodes = append(removeNodes, removeNode)
@@ -567,12 +576,14 @@ func (r *reconciler) planRecreateVolumes(keys []string) {
 			Type:       planning.OpRemoveVolume,
 			ResourceID: "volume:" + key,
 			Cause:      "config hash diverged",
+			Reason:     "config changed",
 			Name:       r.resolvedVolumes[key].Name,
 		}, "", removeNodes...)
 		createVolNode := r.plan.AddNode(planning.Operation{
 			Type:       planning.OpCreateVolume,
 			ResourceID: "volume:" + key,
 			Cause:      "recreate after config change",
+			Reason:     "config changed",
 			Name:       desired.Name,
 			Volume:     &desired,
 		}, "", removeVolNode)
@@ -806,6 +817,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Type:       planning.OpStopContainer,
 				ResourceID: resID,
 				Cause:      "service is now provider-backed",
+				Reason:     "service is now provider-backed",
 				Container:  &oc.Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
@@ -813,6 +825,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Type:       planning.OpRemoveContainer,
 				ResourceID: resID,
 				Cause:      "service is now provider-backed",
+				Reason:     "service is now provider-backed",
 				Container:  &oc.Summary,
 			}, "", stopNode)
 			r.removedByPlan[resID] = true
@@ -881,6 +894,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Type:       planning.OpStopContainer,
 				ResourceID: resID,
 				Cause:      "scale down",
+				Reason:     "scale down",
 				Container:  &containers[i].Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
@@ -888,6 +902,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Type:       planning.OpRemoveContainer,
 				ResourceID: resID,
 				Cause:      "scale down",
+				Reason:     "scale down",
 				Container:  &containers[i].Summary,
 			}, "", stopNode)
 			r.removedByPlan[resID] = true
@@ -895,8 +910,8 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 			continue
 		}
 
-		if r.mustRecreate(service, expectedHash, parentRecreated, oc, strategy) {
-			lastNode = r.planRecreateContainer(service, &containers[i], infraDeps)
+		if reason := r.recreateReason(service, expectedHash, parentRecreated, oc, strategy); reason != "" {
+			lastNode = r.planRecreateContainer(service, &containers[i], infraDeps, reason)
 			r.setContainerNode(service.Name, oc.Number, lastNode)
 			containerNodes = append(containerNodes, lastNode)
 			r.recreatedServices[service.Name] = true
@@ -928,6 +943,7 @@ func (r *reconciler) reconcileService(service types.ServiceConfig) error {
 				Type:       planning.OpStartContainer,
 				ResourceID: serviceReplicaID(service.Name, oc.Number),
 				Cause:      "not running",
+				Reason:     "not running",
 				Container:  &containers[i].Summary,
 			}, "", infraDeps...)
 			r.setContainerNode(service.Name, oc.Number, lastNode)
@@ -1038,28 +1054,33 @@ func (r *reconciler) planPreStartHookRunners(service types.ServiceConfig, expect
 // reconcileService — see expectedConfigHash and parentNamespaceRecreated for
 // the rationale (issue #13878).
 func (r *reconciler) mustRecreate(expected types.ServiceConfig, expectedHash string, parentRecreated bool, oc ObservedContainer, policy string) bool {
+	return r.recreateReason(expected, expectedHash, parentRecreated, oc, policy) != ""
+}
+
+// recreateReason says, in the words a user reads, why oc must be recreated to
+// match expected: empty when it must not.
+func (r *reconciler) recreateReason(expected types.ServiceConfig, expectedHash string, parentRecreated bool, oc ObservedContainer, policy string) string {
 	switch policy {
 	case api.RecreateNever:
-		return false
+		return ""
 	case api.RecreateForce:
-		return true
+		return "recreate forced"
 	}
-	if parentRecreated {
-		return true
+	switch {
+	case parentRecreated:
+		return "a service it shares a namespace or volumes with is recreated"
+	case oc.ConfigHash != expectedHash:
+		return "config changed"
+	case oc.ImageDigest != expected.CustomLabels[api.ImageDigestLabel]:
+		return "image changed"
+	case oc.ImageVolumeDigest != expected.CustomLabels[api.ImageVolumeDigestLabel]:
+		return "image volume changed"
+	case r.hasNetworkMismatch(expected, oc):
+		return "networks changed"
+	case r.hasVolumeMismatch(expected, oc):
+		return "volumes changed"
 	}
-	if oc.ConfigHash != expectedHash {
-		return true
-	}
-	if oc.ImageDigest != expected.CustomLabels[api.ImageDigestLabel] {
-		return true
-	}
-	if oc.ImageVolumeDigest != expected.CustomLabels[api.ImageVolumeDigestLabel] {
-		return true
-	}
-	if r.hasNetworkMismatch(expected, oc) {
-		return true
-	}
-	return r.hasVolumeMismatch(expected, oc)
+	return ""
 }
 
 // parentNamespaceRecreated reports whether any namespace- or volume-sharing
@@ -1641,7 +1662,7 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 
 // planRecreateContainer decomposes container recreation into 4 atomic operations:
 // CreateContainer(tmpName) → StopContainer → RemoveContainer → RenameContainer
-func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*planning.PlanNode) *planning.PlanNode {
+func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *ObservedContainer, infraDeps []*planning.PlanNode, reason string) *planning.PlanNode {
 	resID := serviceReplicaID(service.Name, oc.Number)
 	group := fmt.Sprintf("recreate:%s:%d", service.Name, oc.Number)
 	tmpName := fmt.Sprintf("%s_%s", oc.ID[:min(12, len(oc.ID))], naming.ContainerName(r.project.Name, service, oc.Number))
@@ -1663,6 +1684,7 @@ func (r *reconciler) planRecreateContainer(service types.ServiceConfig, oc *Obse
 		Type:       planning.OpCreateContainer,
 		ResourceID: resID,
 		Cause:      "config changed (tmpName)",
+		Reason:     reason,
 		Service:    &serviceCopy,
 		Inherited:  inherited,
 		Number:     oc.Number,
@@ -1748,6 +1770,7 @@ func (r *reconciler) planStopDependents(service types.ServiceConfig) []*planning
 				Type:       planning.OpStopContainer,
 				ResourceID: serviceReplicaID(depName, oc.Number),
 				Cause:      fmt.Sprintf("dependency %s being recreated", service.Name),
+				Reason:     fmt.Sprintf("dependency %s recreated", service.Name),
 				Container:  &r.observed.Containers[depName][i].Summary,
 				Timeout:    r.options.Timeout,
 			}, "")
@@ -1820,6 +1843,7 @@ func (r *reconciler) reconcileOrphans() {
 			Type:       planning.OpStopContainer,
 			ResourceID: "orphan:" + oc.Name,
 			Cause:      "orphaned container",
+			Reason:     "orphaned",
 			Container:  &r.observed.Orphans[i].Summary,
 			Timeout:    r.options.Timeout,
 		}, "")
@@ -1827,6 +1851,7 @@ func (r *reconciler) reconcileOrphans() {
 			Type:       planning.OpRemoveContainer,
 			ResourceID: "orphan:" + oc.Name,
 			Cause:      "orphaned container",
+			Reason:     "orphaned",
 			Container:  &r.observed.Orphans[i].Summary,
 		}, "", stopNode)
 	}

@@ -17,7 +17,6 @@
 package display
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -32,9 +31,7 @@ import (
 type fakeSource struct{ st api.ProjectStatus }
 
 func (f *fakeSource) Status() api.ProjectStatus { return f.st }
-func (f *fakeSource) Wait(context.Context, uint64) (api.ProjectStatus, error) {
-	return f.st, nil
-}
+func (f *fakeSource) Version() uint64           { return f.st.Version }
 
 func (f *fakeSource) set(resources ...api.ResourceStatus) {
 	f.st.Version++
@@ -52,7 +49,8 @@ func frame(w *termWriter) []string {
 }
 
 func pendingRow(kind, name, message string) api.ResourceStatus {
-	return api.ResourceStatus{Kind: kind, Name: name, State: api.StatePending, Level: api.Working, Message: message}
+	action, _, _ := strings.Cut(message, ":")
+	return api.ResourceStatus{Kind: kind, Name: name, State: api.StatePending, Level: api.Working, Message: message, Action: action}
 }
 
 func TestSyncShowsThePlanThenTheStateOfEachResource(t *testing.T) {
@@ -237,4 +235,155 @@ func TestWhatWasNeverShownIsNotShownWhenSettled(t *testing.T) {
 	w.sync()
 	assert.Equal(t, len(w.tree.nodes), 1, "the held back row stays out")
 	assert.Equal(t, w.tree.nodes["Container app-web-1"].text, api.StateSkipped, "the one that was shown is settled")
+}
+
+// A container the plan creates goes from created to started between two looks
+// at the status: it is shown all the same, since what the plan does to it is
+// what decides, and not the state it happens to be sampled in.
+func TestAttachedOperationShowsWhatItCreatedAndStarted(t *testing.T) {
+	var out strings.Builder
+	w := newTerm(&out, &out, false)
+	w.size = func() (int, int) { return 100, 20 }
+	tr := status.New(w)
+
+	tr.Start(t.Context(), "scale")
+	tr.Plan(nil, []api.ResourceStatus{
+		{Kind: api.KindContainer, Name: "app-web-2", Message: "create, start", Action: "create, start"},
+		{Kind: api.KindContainer, Name: "app-db-1", Message: "start", Action: "start"},
+	})
+	for _, name := range []string{"app-web-2", "app-db-1"} {
+		id := "Container " + name
+		if name == "app-web-2" {
+			tr.On(api.Resource{ID: id, Status: api.Working, Text: api.StatusCreating})
+			tr.On(api.Resource{ID: id, Status: api.Done, Text: api.StatusCreated})
+		}
+		tr.On(api.Resource{ID: id, Status: api.Working, Text: api.StatusStarting})
+		tr.On(api.Resource{ID: id, Status: api.Done, Text: api.StatusStarted})
+	}
+	tr.Done("scale", true)
+
+	created := w.tree.nodes["Container app-web-2"]
+	assert.Assert(t, created != nil, "a container the plan creates is shown")
+	assert.Assert(t, created.completed() && created.text == api.StatusStarted, "ends as %q", created.text)
+	assert.Assert(t, w.tree.nodes["Container app-db-1"] == nil, "one that is only started is not")
+}
+
+// run and up chain operations: when the inner one ends the outer one goes on,
+// and it is its final state that is left on screen.
+func TestTheOuterOperationIsDrawnToTheEndWhenAnInnerOneEnds(t *testing.T) {
+	var out strings.Builder
+	w := newTerm(&out, &out, true)
+	w.size = func() (int, int) { return 100, 20 }
+	tr := status.New(w)
+
+	tr.Start(t.Context(), "up")
+	tr.Start(t.Context(), "pull")
+	tr.On(api.Resource{ID: "Image web", Status: api.Working, Text: api.StatusPulling})
+	tr.Done("pull", true)
+	assert.Equal(t, w.operation, "up", "the display is about the outer operation again")
+	assert.Assert(t, w.stopTicks != nil, "and it goes on being refreshed")
+
+	tr.Plan(nil, []api.ResourceStatus{{Kind: api.KindContainer, Name: "app-web-1", Message: "create", Action: "create"}})
+	tr.On(api.Resource{ID: "Container app-web-1", Status: api.Done, Text: api.StatusCreated})
+	tr.Done("up", true)
+
+	assert.Equal(t, w.operation, "")
+	assert.Assert(t, w.stopTicks == nil)
+	final := stripAnsi(out.String())
+	assert.Assert(t, strings.Contains(final, "Container app-web-1"), final)
+	assert.Assert(t, strings.Contains(final, "Created"), "the settled state of the outer operation is painted: %s", final)
+	assert.Assert(t, !strings.Contains(final, "Container app-web-1 Created \n"), "and not printed as a line outside of the block")
+}
+
+func TestAttachingAnotherStatusForgetsWhatWasDrawnFromTheFirst(t *testing.T) {
+	w, buf, _ := newTermWriter(100, 20)
+	first := &fakeSource{}
+	first.st.Version, first.st.Notices = 1, []string{"first notice"}
+	w.Attach(first)
+	w.sync()
+
+	second := &fakeSource{}
+	second.st.Version, second.st.Notices = 1, []string{"second notice"}
+	w.Attach(second)
+	w.sync()
+
+	out := stripAnsi(buf.String())
+	assert.Equal(t, strings.Count(out, "first notice"), 1)
+	assert.Equal(t, strings.Count(out, "second notice"), 1, "same version, same number of notices: still told")
+}
+
+// A build that begins and ends between two looks at the status was never seen
+// working: its output is on the screen below the block, which must start anew.
+func TestABuildTooShortToBeSeenLeavesTheBlockToBeRepaintedAnew(t *testing.T) {
+	w, _, _ := newTermWriter(100, 20)
+	src := &fakeSource{}
+	w.Attach(src)
+	w.scr.prev = []string{"a row of the block", "another"}
+
+	src.st.Version = 1
+	src.st.Tasks = []api.Resource{{ID: "Image web", Status: api.Done, Text: api.StatusBuilt}}
+	w.sync()
+	assert.Assert(t, w.scr.prev == nil, "the cursor is not moved back over lines that are not the block's")
+	assert.Assert(t, !w.suspended)
+}
+
+func TestSyncDoesNotReadTheStatusWhenItsVersionIsTheOneDrawn(t *testing.T) {
+	w, _, _ := newTermWriter(100, 20)
+	src := &countingSource{}
+	w.Attach(src)
+	src.st.Version = 1
+	w.sync()
+	w.sync()
+	w.sync()
+	assert.Equal(t, src.statuses, 1, "the snapshot is only built for a new version")
+}
+
+type countingSource struct {
+	fakeSource
+	statuses int
+}
+
+func (c *countingSource) Status() api.ProjectStatus {
+	c.statuses++
+	return c.st
+}
+
+// An operation that is run by another is not what decides whether container
+// output shares the terminal: that is the one the user ran.
+func TestAnOperationRunByAnotherDoesNotShowWhatTheOuterOneHides(t *testing.T) {
+	w, _, _ := newTermWriter(100, 20)
+	src := &fakeSource{}
+	w.Attach(src)
+
+	w.Start(t.Context(), "up")
+	w.Start(t.Context(), "start") // run by up
+	src.set(pendingRow(api.KindContainer, "app-db-1", "start"))
+	w.sync()
+	assert.Equal(t, len(w.tree.nodes), 0, "up streams the logs of the containers it starts")
+	w.Done("start", true)
+	w.Done("up", true)
+
+	w2, _, _ := newTermWriter(100, 20)
+	w2.Attach(src)
+	w2.Start(t.Context(), "start")
+	w2.sync()
+	assert.Equal(t, len(w2.tree.nodes), 1, "start is about starting")
+	w2.Done("start", true)
+}
+
+func TestADoneWithNoStartIsHarmless(t *testing.T) {
+	w, _, _ := newTermWriter(100, 20)
+	src := &fakeSource{}
+	w.Attach(src)
+	src.set(pendingRow(api.KindVolume, "data", "create"))
+
+	w.Done("up", true)
+	assert.Equal(t, w.operation, "")
+	assert.Equal(t, len(w.operations), 0)
+
+	// and two Done for one Start do not go below nothing
+	w.Start(t.Context(), "up")
+	w.Done("up", true)
+	w.Done("up", true)
+	assert.Equal(t, len(w.operations), 0)
 }

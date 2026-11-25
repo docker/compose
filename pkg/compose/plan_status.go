@@ -19,7 +19,6 @@ package compose
 import (
 	"slices"
 	"strings"
-	"unicode"
 
 	"github.com/docker/compose/v5/internal/planning"
 	"github.com/docker/compose/v5/internal/status"
@@ -31,6 +30,9 @@ import (
 type statusPublisher interface {
 	Plan(steps []api.PlanStep, pending []api.ResourceStatus)
 	Step(id int, state api.StepState, message string)
+	// Defer tells that operations of the plan run after the current operation
+	// ends: they are not settled with it.
+	Defer(ids ...int)
 }
 
 // noStatus publishes nowhere, for a service whose event processor keeps no
@@ -39,6 +41,7 @@ type noStatus struct{}
 
 func (noStatus) Plan([]api.PlanStep, []api.ResourceStatus) {}
 func (noStatus) Step(int, api.StepState, string)           {}
+func (noStatus) Defer(...int)                              {}
 
 // statusPublisher returns where the service publishes the status of what it
 // reconciles.
@@ -76,10 +79,14 @@ func publishPlan(pub statusPublisher, plan *planning.Plan, groups *groupTracker)
 			kind, name, hasRow = status.SplitID(id)
 		}
 		service := ""
-		if op.Service != nil {
+		switch {
+		case op.Service != nil:
 			service = op.Service.Name
+		case op.Container != nil:
+			// stopping or removing a container acts on one that is observed
+			service = op.Container.Labels[api.ServiceLabel]
 		}
-		step := api.PlanStep{ID: node.ID, Operation: operationName(op.Type), Service: service, Reason: op.Cause}
+		step := api.PlanStep{ID: node.ID, Operation: operationName(op.Type), Service: service, Reason: op.Reason}
 		for _, dep := range node.DependsOn {
 			step.DependsOn = append(step.DependsOn, dep.ID)
 		}
@@ -93,14 +100,16 @@ func publishPlan(pub statusPublisher, plan *planning.Plan, groups *groupTracker)
 			}
 			actions[id] = appendAction(actions[id], plannedAction(node, groups))
 			if reasons[id] == "" {
-				reasons[id] = userReason(op.Cause)
+				reasons[id] = op.Reason
 			}
 		}
 		steps = append(steps, step)
 	}
 	for i := range rows {
 		id := rows[i].ID()
-		rows[i].Message = describePending(normalizeActions(actions[id]), reasons[id])
+		acts := normalizeActions(actions[id])
+		rows[i].Action = strings.Join(acts, ", ")
+		rows[i].Message = describePending(acts, reasons[id])
 	}
 	pub.Plan(steps, rows)
 }
@@ -173,37 +182,34 @@ func describePending(actions []string, reason string) string {
 	}
 }
 
-// internalCauses are the causes of an operation that describe how the plan is
-// built rather than why something has to change.
-var internalCauses = []string{
-	"replaced by", "finalize recreate", "config changed (tmpName)", "start", "pre_start hook",
-	"post_start hooks", "pre_start hooks", "no existing container", "depends_on condition",
-	"stale pre_start hook container",
+// stepOperations names the operations of a plan in the status. The names are
+// part of what a consumer of the status relies on: they are listed here, and
+// not derived from the debug form of the type, so that renaming one cannot
+// change them.
+var stepOperations = map[planning.OperationType]string{
+	planning.OpCreateNetwork:     "create_network",
+	planning.OpRemoveNetwork:     "remove_network",
+	planning.OpDisconnectNetwork: "disconnect_network",
+	planning.OpConnectNetwork:    "connect_network",
+	planning.OpCreateVolume:      "create_volume",
+	planning.OpRemoveVolume:      "remove_volume",
+	planning.OpCreateContainer:   "create_container",
+	planning.OpStartContainer:    "start_container",
+	planning.OpStopContainer:     "stop_container",
+	planning.OpRemoveContainer:   "remove_container",
+	planning.OpRenameContainer:   "rename_container",
+	planning.OpRunProvider:       "run_provider",
+	planning.OpWaitCondition:     "wait_condition",
+	planning.OpRunPreStart:       "run_pre_start",
+	planning.OpRunPostStart:      "run_post_start",
+
+	planning.OpCreateHookContainer: "create_hook_container",
 }
 
-// userReason returns the cause of an operation when it tells a user why the
-// resource changes, and nothing for the ones that are plumbing.
-func userReason(cause string) string {
-	for _, internal := range internalCauses {
-		if strings.HasPrefix(cause, internal) {
-			return ""
-		}
-	}
-	return cause
-}
-
-// operationName is the name of an operation in the status, in snake case:
-// "create_container".
+// operationName is the name of an operation in the status: "create_container".
 func operationName(t planning.OperationType) string {
-	var b strings.Builder
-	for i, r := range t.String() {
-		if unicode.IsUpper(r) {
-			if i > 0 {
-				b.WriteByte('_')
-			}
-			r = unicode.ToLower(r)
-		}
-		b.WriteRune(r)
+	if name, ok := stepOperations[t]; ok {
+		return name
 	}
-	return b.String()
+	return "unknown"
 }

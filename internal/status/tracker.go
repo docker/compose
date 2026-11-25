@@ -18,10 +18,10 @@
 // resources of the application and their state, and the reconciliation plan.
 //
 // It is what a progress display reads. The code that changes resources
-// publishes there, and nothing reaches a display that is not in the status:
-// whether the status is kept by the plan executor of the CLI, as here, or
-// served by an engine that reconciles the application itself, the display is
-// the same.
+// publishes there, and while an operation runs a display that draws from the
+// status reads it there rather than replaying the events: whether the status is
+// kept by the plan executor of the CLI, as here, or served by an engine that
+// reconciles the application itself, the display is the same.
 package status
 
 import (
@@ -56,13 +56,14 @@ type Tracker struct {
 	tasks     []api.Resource
 	byTask    map[taskKey]int
 	notices   []string
+	// deferred are the operations of the plan that run after the current
+	// operation ends, and are not settled with it (see Defer).
+	deferred map[int]bool
 	// depth is the number of operations in progress: Start without its Done.
-	// open tells whether a display is between a Start and a Done: like the
-	// display itself it is closed by any Done, so for a nested operation it is
-	// closed while depth is not.
-	depth   int
-	open    bool
-	changed chan struct{}
+	// open tells whether a display is between its first Start and its last Done,
+	// that is while depth is not zero.
+	depth int
+	open  bool
 }
 
 type taskKey struct{ id, parent string }
@@ -76,11 +77,10 @@ var (
 // that is an api.StatusRenderer is attached to it.
 func New(sink api.EventProcessor) *Tracker {
 	t := &Tracker{
-		sink:    sink,
-		byID:    map[string]int{},
-		byStep:  map[int]int{},
-		byTask:  map[taskKey]int{},
-		changed: make(chan struct{}),
+		sink:   sink,
+		byID:   map[string]int{},
+		byStep: map[int]int{},
+		byTask: map[taskKey]int{},
 	}
 	if r, ok := sink.(api.StatusRenderer); ok {
 		t.renderer = r
@@ -96,14 +96,60 @@ func (t *Tracker) Start(ctx context.Context, operation string) {
 	t.mu.Lock()
 	t.depth++
 	t.open = true
-	if t.depth == 1 && len(t.tasks) > 0 {
-		t.tasks, t.byTask = nil, map[taskKey]int{}
+	if t.depth == 1 && t.forgetLastOperation() {
 		t.bump()
 	}
 	t.mu.Unlock()
 	if t.sink != nil {
 		t.sink.Start(ctx, operation)
 	}
+}
+
+// forgetLastOperation drops what the previous operation left behind, which is
+// not the business of the one that starts: its tasks, what it deferred and never
+// ran (settled as not reached), and what it planned for its resources. It tells
+// whether anything changed. The lock is held.
+func (t *Tracker) forgetLastOperation() bool {
+	changed := false
+	if len(t.tasks) > 0 {
+		t.tasks, t.byTask = nil, map[taskKey]int{}
+		changed = true
+	}
+	if t.settleDeferred() {
+		changed = true
+	}
+	for i := range t.resources {
+		if r := &t.resources[i]; r.Action != "" {
+			r.Action = ""
+			changed = true
+		}
+	}
+	return changed
+}
+
+// settleDeferred ends the operations that were deferred and never ran, and the
+// resources only they change. It tells whether anything changed. The lock is
+// held.
+func (t *Tracker) settleDeferred() bool {
+	if len(t.deferred) == 0 {
+		return false
+	}
+	held := t.heldResources()
+	changed := false
+	for i := range t.resources {
+		if r := &t.resources[i]; r.Pending() && held[r.ID()] {
+			r.State, r.Level, r.Message = api.StateSkipped, api.Warning, "not reached"
+			changed = true
+		}
+	}
+	for i := range t.plan {
+		if st := &t.plan[i]; st.State == api.StepPending && t.deferred[st.ID] {
+			st.State, st.Message = api.StepSkipped, "not reached"
+			changed = true
+		}
+	}
+	t.deferred = nil
+	return changed
 }
 
 // Done closes an operation. When it is the outermost one, what the plan listed
@@ -114,10 +160,12 @@ func (t *Tracker) Done(operation string, success bool) {
 	if t.depth <= 1 && t.settle(success) {
 		t.bump()
 	}
-	// closed before the display is: whatever is reported from now on is its to
-	// be told, and not left to a status nobody reads
+	// closed before the display is: whatever is reported once the last operation
+	// is over is its to be told, and not left to a status nobody reads
 	t.depth = max(t.depth-1, 0)
-	t.open = false
+	if t.depth == 0 {
+		t.open = false
+	}
 	t.mu.Unlock()
 	if t.sink != nil {
 		t.sink.Done(operation, success)
@@ -131,20 +179,60 @@ func (t *Tracker) settle(success bool) bool {
 	if success {
 		message, level = "nothing to do", api.Done
 	}
+	held := t.heldResources()
 	changed := false
 	for i := range t.resources {
-		if r := &t.resources[i]; r.Pending() {
+		if r := &t.resources[i]; r.Pending() && !held[r.ID()] {
 			r.State, r.Level, r.Message = api.StateSkipped, level, message
 			changed = true
 		}
 	}
 	for i := range t.plan {
-		if st := &t.plan[i]; st.State == api.StepPending {
+		if st := &t.plan[i]; st.State == api.StepPending && !t.deferred[st.ID] {
 			st.State, st.Message = api.StepSkipped, message
 			changed = true
 		}
 	}
 	return changed
+}
+
+// heldResources are the resources only deferred operations change: they stay
+// pending with them. The lock is held.
+func (t *Tracker) heldResources() map[string]bool {
+	if len(t.deferred) == 0 {
+		return nil
+	}
+	held, active := map[string]bool{}, map[string]bool{}
+	for _, st := range t.plan {
+		switch {
+		case st.Resource == "":
+		case t.deferred[st.ID]:
+			held[st.Resource] = true
+		default:
+			active[st.Resource] = true
+		}
+	}
+	for id := range active {
+		delete(held, id)
+	}
+	return held
+}
+
+// Defer tells that operations of the plan run after the current operation ends,
+// outside of it: the end of the operation does not settle them, nor the
+// resources only they change. It is for a plan whose last phase runs once the
+// output of the application is attached to the terminal. They end by reporting
+// their own outcome; one that never ran is settled as not reached when the next
+// operation starts.
+func (t *Tracker) Defer(ids ...int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.deferred == nil {
+		t.deferred = make(map[int]bool, len(ids))
+	}
+	for _, id := range ids {
+		t.deferred[id] = true
+	}
 }
 
 // On folds events into the status. Events are handed to the sink as they come,
@@ -176,11 +264,8 @@ func (t *Tracker) fold(e api.Resource) bool {
 			// nothing is drawing the status: the sink prints it
 			return false
 		}
-		msg := e.Details
-		if msg == "" {
-			msg = e.Text
-		}
-		t.notices = append(t.notices, msg)
+		// what the sink prints of such an event: its details
+		t.notices = append(t.notices, e.Details)
 		return true
 	}
 	if kind, name, ok := SplitID(e.ID); ok {
@@ -225,6 +310,9 @@ func (t *Tracker) setResource(r api.ResourceStatus) bool {
 	if r.Service == "" {
 		r.Service = t.resources[i].Service
 	}
+	if r.Action == "" {
+		r.Action = t.resources[i].Action
+	}
 	if t.resources[i] == r {
 		return false
 	}
@@ -239,6 +327,7 @@ func (t *Tracker) Plan(steps []api.PlanStep, pending []api.ResourceStatus) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.plan = slices.Clone(steps)
+	t.deferred = nil
 	t.byStep = make(map[int]int, len(steps))
 	for i := range t.plan {
 		t.plan[i].State = api.StepPending
@@ -266,8 +355,13 @@ func (t *Tracker) Step(id int, state api.StepState, message string) {
 // bump marks a change. The lock is held.
 func (t *Tracker) bump() {
 	t.version++
-	close(t.changed)
-	t.changed = make(chan struct{})
+}
+
+// Version returns the version of the status, which grows with every change.
+func (t *Tracker) Version() uint64 {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return t.version
 }
 
 // Status returns a snapshot of the status.
@@ -289,26 +383,5 @@ func (t *Tracker) snapshot() api.ProjectStatus {
 		Plan:      plan,
 		Tasks:     slices.Clone(t.tasks),
 		Notices:   slices.Clone(t.notices),
-	}
-}
-
-// Wait returns a snapshot newer than the version given as soon as there is
-// one. When the context ends first it returns the current snapshot and the
-// error of the context.
-func (t *Tracker) Wait(ctx context.Context, after uint64) (api.ProjectStatus, error) {
-	for {
-		t.mu.Lock()
-		if t.version > after {
-			s := t.snapshot()
-			t.mu.Unlock()
-			return s, nil
-		}
-		changed := t.changed
-		t.mu.Unlock()
-		select {
-		case <-ctx.Done():
-			return t.Status(), ctx.Err()
-		case <-changed:
-		}
 	}
 }

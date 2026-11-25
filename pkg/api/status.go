@@ -16,8 +16,6 @@
 
 package api
 
-import "context"
-
 // Resource kinds a ProjectStatus reports. A kind is also the first word of the
 // ID of the matching Resource events ("Container myapp-web-1").
 const (
@@ -74,6 +72,10 @@ type ResourceStatus struct {
 	// Message gives the reason of a pending action or the detail of a warning
 	// or an error.
 	Message string
+	// Action is what the plan does to the resource ("create, start"). It is kept
+	// once the resource moves on from pending, so that what a display shows of a
+	// resource does not depend on the states it happens to sample.
+	Action string
 }
 
 // ID is the identifier a Resource event of this resource goes by.
@@ -115,9 +117,9 @@ type PlanStep struct {
 type StatusSource interface {
 	// Status returns the current snapshot.
 	Status() ProjectStatus
-	// Wait returns a snapshot more recent than the Version given, as soon as
-	// there is one, or the current one when the context ends.
-	Wait(ctx context.Context, after uint64) (ProjectStatus, error)
+	// Version returns the Version of the current snapshot, without building it:
+	// a reader that polls compares it with the one it has drawn.
+	Version() uint64
 }
 
 // StatusRenderer is a progress display that draws from the status of the

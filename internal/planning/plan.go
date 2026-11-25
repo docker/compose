@@ -120,6 +120,7 @@ type Operation struct {
 	Type       OperationType
 	ResourceID string // e.g. "service:web:1", "network:backend", "volume:data"
 	Cause      string // why this operation is needed
+	Reason     string // why, in the words a user reads; empty when the cause is only how the plan is built
 
 	// Resource-specific data (only the relevant fields are set per operation type)
 	Service      *types.ServiceConfig // for container operations

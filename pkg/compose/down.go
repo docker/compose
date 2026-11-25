@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -207,11 +208,15 @@ func (s *composeService) publishRemovals(project *types.Project, containers Cont
 
 // containersToRemove lists what a down of the whole project is going to remove
 // among its containers, to tell the status before the first of them is
-// stopped. Networks, volumes and images are not listed: whether there is
-// anything to remove is only known once the engine is asked, and they show up
-// when their removal starts.
+// stopped, in the order down reaches them: the services nothing depends on
+// first, the orphans last. Networks, volumes and images are not listed: whether
+// there is anything to remove is only known once the engine is asked, and they
+// show up when their removal starts.
+//
+// The containers of a service disabled by a profile are left alone, as down
+// does, even with removeOrphans: they are not announced.
 func containersToRemove(project *types.Project, containers Containers, removeOrphans bool) []api.ResourceStatus {
-	declared := isService(append(project.ServiceNames(), project.DisabledServiceNames()...)...)
+	declared := isService(project.ServiceNames()...)
 	selected := containers.filter(func(c containerType.Summary) bool {
 		return declared(c) || (removeOrphans && isOrphaned(project)(c))
 	})
@@ -226,10 +231,51 @@ func containersToRemove(project *types.Project, containers Containers, removeOrp
 			Name:    naming.CanonicalContainerName(ctr),
 			Service: ctr.Labels[api.ServiceLabel],
 			Message: action,
+			Action:  action,
 		})
 	}
-	slices.SortFunc(rows, func(a, b api.ResourceStatus) int { return strings.Compare(a.Name, b.Name) })
+	depth := dependencyDepth(project)
+	rank := func(r api.ResourceStatus) int {
+		if d, ok := depth[r.Service]; ok {
+			return -d // the more a service depends on, the earlier it goes
+		}
+		return 1 // an orphan
+	}
+	slices.SortFunc(rows, func(a, b api.ResourceStatus) int {
+		if c := cmp.Compare(rank(a), rank(b)); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
 	return rows
+}
+
+// dependencyDepth gives each service of the project the length of the longest
+// chain of services it depends on: 0 for one that depends on none.
+func dependencyDepth(project *types.Project) map[string]int {
+	depth := make(map[string]int, len(project.Services))
+	var of func(name string, seen map[string]bool) int
+	of = func(name string, seen map[string]bool) int {
+		if d, ok := depth[name]; ok {
+			return d
+		}
+		service, ok := project.Services[name]
+		if !ok || seen[name] {
+			return -1 // not a service of the project, or a cycle the model rejects anyway
+		}
+		seen[name] = true
+		d := 0
+		for dep := range service.DependsOn {
+			d = max(d, of(dep, seen)+1)
+		}
+		delete(seen, name)
+		depth[name] = d
+		return d
+	}
+	for name := range project.Services {
+		of(name, map[string]bool{})
+	}
+	return depth
 }
 
 // With services given, a volume another service uses is kept: the engine

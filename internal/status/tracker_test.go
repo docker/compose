@@ -185,43 +185,12 @@ func TestNoticeOutsideAnOperationIsLeftToTheSink(t *testing.T) {
 	assert.Equal(t, len(tr.Status().Notices), 0)
 }
 
-func TestWait(t *testing.T) {
+func TestVersionIsThatOfTheStatus(t *testing.T) {
 	tr := New(nil)
+	assert.Equal(t, tr.Version(), tr.Status().Version)
 	tr.On(progress.Creating("Volume data"))
-	first := tr.Status()
-
-	got := make(chan api.ProjectStatus, 1)
-	go func() {
-		st, err := tr.Wait(t.Context(), first.Version)
-		assert.NilError(t, err)
-		got <- st
-	}()
-	select {
-	case <-got:
-		t.Fatal("Wait returned before any change")
-	case <-time.After(50 * time.Millisecond):
-	}
-	tr.On(progress.Created("Volume data"))
-	select {
-	case st := <-got:
-		assert.Equal(t, st.Resources[0].State, api.StatusCreated)
-		assert.Assert(t, st.Version > first.Version)
-	case <-time.After(5 * time.Second):
-		t.Fatal("Wait did not return after a change")
-	}
-
-	st, err := tr.Wait(t.Context(), 0)
-	assert.NilError(t, err)
-	assert.Equal(t, st.Version, tr.Status().Version, "an older version is answered at once")
-}
-
-func TestWaitEndsWithItsContext(t *testing.T) {
-	tr := New(nil)
-	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
-	defer cancel()
-	st, err := tr.Wait(ctx, tr.Status().Version)
-	assert.ErrorIs(t, err, context.DeadlineExceeded)
-	assert.Equal(t, st.Version, tr.Status().Version)
+	assert.Equal(t, tr.Version(), tr.Status().Version)
+	assert.Assert(t, tr.Version() > 0)
 }
 
 func TestPlanBringsAKnownResourceBackToPending(t *testing.T) {
@@ -288,19 +257,92 @@ func TestWhatThePlanNeverReachedIsSettledWhenTheOperationEnds(t *testing.T) {
 	})
 }
 
-func TestAnEventAfterAnInnerDoneIsToldToTheDisplay(t *testing.T) {
+// A display keeps the operation that runs another in progress when the inner one
+// ends: what is reported meanwhile is read from the status, and not handed to a
+// display that would print it as a line outside of the operation.
+func TestAnEventAfterAnInnerDoneStillGoesThroughTheStatus(t *testing.T) {
 	sink := &renderer{}
 	tr := New(sink)
 	tr.Start(t.Context(), "up")
 	tr.Start(t.Context(), "build") // a nested operation
 	tr.Done("build", true)
-	// the display ended its operation with the first Done: it is told what
-	// comes next, as it was before it drew from the status
+
 	tr.On(progress.Created("Container app-web-1"))
-	assert.Equal(t, len(sink.events), 1)
 	tr.On(api.Resource{ID: api.ResourceCompose, Details: "Gracefully Stopping..."})
-	assert.Equal(t, len(sink.events), 2)
-	assert.Equal(t, len(tr.Status().Notices), 0)
+	assert.Equal(t, len(sink.events), 0, "the display of the outer operation reads the status")
+	st := tr.Status()
+	assert.Equal(t, st.Resources[0].State, api.StatusCreated)
+	assert.DeepEqual(t, st.Notices, []string{"Gracefully Stopping..."})
+
+	// once the last operation is over nothing reads the status any more
+	tr.Done("up", true)
+	tr.On(progress.Created("Container late-1"))
+	assert.Equal(t, len(sink.events), 1)
+}
+
+func TestDeferKeepsWhatRunsAfterTheOperationPending(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "up")
+	tr.Plan(
+		[]api.PlanStep{
+			{ID: 1, Resource: "Container app-db-1"},
+			{ID: 2, Resource: "Container app-db-1"},
+			{ID: 3, Resource: "Container app-web-1"},
+		},
+		[]api.ResourceStatus{
+			{Kind: api.KindContainer, Name: "app-db-1", Message: "create, start"},
+			{Kind: api.KindContainer, Name: "app-web-1", Message: "start"},
+		},
+	)
+	tr.Step(1, api.StepSucceeded, "")
+	tr.Defer(2, 3) // the start phase
+	tr.Done("up", true)
+
+	st := tr.Status()
+	assert.Equal(t, st.Plan[1].State, api.StepPending)
+	assert.Equal(t, st.Plan[2].State, api.StepPending)
+	assert.Assert(t, st.Resources[1].Pending(), "only the deferred operation changes app-web-1")
+
+	// it runs on its own, outside of any operation, and is then settled by its outcome
+	tr.Step(3, api.StepSucceeded, "")
+	assert.Equal(t, tr.Status().Plan[2].State, api.StepSucceeded)
+}
+
+func TestDeferSettlesTheResourcesWhateverIsDeferred(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "up")
+	tr.Plan(
+		[]api.PlanStep{{ID: 1, Resource: "Container a"}, {ID: 2, Resource: "Container a"}},
+		[]api.ResourceStatus{{Kind: api.KindContainer, Name: "a", Message: "create, start"}},
+	)
+	tr.Defer(2)
+	tr.Done("up", true)
+	// a is also changed by an operation that ran in the operation: only the
+	// operations not deferred are the ones the end of it answers for
+	assert.Equal(t, tr.Status().Resources[0].State, api.StateSkipped)
+
+	// and a deferral does not outlive the operation it was made for
+	tr.Start(t.Context(), "up")
+	tr.Plan([]api.PlanStep{{ID: 1}}, []api.ResourceStatus{{Kind: api.KindContainer, Name: "b", Message: "create"}})
+	tr.Done("up", false)
+	assert.Equal(t, tr.Status().Plan[0].State, api.StepSkipped)
+}
+
+func TestAResourceKeepsWhatThePlanDoesToIt(t *testing.T) {
+	tr := New(nil)
+	tr.Plan(nil, []api.ResourceStatus{{Kind: api.KindContainer, Name: "app-web-1", Message: "create, start", Action: "create, start"}})
+	tr.On(progress.Creating("Container app-web-1"))
+	tr.On(progress.New("Container app-web-1", api.Done, api.StatusStarted))
+	r := tr.Status().Resources[0]
+	assert.Equal(t, r.State, api.StatusStarted)
+	assert.Equal(t, r.Action, "create, start", "the action outlives the pending state")
+}
+
+func TestANoticeIsItsDetailsAsTheSinkPrintsThem(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "up")
+	tr.On(api.Resource{ID: api.ResourceCompose, Text: "ignored", Details: "Gracefully Stopping..."})
+	assert.DeepEqual(t, tr.Status().Notices, []string{"Gracefully Stopping..."})
 	tr.Done("up", true)
 }
 
@@ -341,10 +383,12 @@ func TestTrackerIsSafeForConcurrentUse(t *testing.T) {
 	done := make(chan struct{})
 	go func() { // a display reading
 		defer close(done)
-		var after uint64
+		var seen uint64
 		for ctx.Err() == nil {
-			st, _ := tr.Wait(ctx, after)
-			after = st.Version
+			if v := tr.Version(); v != seen {
+				seen = tr.Status().Version
+			}
+			time.Sleep(time.Microsecond)
 		}
 	}()
 
@@ -368,4 +412,54 @@ func TestTrackerIsSafeForConcurrentUse(t *testing.T) {
 	wg.Wait()
 	cancel()
 	<-done
+}
+
+// A start phase that never runs (the attach failed, Ctrl-C) leaves nothing
+// pending for ever: the next operation settles it.
+func TestWhatWasDeferredAndNeverRanIsSettledByTheNextOperation(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "up")
+	tr.Plan(
+		[]api.PlanStep{{ID: 1, Resource: "Container a"}, {ID: 2, Resource: "Container b"}},
+		[]api.ResourceStatus{{Kind: api.KindContainer, Name: "a", Message: "create"}, {Kind: api.KindContainer, Name: "b", Message: "start"}},
+	)
+	tr.Step(1, api.StepSucceeded, "")
+	tr.Defer(2)
+	tr.Done("up", true)
+	assert.Equal(t, tr.Status().Plan[1].State, api.StepPending)
+
+	before := tr.Version()
+	tr.Start(t.Context(), "down")
+	st := tr.Status()
+	assert.Assert(t, tr.Version() > before)
+	assert.Equal(t, st.Plan[1].State, api.StepSkipped)
+	assert.Equal(t, st.Plan[1].Message, "not reached")
+	assert.Equal(t, st.Resources[1].State, api.StateSkipped)
+	assert.Equal(t, st.Resources[1].Level, api.Warning)
+}
+
+func TestAPlanReplacesWhatWasDeferred(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "up")
+	tr.Plan([]api.PlanStep{{ID: 1}}, nil)
+	tr.Defer(1)
+	tr.Plan([]api.PlanStep{{ID: 1}}, nil) // a new plan: nothing of the old one is deferred
+	tr.Done("up", true)
+	assert.Equal(t, tr.Status().Plan[0].State, api.StepSkipped)
+}
+
+// What the plan did to a resource in an operation says nothing of what a later
+// operation does to it.
+func TestTheActionOfAResourceDoesNotOutliveItsOperation(t *testing.T) {
+	tr := New(nil)
+	tr.Start(t.Context(), "up")
+	tr.Plan(nil, []api.ResourceStatus{{Kind: api.KindContainer, Name: "app-web-1", Message: "create, start", Action: "create, start"}})
+	tr.On(progress.New("Container app-web-1", api.Done, api.StatusStarted))
+	tr.Done("up", true)
+	assert.Equal(t, tr.Status().Resources[0].Action, "create, start", "still there once the operation is over: a start phase may follow")
+
+	tr.Start(t.Context(), "restart")
+	tr.On(progress.New("Container app-web-1", api.Done, api.StatusStarted))
+	assert.Equal(t, tr.Status().Resources[0].Action, "")
+	tr.Done("restart", true)
 }
