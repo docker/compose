@@ -61,6 +61,9 @@ const (
 
 	// Hook operations
 	OpCreateHookContainer OperationType = 43
+	// OpRunPreStop runs the pre_stop hooks of a container Compose is about to
+	// stop. The stop depends on it.
+	OpRunPreStop OperationType = 44
 )
 
 // PlanPhase situates a node in the plan lifecycle. The Create phase converges
@@ -100,6 +103,8 @@ func (o OperationType) String() string {
 		return "RemoveContainer"
 	case OpRenameContainer:
 		return "RenameContainer"
+	case OpRunPreStop:
+		return "RunPreStop"
 	case OpRunProvider:
 		return "RunProvider"
 	case OpWaitCondition:
@@ -143,9 +148,6 @@ type Operation struct {
 	// for purging stale pre_start hook runners (a failed removal only warns:
 	// it leaves the container visible, never blocks).
 	BestEffort bool
-	// SkipPreStop asks OpStopContainer not to run the pre_stop hooks: set on
-	// the stop of a recreate, whose replacement already exists.
-	SkipPreStop bool
 }
 
 // PlanNode is a single node in the reconciliation DAG. It represents one

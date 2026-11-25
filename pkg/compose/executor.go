@@ -44,7 +44,9 @@ type planExecutor struct {
 	// listener streams pre_start/post_start hook logs. It is set once, when
 	// the Start phase is entered (planRun.runStart): an attached caller only
 	// has one by then, its printer not existing before the Create phase is
-	// done. nil leaves hook execution silent, matching detached behavior.
+	// done. nil leaves hook execution silent, matching detached behavior. The
+	// pre_stop hooks of the Create phase (a recreation, a scale down) run before
+	// it is set: their output is only kept for the error of a hook that fails.
 	listener api.ContainerEventListener
 
 	// containersByService is a live view used to resolve service references
@@ -286,8 +288,9 @@ func (r *planRun) runCreate(ctx context.Context) error {
 // logs, and nil leaves them unstreamed. It is given here because an attached
 // caller only has one once it has set up its session, which happens after the
 // Create phase. It is set before any Start-phase node is dispatched, and the
-// planner only emits the operations that read it (pre_start, post_start) in
-// the Start phase, so no goroutine can observe the previous value.
+// operations of the Start phase that read it (pre_start, post_start) only run
+// after it is. The Create phase, whose pre_stop hooks read it and see nil, has
+// ended with all its goroutines by the time it is written.
 func (r *planRun) runStart(ctx context.Context, listener api.ContainerEventListener) error {
 	if !r.createRan || r.createErr != nil {
 		return errors.New("plan run: the start phase cannot run before the create phase succeeded")
@@ -605,6 +608,8 @@ func (exec *planExecutor) executeNode(ctx context.Context, node *planning.PlanNo
 		return exec.execCreateContainer(ctx, node)
 	case planning.OpStartContainer:
 		return exec.execStartContainer(ctx, op)
+	case planning.OpRunPreStop:
+		return exec.execRunPreStop(ctx, op)
 	case planning.OpStopContainer:
 		return exec.execStopContainer(ctx, op)
 	case planning.OpRemoveContainer:

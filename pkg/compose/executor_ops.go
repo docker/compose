@@ -317,17 +317,19 @@ func (exec *planExecutor) execRunPostStart(ctx context.Context, op planning.Oper
 	return nil
 }
 
-// execStopContainer runs the pre_stop hooks itself rather than as nodes of the
-// plan, so that every stop of the plan runs them, except the stop of a recreate
-// (see planning.Operation.SkipPreStop).
-func (exec *planExecutor) execStopContainer(ctx context.Context, op planning.Operation) error {
-	if service, ok := exec.project.Services[op.Container.Labels[api.ServiceLabel]]; ok && !op.SkipPreStop {
-		// a container already gone or stopped is still handed to ContainerStop,
-		// as before the plan ran the hooks
-		if _, err := exec.compose.runPreStopHooks(ctx, *op.Container, &service, exec.listener); err != nil {
-			return err
-		}
+// execRunPreStop runs the pre_stop hooks of the container the stop that depends
+// on this node is about to stop. A container that has no process to run them in
+// (stopped, paused) skips them, and one that is gone leaves the stop to report
+// it, as it would have without hooks.
+func (exec *planExecutor) execRunPreStop(ctx context.Context, op planning.Operation) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
+	_, err := exec.compose.runPreStopHooks(ctx, *op.Container, op.Service, exec.listener)
+	return err
+}
+
+func (exec *planExecutor) execStopContainer(ctx context.Context, op planning.Operation) error {
 	_, err := exec.compose.apiClient().ContainerStop(ctx, op.Container.ID, client.ContainerStopOptions{
 		Timeout: utils.DurationSecondToInt(op.Timeout),
 	})

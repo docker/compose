@@ -1,0 +1,13 @@
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    environment:
+      - VERSION=${VERSION:-1}
+    volumes:
+      - data:/data
+    pre_stop:
+      - command: sh -c 'echo "pre_stop ran" >> /data/log.txt'
+volumes:
+  data:
