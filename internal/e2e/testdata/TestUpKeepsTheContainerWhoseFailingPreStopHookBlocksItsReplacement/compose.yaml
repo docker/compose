@@ -1,0 +1,9 @@
+services:
+  sample:
+    image: alpine
+    init: true
+    command: sleep infinity
+    environment:
+      - VERSION=${VERSION:-1}
+    pre_stop:
+      - command: sh -c 'exit ${HOOK_EXIT:-3}'

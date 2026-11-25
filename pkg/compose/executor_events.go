@@ -365,8 +365,6 @@ func progressName(op planning.Operation) string {
 }
 
 // emitStartEvent emits the appropriate Working event for an ungrouped node.
-//
-//nolint:dupl // mirrors emitDoneEvent: keeping the Working and Done events side by side keeps their pairing visible
 func emitStartEvent(node *planning.PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	name := progressName(op)
@@ -375,16 +373,28 @@ func emitStartEvent(node *planning.PlanNode, events api.EventProcessor) {
 		events.On(progress.Creating(name))
 	case planning.OpStartContainer:
 		events.On(progress.New(name, api.Working, api.StatusStarting))
-	case planning.OpStopContainer:
+	case planning.OpRunPreStop:
+		// the row is stopping while its hooks run, as it is for a stop without
+		// them: the stop that follows does not say it again
 		events.On(progress.Stopping(name))
+	case planning.OpStopContainer:
+		if !followsPreStop(node) {
+			events.On(progress.Stopping(name))
+		}
 	case planning.OpRemoveContainer, planning.OpRemoveNetwork, planning.OpRemoveVolume:
 		events.On(progress.Removing(name))
 	}
 }
 
+// followsPreStop tells whether the stop is the one of a container whose pre_stop
+// hooks have just run: its row is already stopping.
+func followsPreStop(stop *planning.PlanNode) bool {
+	return slices.ContainsFunc(stop.DependsOn, func(dep *planning.PlanNode) bool {
+		return dep.Operation.Type == planning.OpRunPreStop
+	})
+}
+
 // emitDoneEvent emits the appropriate Done event for an ungrouped node.
-//
-//nolint:dupl // mirrors emitStartEvent, see there
 func emitDoneEvent(node *planning.PlanNode, events api.EventProcessor) {
 	op := node.Operation
 	name := progressName(op)

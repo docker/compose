@@ -354,6 +354,37 @@ func Recreated(services ...string) Check {
 	}
 }
 
+// RunningContainersKept expects every container of the service that was running
+// before the step to be running still after it, whatever else the step created:
+// a step that fails halfway must not have taken down what it was about to
+// replace. It fails when nothing was running before.
+func RunningContainersKept(service string) Check {
+	return Check{
+		name: fmt.Sprintf("running containers of service %q kept", service),
+		fn: func(ctx *CheckContext) error {
+			var before []string
+			for _, c := range ctx.prev.service(service) {
+				if c.State == "running" {
+					before = append(before, c.ID)
+				}
+			}
+			if len(before) == 0 {
+				return fmt.Errorf("service %q had no running container before the step", service)
+			}
+			running := map[string]bool{}
+			for _, c := range ctx.curr.service(service) {
+				running[c.ID] = c.State == "running"
+			}
+			for _, id := range before {
+				if !running[id] {
+					return fmt.Errorf("container %s is not running anymore", id[:12])
+				}
+			}
+			return nil
+		},
+	}
+}
+
 func containerIDs(containers []containerState) []string {
 	ids := make([]string, 0, len(containers))
 	for _, c := range containers {
