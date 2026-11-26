@@ -273,6 +273,58 @@ func TestReconcileRunsPreStopHooksOnceForAContainerStoppedForTwoReasons(t *testi
 	assert.Assert(t, slices.Contains(remove.DependsOn, stop), "the removal does not wait for the stop:\n%s", plan)
 }
 
+// The replica a scale down removes can also be attached to a recreated network,
+// which stops it first: it is stopped once, so its hooks run once and neither
+// stop can interrupt the other's hooks.
+func TestReconcileRunsPreStopHooksOnceForAReplicaScaledDownOnARecreatedNetwork(t *testing.T) {
+	web := types.ServiceConfig{
+		Name: "web", Scale: intPtr(1), PreStop: quiesceHook,
+		ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services: types.Services{"web": web},
+	}
+	first := networkAttachedContainer(t, web, "web-1")
+	second := networkAttachedContainer(t, web, "web-2")
+	second.Number = 2
+	second.Summary.Labels[api.ContainerNumberLabel] = "2"
+	observed := observedOf("myproject", map[string][]ObservedContainer{"web": {first, second}})
+	observed.Networks["frontend"] = []ObservedNetwork{{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(nodesOf(plan, planning.OpStopContainer)), 2, "\n%s", plan)
+	assert.Equal(t, len(nodesOf(plan, planning.OpRunPreStop)), 2, "\n%s", plan)
+	hooksBeforeStop(t, plan, "web-1")
+	hooksBeforeStop(t, plan, "web-2")
+}
+
+// Same for the replicas a service leaves for a provider while their network is
+// recreated.
+func TestReconcileRunsPreStopHooksOnceForAReplicaLeftForAProviderOnARecreatedNetwork(t *testing.T) {
+	db := types.ServiceConfig{
+		Name: "db", PreStop: quiesceHook, Provider: &types.ServiceProviderConfig{Type: "test"},
+		ContainerSpec: types.ContainerSpec{Networks: map[string]*types.ServiceNetworkConfig{"frontend": {}}},
+	}
+	project := &types.Project{
+		Name:     "myproject",
+		Networks: types.Networks{"frontend": {Name: "myproject_frontend", Driver: "overlay"}},
+		Services: types.Services{"db": db},
+	}
+	observed := observedOf("myproject", map[string][]ObservedContainer{"db": {networkAttachedContainer(t, types.ServiceConfig{Name: "db"}, "db-1")}})
+	observed.Networks["frontend"] = []ObservedNetwork{{ID: "net1", Name: "myproject_frontend", ConfigHash: "oldhash"}}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, len(nodesOf(plan, planning.OpStopContainer)), 1, "\n%s", plan)
+	assert.Equal(t, len(nodesOf(plan, planning.OpRunPreStop)), 1, "\n%s", plan)
+	hooksBeforeStop(t, plan, "db-1")
+}
+
 // No hooks node where there is no hook to run: the plans of services without
 // pre_stop hooks are the ones they always were.
 func TestReconcileAddsNoPreStopNodeWithoutHooksToRun(t *testing.T) {
