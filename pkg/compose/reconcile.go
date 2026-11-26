@@ -1646,11 +1646,27 @@ func (r *reconciler) chainStartReplicas(service types.ServiceConfig, replicas []
 // down does. The node returned is the stop, so whatever depends on it waits for
 // the hooks too. (A recreation runs them before it creates the replacement, see
 // planRecreateContainer.)
+//
+// A container is stopped once per plan: when an earlier stage already scheduled
+// its stop (a recreated network, a restarted dependent...) that node is returned
+// and no second chain of hooks and stop is added, which would run the hooks twice
+// and let one stop interrupt the hooks of the other.
 func (r *reconciler) planStop(op planning.Operation) *planning.PlanNode {
-	if hooks := r.planPreStop(op.ResourceID, op.Container, ""); hooks != nil {
-		return r.plan.AddNode(op, "", hooks)
+	if op.Container != nil {
+		if stop, already := r.stoppedByPlan[op.Container.ID]; already {
+			return stop
+		}
 	}
-	return r.plan.AddNode(op, "")
+	var stop *planning.PlanNode
+	if hooks := r.planPreStop(op.ResourceID, op.Container, ""); hooks != nil {
+		stop = r.plan.AddNode(op, "", hooks)
+	} else {
+		stop = r.plan.AddNode(op, "")
+	}
+	if op.Container != nil {
+		r.stoppedByPlan[op.Container.ID] = stop
+	}
+	return stop
 }
 
 // preStopOf returns the node of the pre_stop hooks a stop waits for, nil when it
