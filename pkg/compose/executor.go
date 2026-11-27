@@ -230,6 +230,7 @@ func (exec *planExecutor) begin(plan *planning.Plan) (*planRun, error) {
 	// Track group event state: first node emits Working, last emits Done
 	groups := exec.buildGroupTracker(plan)
 	events := exec.compose.events
+	pub := exec.compose.statusPublisher()
 
 	rs := &runState{
 		done:             done,
@@ -239,6 +240,7 @@ func (exec *planExecutor) begin(plan *planning.Plan) (*planRun, error) {
 		failedDependency: failedDependency,
 		groups:           groups,
 		events:           events,
+		status:           pub,
 		limiter:          concurrency.NewLimiter(exec.compose.maxConcurrency),
 	}
 
@@ -266,7 +268,22 @@ func (exec *planExecutor) begin(plan *planning.Plan) (*planRun, error) {
 		}
 	}
 
+	// published once the plan is known to be runnable: an invalid one leaves
+	// nothing behind in the status
+	publishPlan(pub, plan, groups)
+
 	return &planRun{exec: exec, rs: rs, createNodes: createNodes, startNodes: startNodes}, nil
+}
+
+// deferStart tells the status that the Start phase runs after the operation
+// that ran the Create phase ends, outside of it: what it is to do is not
+// settled as skipped with that operation.
+func (r *planRun) deferStart() {
+	ids := make([]int, 0, len(r.startNodes))
+	for _, node := range r.startNodes {
+		ids = append(ids, node.ID)
+	}
+	r.rs.status.Defer(ids...)
 }
 
 // runCreate dispatches the Create phase and waits for it. The Start phase
@@ -408,6 +425,7 @@ type runState struct {
 	failedDependency func(deps []*planning.PlanNode) error
 	groups           *groupTracker
 	events           api.EventProcessor
+	status           statusPublisher
 	limiter          *semaphore.Weighted
 }
 
@@ -416,6 +434,39 @@ type runState struct {
 // the cancellation scope of the runPhase call driving it -- see runPhase and
 // phaseCancel's own doc comments.
 func (exec *planExecutor) runNode(node *planning.PlanNode, rs *runState, phase *phaseCancel) error {
+	var started bool
+	err := exec.runNodeBody(node, rs, phase, &started)
+	rs.publishOutcome(node, started, err)
+	return err
+}
+
+// publishOutcome tells the status how an operation of the plan ended. started
+// says whether it reached the point of acting; one that did not was given up
+// because a dependency failed or the phase was canceled. An operation that
+// acted and ran out of time, a wait that hit --wait-timeout included, failed:
+// only one cut short by its context being canceled was interrupted.
+func (rs *runState) publishOutcome(node *planning.PlanNode, started bool, err error) {
+	canceled := err != nil && errors.Is(err, context.Canceled)
+	switch {
+	case err == nil && rs.succeeded(node.ID):
+		rs.status.Step(node.ID, api.StepSucceeded, "")
+	case err == nil, canceled:
+		// a wait that ended without its condition reached has no error, see
+		// runNodeBody
+		rs.status.Step(node.ID, api.StepSkipped, "interrupted")
+	case !started && errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, errWaitTimeout):
+		// the deadline of the caller passed before it could act
+		rs.status.Step(node.ID, api.StepSkipped, "interrupted")
+	case !started:
+		rs.status.Step(node.ID, api.StepSkipped, "dependency failed")
+	default:
+		rs.status.Step(node.ID, api.StepFailed, err.Error())
+	}
+}
+
+// runNodeBody is runNode without the report to the status. started is set once
+// the node is about to act.
+func (exec *planExecutor) runNodeBody(node *planning.PlanNode, rs *runState, phase *phaseCancel, started *bool) error {
 	nodeCtx := phase.ctx
 
 	// Every exit path below must close rs.done[node.ID] exactly once, or a
@@ -479,6 +530,8 @@ func (exec *planExecutor) runNode(node *planning.PlanNode, rs *runState, phase *
 		return err
 	}
 
+	*started = true
+	rs.status.Step(node.ID, api.StepRunning, "")
 	err := exec.executeNode(nodeCtx, node)
 	var wi *waitInterrupted
 	interrupted := errors.As(err, &wi)

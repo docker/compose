@@ -27,12 +27,15 @@ import (
 // taskTree.apply. It holds no rendering concern: no spinner, no strings
 // destined for the screen, no clock reads.
 type node struct {
-	id        string
-	anchor    string // first parent seen; only events carrying it update the node
-	parents   utils.Set[string]
-	text      string
-	details   string
-	status    api.EventStatus
+	id      string
+	anchor  string // first parent seen; only events carrying it update the node
+	parents utils.Set[string]
+	text    string
+	details string
+	status  api.EventStatus
+	// pending: the plan is going to change the resource and has not reached it
+	// yet. It is not under way, so it has no spinner and no timer.
+	pending   bool
 	current   int64
 	total     int64
 	percent   int
@@ -108,6 +111,12 @@ func (t *taskTree) apply(e api.Resource, now time.Time) {
 	}
 
 	wasCompleted := n.completed()
+	pending := e.Text == api.StatePending && e.Status == api.Working
+	if n.pending && !pending {
+		// the work starts now: time it from here
+		n.startedAt = now
+	}
+	n.pending = pending
 	n.status = e.Status
 	n.text = e.Text
 	n.details = e.Details

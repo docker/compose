@@ -17,6 +17,7 @@
 package compose
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -126,6 +127,7 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	if len(containers) > 0 {
 		resourceToRemove = true
 	}
+	s.publishRemovals(project, containers, options)
 
 	// shared across services — see restart.go's concurrency.NewLimiter comment
 	// for why a per-service limiter alone isn't enough.
@@ -193,6 +195,87 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 		eg.Go(op)
 	}
 	return eg.Wait()
+}
+
+// publishRemovals tells the status which containers a down is going to remove.
+// A down of some services only is not announced: which containers go with them
+// depends on what depends on them.
+func (s *composeService) publishRemovals(project *types.Project, containers Containers, options api.DownOptions) {
+	if len(options.Services) == 0 {
+		s.statusPublisher().Plan(nil, containersToRemove(project, containers, options.RemoveOrphans))
+	}
+}
+
+// containersToRemove lists what a down of the whole project is going to remove
+// among its containers, to tell the status before the first of them is
+// stopped, in the order down reaches them: the services nothing depends on
+// first, the orphans last. Networks, volumes and images are not listed: whether
+// there is anything to remove is only known once the engine is asked, and they
+// show up when their removal starts.
+//
+// The containers of a service disabled by a profile are left alone, as down
+// does, even with removeOrphans: they are not announced.
+func containersToRemove(project *types.Project, containers Containers, removeOrphans bool) []api.ResourceStatus {
+	declared := isService(project.ServiceNames()...)
+	selected := containers.filter(func(c containerType.Summary) bool {
+		return declared(c) || (removeOrphans && isOrphaned(project)(c))
+	})
+	rows := make([]api.ResourceStatus, 0, len(selected))
+	for _, ctr := range selected {
+		action := "remove"
+		if ctr.State == containerType.StateRunning || ctr.State == containerType.StateRestarting {
+			action = "stop, remove"
+		}
+		rows = append(rows, api.ResourceStatus{
+			Kind:    api.KindContainer,
+			Name:    naming.CanonicalContainerName(ctr),
+			Service: ctr.Labels[api.ServiceLabel],
+			Message: action,
+			Action:  action,
+		})
+	}
+	depth := dependencyDepth(project)
+	rank := func(r api.ResourceStatus) int {
+		if d, ok := depth[r.Service]; ok {
+			return -d // the more a service depends on, the earlier it goes
+		}
+		return 1 // an orphan
+	}
+	slices.SortFunc(rows, func(a, b api.ResourceStatus) int {
+		if c := cmp.Compare(rank(a), rank(b)); c != 0 {
+			return c
+		}
+		return strings.Compare(a.Name, b.Name)
+	})
+	return rows
+}
+
+// dependencyDepth gives each service of the project the length of the longest
+// chain of services it depends on: 0 for one that depends on none.
+func dependencyDepth(project *types.Project) map[string]int {
+	depth := make(map[string]int, len(project.Services))
+	var of func(name string, seen map[string]bool) int
+	of = func(name string, seen map[string]bool) int {
+		if d, ok := depth[name]; ok {
+			return d
+		}
+		service, ok := project.Services[name]
+		if !ok || seen[name] {
+			return -1 // not a service of the project, or a cycle the model rejects anyway
+		}
+		seen[name] = true
+		d := 0
+		for dep := range service.DependsOn {
+			d = max(d, of(dep, seen)+1)
+		}
+		delete(seen, name)
+		depth[name] = d
+		return d
+	}
+	for name := range project.Services {
+		of(name, map[string]bool{})
+	}
+	return depth
 }
 
 // With services given, a volume another service uses is kept: the engine

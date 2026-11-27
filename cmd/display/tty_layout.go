@@ -122,6 +122,11 @@ func makeRow(t *taskTree, n *node, o layoutOpts) row {
 		details:     n.details,
 		timer:       fmt.Sprintf("%.1fs", nodeElapsed(n, o.now).Seconds()),
 	}
+	if n.pending {
+		// planned, not started: what is going to be done is the whole story
+		r.statusColor = TimerColor
+		r.timer = ""
+	}
 	if o.dryRun {
 		r.prefix = DRYRUN_PREFIX
 	}
@@ -311,6 +316,7 @@ var (
 	spinnerDone    = "✔"
 	spinnerWarning = "!"
 	spinnerError   = "✘"
+	spinnerPending = "·"
 
 	// percentChars maps a completion ratio to a braille glyph for the
 	// aggregated per-image strip
@@ -347,6 +353,9 @@ func spinnerFrames() []string {
 // frame is a pure function of the clock, so its speed doesn't depend on how
 // often the layout runs.
 func spinGlyph(n *node, now time.Time) seg {
+	if n.pending {
+		return seg{text: spinnerPending, color: TimerColor}
+	}
 	switch n.status {
 	case api.Done:
 		return seg{text: spinnerDone, color: SuccessColor}

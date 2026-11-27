@@ -111,6 +111,9 @@ func (s *composeService) upCreatePhase(ctx context.Context, project *types.Proje
 	if err := run.runCreate(ctx); err != nil {
 		return nil, err
 	}
+	// the Start phase runs once the output of the application is attached, after
+	// the operation this runs in: it must not be settled as skipped with it
+	run.deferStart()
 	return &createdUp{project: project, run: run}, nil
 }
 
