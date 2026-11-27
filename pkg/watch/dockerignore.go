@@ -21,7 +21,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"slices"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/types"
@@ -131,15 +130,6 @@ func NewDockerPatternMatcher(repoRoot string, patterns []string) (*dockerPathMat
 	absRoot, err := filepath.Abs(repoRoot)
 	if err != nil {
 		return nil, err
-	}
-
-	// Check if "*" is present in patterns
-	hasAllPattern := slices.Contains(patterns, "*")
-	if hasAllPattern {
-		// Remove all non-exclusion patterns (those that don't start with '!')
-		patterns = slices.DeleteFunc(patterns, func(p string) bool {
-			return p != "" && p[0] != '!' // Only keep exclusion patterns
-		})
 	}
 
 	pm, err := patternmatcher.New(absPatterns(absRoot, patterns))
