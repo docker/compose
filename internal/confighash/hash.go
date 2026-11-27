@@ -157,6 +157,10 @@ var serviceHashKeyOrder = []string{
 	// sorted fallback would place it here already, listing it only freezes
 	// the position
 	"umask",
+	// added with the mounts service attribute, at the end: it is left out of
+	// the JSON when a service has none, so the hash of the services that don't
+	// use it is the one they had
+	"mounts",
 }
 
 // trimServiceHashFields removes the attributes deliberately excluded from the
