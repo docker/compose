@@ -1061,16 +1061,15 @@ func (s *composeService) buildContainerVolumes(
 
 	for _, m := range mountOptions {
 		switch m.Type {
-		case mount.TypeBind:
+		case mount.TypeBind, mount.TypeVolume:
 			// `Mount` is preferred but does not offer option to created host path if missing
 			// so `Bind` API is used here with raw volume string
 			// see https://github.com/moby/moby/issues/43483
-			if bind, ok := bindStringForMount(service, m); ok {
-				binds = append(binds, bind)
-				continue
+			bind, ok, err := bindStringForMount(p, service, m)
+			if err != nil {
+				return nil, nil, err
 			}
-		case mount.TypeVolume:
-			if bind, ok := volumeBindString(p, service, m); ok {
+			if ok {
 				binds = append(binds, bind)
 				continue
 			}
@@ -1085,34 +1084,36 @@ func (s *composeService) buildContainerVolumes(
 	return binds, mounts, nil
 }
 
-// bindStringForMount returns the legacy Bind-API string for a bind mount
-// which doesn't require the Mount API
-func bindStringForMount(service types.ServiceConfig, m mount.Mount) (string, bool) {
+// bindStringForMount returns the legacy Bind-API string for the mount of a volume the
+// service declares, when the volume doesn't need the Mount API (see volumeNeedsMountAPI),
+// and fails when the engine can't take the volume at all. A mount which is not of a declared
+// volume (a secret, a config, a volume inherited from the previous container) is none.
+func bindStringForMount(p types.Project, service types.ServiceConfig, m mount.Mount) (string, bool, error) {
 	v := findVolumeByTarget(service.Volumes, m.Target)
 	if v == nil {
-		return "", false
+		return "", false, nil
 	}
-	if v.Type != types.VolumeTypeBind {
-		v.Source = m.Source
+	// the decision is about the volume as it is sent: its source is the path Compose resolved,
+	// or the name of the volume in the engine, not what the file says
+	sent := *v
+	sent.Source = m.Source
+	needsMountAPI, err := volumeNeedsMountAPI(sent)
+	if err != nil {
+		return "", false, fmt.Errorf("service %q: volume %s: %w", service.Name, v.Target, err)
 	}
-	if bindRequiresMountAPI(v.Bind) {
-		return "", false
+	if needsMountAPI {
+		return "", false, nil
 	}
-	return toBindString(m.Source, v), true
-}
-
-// volumeBindString returns the legacy Bind-API string for a volume mount
-// without advanced options, preferred to preserve backward compatibility
-func volumeBindString(p types.Project, service types.ServiceConfig, m mount.Mount) (string, bool) {
-	v := findVolumeByTarget(service.Volumes, m.Target)
-	vol := findVolumeByName(p.Volumes, m.Source)
-	if v == nil || vol == nil {
-		return "", false
+	switch m.Type {
+	case mount.TypeBind:
+		return toBindString(m.Source, v), true, nil
+	case mount.TypeVolume:
+		// an anonymous volume, or one the project doesn't declare, has no name to bind
+		if vol := findVolumeByName(p.Volumes, m.Source); vol != nil {
+			return toBindString(vol.Name, v), true, nil
+		}
 	}
-	if volumeRequiresMountAPI(v.Volume) {
-		return "", false
-	}
-	return toBindString(vol.Name, v), true
+	return "", false, nil
 }
 
 // checkImageMountSupported verifies the negotiated API version supports image
@@ -1163,40 +1164,6 @@ func findVolumeByTarget(volumes []types.ServiceVolumeConfig, target string) *typ
 		}
 	}
 	return nil
-}
-
-// bindRequiresMountAPI check if Bind declaration can be implemented by the plain old Bind API or uses any of the advanced
-// options which require use of Mount API
-func bindRequiresMountAPI(bind *types.ServiceVolumeBind) bool {
-	switch {
-	case bind == nil:
-		return false
-	case !bool(bind.CreateHostPath):
-		return true
-	case bind.Propagation != "":
-		return true
-	case bind.Recursive != "":
-		return true
-	default:
-		return false
-	}
-}
-
-// volumeRequiresMountAPI check if Volume declaration can be implemented by the plain old Bind API or uses any of the advanced
-// options which require use of Mount API
-func volumeRequiresMountAPI(vol *types.ServiceVolumeVolume) bool {
-	switch {
-	case vol == nil:
-		return false
-	case len(vol.Labels) > 0:
-		return true
-	case vol.Subpath != "":
-		return true
-	case vol.NoCopy:
-		return true
-	default:
-		return false
-	}
 }
 
 func (s *composeService) buildContainerMountOptions(ctx context.Context, p types.Project, service types.ServiceConfig, inherit *container.Summary) ([]mount.Mount, error) {

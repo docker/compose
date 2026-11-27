@@ -318,3 +318,51 @@ type noBackend struct{}
 
 func (noBackend) APIClient() client.APIClient { return nil }
 func (noBackend) CLI() command.Cli            { return nil }
+
+// The `mounts` attribute is in the model, but nothing in Compose applies it yet: the project is refused when it
+// is loaded, whichever container declares them, before a network is created or a container replaced.
+func TestLoadProject_RefusesMounts(t *testing.T) {
+	for name, tc := range map[string]struct{ yaml, err string }{
+		"service": {`
+services:
+  web:
+    image: alpine
+    mounts:
+      - {type: tmpfs, target: /scratch}
+`, `service "web": the ` + "`mounts`" + ` attribute is not supported yet`},
+		"pre_start hook": {`
+services:
+  web:
+    image: alpine
+    pre_start:
+      - image: alpine
+        mounts:
+          - {type: tmpfs, target: /scratch}
+`, `service "web": pre_start[0]: the ` + "`mounts`" + ` attribute is not supported yet`},
+		"job": {`
+services:
+  web:
+    image: alpine
+jobs:
+  report:
+    image: alpine
+    triggers: {manual: true}
+    mounts:
+      - {type: tmpfs, target: /scratch}
+`, `job "report": the ` + "`mounts`" + ` attribute is not supported yet`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			composeFile := filepath.Join(t.TempDir(), "compose.yaml")
+			assert.NilError(t, os.WriteFile(composeFile, []byte("name: test\n"+tc.yaml), 0o644))
+			_, err := New(noBackend{}).LoadProject(t.Context(), api.ProjectLoadOptions{ConfigPaths: []string{composeFile}})
+			assert.ErrorContains(t, err, tc.err)
+		})
+	}
+
+	t.Run("a project without mounts loads", func(t *testing.T) {
+		composeFile := filepath.Join(t.TempDir(), "compose.yaml")
+		assert.NilError(t, os.WriteFile(composeFile, []byte("name: test\nservices:\n  web:\n    image: alpine\n    volumes: [\"/data:/data\"]\n"), 0o644))
+		_, err := New(noBackend{}).LoadProject(t.Context(), api.ProjectLoadOptions{ConfigPaths: []string{composeFile}})
+		assert.NilError(t, err)
+	})
+}
