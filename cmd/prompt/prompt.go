@@ -31,7 +31,11 @@ import (
 
 //go:generate mockgen -destination=./prompt_mock.go -self_package "github.com/docker/compose/v5/pkg/prompt" -package=prompt . UI
 
-var errInterrupt = errors.New("interrupt")
+// ErrInterrupt is returned by an interactive prompt when the user presses
+// Ctrl+C. The terminal being in raw mode, no SIGINT is ever delivered: this
+// error is the only interrupt signal callers get, and the command runner
+// maps it to the conventional 130 exit status like a real SIGINT.
+var ErrInterrupt = errors.New("interrupt")
 
 // UI - prompt user input
 type UI interface {
@@ -59,13 +63,8 @@ func (u User) Confirm(message string, defaultValue bool) (bool, error) {
 	}
 	defer u.stdin.RestoreTerminal()
 
-	prompt := " [y/N]: "
-	if defaultValue {
-		prompt = " [Y/n]: "
-	}
-
 	for {
-		_, _ = fmt.Fprint(u.stdout, message+prompt)
+		_, _ = fmt.Fprint(u.stdout, message+confirmHint(defaultValue))
 
 		answer, err := readLine(u.reader, u.stdout)
 		if err != nil {
@@ -83,6 +82,15 @@ func (u User) Confirm(message string, defaultValue bool) (bool, error) {
 	}
 }
 
+// confirmHint renders the answer hint appended to every confirmation
+// message, the capitalized letter marking the default.
+func confirmHint(defaultValue bool) string {
+	if defaultValue {
+		return " [Y/n]: "
+	}
+	return " [y/N]: "
+}
+
 func readLine(in io.RuneReader, out io.Writer) (string, error) {
 	var line []rune
 
@@ -95,7 +103,7 @@ func readLine(in io.RuneReader, out io.Writer) (string, error) {
 		switch ch {
 		case 3: // Ctrl+C
 			_, _ = fmt.Fprint(out, "\r\n")
-			return "", errInterrupt
+			return "", ErrInterrupt
 
 		case 4: // Ctrl+D
 			return "", io.EOF
@@ -104,10 +112,17 @@ func readLine(in io.RuneReader, out io.Writer) (string, error) {
 			_, _ = fmt.Fprint(out, "\r\n")
 			return string(line), nil
 
-		case 127: // Backspace
+		case 8, 127: // Backspace (^H on some terminals, DEL on most)
 			if len(line) > 0 {
 				line = line[:len(line)-1]
 				_, _ = fmt.Fprint(out, "\b \b")
+			}
+
+		case 27: // ESC: swallow the whole escape sequence (arrow keys, F-keys)
+			// so its printable tail ("[A"...) is neither echoed nor taken as
+			// input — the raw terminal delivers those as bytes, not events
+			if err := discardEscapeSequence(in); err != nil {
+				return "", err
 			}
 
 		default:
@@ -120,6 +135,35 @@ func readLine(in io.RuneReader, out io.Writer) (string, error) {
 	}
 }
 
+// discardEscapeSequence consumes the remainder of an ANSI escape sequence
+// whose ESC has just been read: a CSI sequence ("ESC [", parameters, one
+// final byte in 0x40-0x7E) or an SS3 one ("ESC O", one byte). A bare ESC
+// followed by anything else swallows that single rune, close enough for a
+// yes/no prompt.
+func discardEscapeSequence(in io.RuneReader) error {
+	ch, _, err := in.ReadRune()
+	if err != nil {
+		return err
+	}
+	switch ch {
+	case '[': // CSI: parameter/intermediate bytes then one final byte
+		for {
+			ch, _, err = in.ReadRune()
+			if err != nil {
+				return err
+			}
+			if ch >= 0x40 && ch <= 0x7E {
+				return nil
+			}
+		}
+	case 'O': // SS3 (application-mode cursor/function keys): one byte
+		_, _, err = in.ReadRune()
+		return err
+	default:
+		return nil
+	}
+}
+
 // Pipe - aggregates prompt methods
 type Pipe struct {
 	stdout io.Writer
@@ -128,7 +172,9 @@ type Pipe struct {
 
 // Confirm asks for yes or no input
 func (u Pipe) Confirm(message string, defaultValue bool) (bool, error) {
-	_, _ = fmt.Fprint(u.stdout, message)
+	// same hint as the interactive prompt: the message reaching a log or a
+	// piped consumer documents what was asked and what the default was
+	_, _ = fmt.Fprint(u.stdout, message+confirmHint(defaultValue))
 	var answer string
 	_, _ = fmt.Fscanln(u.stdin, &answer)
 	return utils.StringToBool(answer), nil
