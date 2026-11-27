@@ -68,14 +68,21 @@ func (s *composeService) jobsClient() (jobsv0.Jobs, error) {
 	return s.jobsAPI, s.jobsAPIErr
 }
 
-// jobsStatus is what the engine offers for jobs.
+// jobsStatus is what the engine offers for jobs, as reachable through its API endpoint.
 type jobsStatus int
 
 const (
 	jobsAvailable jobsStatus = iota
 	jobsEngineTooOld
 	jobsExtensionOff
+	// jobsHTTP2Unsupported is an engine API endpoint that does not speak HTTP/2
+	// (an HTTP/1.1-only proxy, as in front of Docker Desktop's engine): gRPC
+	// cannot reach the extension, whether it is enabled or not.
+	jobsHTTP2Unsupported
 )
+
+// jobsHTTP2Reason says why jobs are unusable through an endpoint without HTTP/2.
+const jobsHTTP2Reason = "the engine API endpoint does not support HTTP/2"
 
 // errJobsExtensionNotReady reports a jobs extension that is enabled but does
 // not answer yet (or failed to activate): not missing support, a failure.
@@ -84,8 +91,9 @@ var errJobsExtensionNotReady = errors.New("the engine's jobs extension is enable
 // jobsAvailability reports what the engine offers for jobs. The API version
 // only says the extension is compiled in: it is disabled by default and the
 // engine cannot list its extensions, so a call scoped to the project tells
-// (Unimplemented: off). Unavailable (enabled, not ready) is an error, never a
-// status, so no caller degrades on it.
+// (Unimplemented: off). An Unavailable from the engine (enabled, not ready) is
+// an error, never a status, so no caller degrades on it. The one Unavailable
+// that is a status is a transport without HTTP/2 (jobsHTTP2Unsupported).
 func (s *composeService) jobsAvailability(ctx context.Context, projectName string) (jobsStatus, error) {
 	version, err := s.RuntimeAPIVersion(ctx)
 	if err != nil {
@@ -120,10 +128,21 @@ func (s *composeService) probeJobs(ctx context.Context, projectName string) (job
 	case codes.Unimplemented:
 		return jobsExtensionOff, nil
 	case codes.Unavailable:
+		if isHTTP2Unsupported(err) {
+			return jobsHTTP2Unsupported, nil
+		}
 		return jobsAvailable, fmt.Errorf("%w: %s", errJobsExtensionNotReady, status.Convert(err).Message())
 	default:
 		return jobsAvailable, err
 	}
+}
+
+// isHTTP2Unsupported tells whether a gRPC error means the engine API endpoint
+// answered the HTTP/2 preface with HTTP/1.1. gRPC gives it no code of its own,
+// and words a dropped connection the same way: only the HTTP/1.1 hint x/net/http2
+// adds to its error proves the missing HTTP/2 (see the TestIsHTTP2Unsupported* tests).
+func isHTTP2Unsupported(err error) bool {
+	return strings.Contains(status.Convert(err).Message(), "looked like an HTTP/1.1 header")
 }
 
 // rejectUnsupportedScheduledJobs refuses a project declaring active scheduled
@@ -145,6 +164,9 @@ func (s *composeService) rejectUnsupportedScheduledJobs(ctx context.Context, pro
 	case jobsExtensionOff:
 		return fmt.Errorf("scheduled jobs need the engine's jobs extension, which is not enabled (start dockerd with %s): %s",
 			jobsv0.EnableFlag, strings.Join(names, ", "))
+	case jobsHTTP2Unsupported:
+		return fmt.Errorf("scheduled jobs need the engine's jobs extension, which is unreachable because %s: %s",
+			jobsHTTP2Reason, strings.Join(names, ", "))
 	}
 	return nil
 }
@@ -491,6 +513,8 @@ func (s *composeService) RunJob(ctx context.Context, project *types.Project, nam
 		return 0, fmt.Errorf("%w: this version of the engine (API version %s) predates jobs", api.ErrJobsNotSupported, version)
 	case jobsExtensionOff:
 		return 0, fmt.Errorf("%w: the jobs extension is not enabled (start dockerd with %s)", api.ErrJobsNotSupported, jobsv0.EnableFlag)
+	case jobsHTTP2Unsupported:
+		return 0, fmt.Errorf("%w: %s, which the jobs extension needs", api.ErrJobsNotSupported, jobsHTTP2Reason)
 	}
 	// Past the availability switch so a degraded run, a one-off service, keeps
 	// honouring -d and dry-run.

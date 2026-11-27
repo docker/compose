@@ -20,6 +20,9 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"slices"
 	"strings"
@@ -31,8 +34,11 @@ import (
 	"github.com/moby/moby/client"
 	"github.com/sirupsen/logrus"
 	"go.uber.org/mock/gomock"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"gotest.tools/v3/assert"
 
 	jobsv0 "github.com/docker/compose/v5/internal/jobsapi"
@@ -756,6 +762,9 @@ var (
 	// jobsExtensionNotReadyErr is what an engine whose jobs extension is
 	// enabled but still reconciling (or failed to activate) answers.
 	jobsExtensionNotReadyErr = status.Error(codes.Unavailable, "the jobs extension is not active")
+	// jobsNoHTTP2Err is what the HTTP/1.1-only Docker Desktop socket yields.
+	jobsNoHTTP2Err = status.Error(codes.Unavailable, `connection error: desc = "error reading server preface: `+
+		`http2: failed reading the frame payload: http2: frame too large, note that the frame header looked like an HTTP/1.1 header"`)
 )
 
 const (
@@ -771,6 +780,10 @@ const (
 	// jobsExtensionNotReady prefixes the distinct error of an enabled but not
 	// ready extension.
 	jobsExtensionNotReady = "the engine's jobs extension is enabled but not ready: the jobs extension is not active"
+	// scheduledJobsNoHTTP2Refused is what a project declaring the scheduled
+	// jobs of scheduledJobsProject gets through such an endpoint.
+	scheduledJobsNoHTTP2Refused = "scheduled jobs need the engine's jobs extension, which is unreachable because " +
+		"the engine API endpoint does not support HTTP/2: backup, sync"
 )
 
 func TestJobsAvailability(t *testing.T) {
@@ -807,6 +820,13 @@ func TestJobsAvailability(t *testing.T) {
 		assert.ErrorContains(t, err, jobsExtensionNotReady)
 	})
 
+	t.Run("an endpoint without HTTP/2 is its own status, not an extension failure", func(t *testing.T) {
+		fake := &fakeJobsClient{listErr: jobsNoHTTP2Err}
+		got, err := newJobsTestService(t, apiVersionJobs, fake).jobsAvailability(t.Context(), "prj")
+		assert.NilError(t, err)
+		assert.Equal(t, got, jobsHTTP2Unsupported)
+	})
+
 	t.Run("any other error is returned as is", func(t *testing.T) {
 		boom := errors.New("connection refused")
 		fake := &fakeJobsClient{listErr: boom}
@@ -816,7 +836,7 @@ func TestJobsAvailability(t *testing.T) {
 	})
 
 	t.Run("a definitive answer is probed once per process", func(t *testing.T) {
-		for _, listErr := range []error{nil, jobsExtensionOffErr} {
+		for _, listErr := range []error{nil, jobsExtensionOffErr, jobsNoHTTP2Err} {
 			fake := &fakeJobsClient{listErr: listErr}
 			tested := newJobsTestService(t, apiVersionJobs, fake)
 			first, err := tested.jobsAvailability(t.Context(), "prj")
@@ -840,6 +860,61 @@ func TestJobsAvailability(t *testing.T) {
 		assert.Equal(t, got, jobsAvailable)
 		assert.Equal(t, len(fake.listCalls), 2)
 	})
+}
+
+// jobsListError dials addr as a gRPC client and returns the error of the jobs
+// service's List call, which must be Unavailable.
+func jobsListError(t *testing.T, addr string) error {
+	t.Helper()
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = conn.Close() })
+	err = conn.Invoke(t.Context(), "/jobs.Jobs/List", &emptypb.Empty{}, &emptypb.Empty{})
+	assert.Equal(t, status.Code(err), codes.Unavailable, "%v", err)
+	return err
+}
+
+// isHTTP2Unsupported relies on the text grpc-go gives to a failed HTTP/2
+// handshake. A plain HTTP/1.1 server, like the Docker Desktop API socket, pins
+// that text: a grpc-go upgrade changing it fails here instead of silently
+// turning the endpoint back into an "extension not ready" failure.
+func TestIsHTTP2UnsupportedAgainstHTTP1Endpoint(t *testing.T) {
+	srv := httptest.NewServer(http.NotFoundHandler()) // plain HTTP: it cannot speak HTTP/2
+	t.Cleanup(srv.Close)
+
+	err := jobsListError(t, strings.TrimPrefix(srv.URL, "http://"))
+	assert.Assert(t, isHTTP2Unsupported(err), "%v", err)
+}
+
+// gRPC words a failure to read the HTTP/2 preface "error reading server
+// preface: ..." whatever the read-side cause. Only a server answering HTTP/1.1 proves the
+// endpoint has no HTTP/2: an endpoint that drops the connection (a daemon
+// restarting, a proxy not ready) is a transient failure, which must stay one,
+// never be cached as "jobs unsupported". Which text a real dropped connection
+// yields depends on timing (a write that loses the race says "broken pipe"), so
+// the synthetic causes below are the deterministic guard, the real one a check
+// that a real drop does not classify.
+func TestIsHTTP2UnsupportedIgnoresDroppedConnections(t *testing.T) {
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NilError(t, err)
+	t.Cleanup(func() { _ = lis.Close() })
+	go func() {
+		for {
+			c, err := lis.Accept()
+			if err != nil {
+				return
+			}
+			_ = c.Close() // accepted, then dropped before any HTTP/2 frame
+		}
+	}()
+
+	err = jobsListError(t, lis.Addr().String())
+	assert.Assert(t, !isHTTP2Unsupported(err), "%v", err)
+
+	for _, cause := range []string{"EOF", "read: connection reset by peer"} {
+		dropped := status.Error(codes.Unavailable, `connection error: desc = "error reading server preface: `+cause+`"`)
+		assert.Assert(t, !isHTTP2Unsupported(dropped), cause)
+	}
 }
 
 func TestRejectUnsupportedScheduledJobs(t *testing.T) {
@@ -883,6 +958,7 @@ func TestScheduledJobsRefusedWithoutJobsEngine(t *testing.T) {
 		"API predates jobs":   {version: noJobsEngine, refused: scheduledJobsRefused},
 		"extension off":       {version: apiVersionJobs, listErr: jobsExtensionOffErr, refused: scheduledJobsExtensionOffRefused},
 		"extension not ready": {version: apiVersionJobs, listErr: jobsExtensionNotReadyErr, refused: jobsExtensionNotReady},
+		"no HTTP/2":           {version: apiVersionJobs, listErr: jobsNoHTTP2Err, refused: scheduledJobsNoHTTP2Refused},
 	} {
 		t.Run(name, func(t *testing.T) {
 			tested := newJobsTestService(t, tc.version, &fakeJobsClient{listErr: tc.listErr})
@@ -923,6 +999,12 @@ func TestRunJobWithoutJobsEngine(t *testing.T) {
 		err := run(t, apiVersionJobs, jobsExtensionNotReadyErr)
 		assert.ErrorIs(t, err, errJobsExtensionNotReady)
 		assert.Assert(t, !errors.Is(err, api.ErrJobsNotSupported), "no sentinel: the CLI must not degrade to a one-off")
+	})
+
+	t.Run("endpoint without HTTP/2", func(t *testing.T) {
+		err := run(t, apiVersionJobs, jobsNoHTTP2Err)
+		assert.ErrorIs(t, err, api.ErrJobsNotSupported)
+		assert.ErrorContains(t, err, "the engine API endpoint does not support HTTP/2, which the jobs extension needs")
 	})
 }
 
@@ -996,11 +1078,13 @@ func TestDownJobsWithoutJobsEngine(t *testing.T) {
 		assert.Equal(t, out.String(), "")
 	})
 
-	t.Run("an extension that is off leaves nothing to remove, silently", func(t *testing.T) {
-		out := captureWarnings(t)
-		tested := newJobsTestService(t, apiVersionJobs, &fakeJobsClient{listErr: jobsExtensionOffErr})
-		assert.Equal(t, len(tested.ensureJobsDown(t.Context(), project)), 0)
-		assert.Equal(t, out.String(), "")
+	t.Run("an extension that is off, or out of reach without HTTP/2, leaves nothing to remove, silently", func(t *testing.T) {
+		for _, listErr := range []error{jobsExtensionOffErr, jobsNoHTTP2Err} {
+			out := captureWarnings(t)
+			tested := newJobsTestService(t, apiVersionJobs, &fakeJobsClient{listErr: listErr})
+			assert.Equal(t, len(tested.ensureJobsDown(t.Context(), project)), 0)
+			assert.Equal(t, out.String(), "")
+		}
 	})
 
 	t.Run("an extension enabled but not ready leaves nothing to remove, with a warning", func(t *testing.T) {
@@ -1063,11 +1147,13 @@ func TestActualJobs(t *testing.T) {
 		assert.Equal(t, out.String(), "")
 	})
 
-	t.Run("an extension that is off lists nothing, silently", func(t *testing.T) {
-		out := captureWarnings(t)
-		tested := newJobsTestService(t, apiVersionJobs, &fakeJobsClient{listErr: jobsExtensionOffErr})
-		assert.Equal(t, len(tested.actualJobs(t.Context(), "prj")), 0)
-		assert.Equal(t, out.String(), "")
+	t.Run("an extension that is off, or out of reach without HTTP/2, lists nothing, silently", func(t *testing.T) {
+		for _, listErr := range []error{jobsExtensionOffErr, jobsNoHTTP2Err} {
+			out := captureWarnings(t)
+			tested := newJobsTestService(t, apiVersionJobs, &fakeJobsClient{listErr: listErr})
+			assert.Equal(t, len(tested.actualJobs(t.Context(), "prj")), 0)
+			assert.Equal(t, out.String(), "")
+		}
 	})
 
 	t.Run("an extension enabled but not ready lists nothing, with a warning", func(t *testing.T) {
