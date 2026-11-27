@@ -17,7 +17,10 @@
 package watch
 
 import (
+	"path/filepath"
 	"testing"
+
+	"gotest.tools/v3/assert"
 )
 
 func TestNewDockerPatternMatcher(t *testing.T) {
@@ -103,6 +106,33 @@ func TestNewDockerPatternMatcher(t *testing.T) {
 					}
 				}
 			}
+		})
+	}
+}
+
+func TestDockerPatternMatcherMatchesEntireDirWithWildcardExclusion(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "src")
+	for _, tc := range []struct {
+		name      string
+		exclusion string
+		ignored   bool
+	}{
+		{name: "recursive wildcard", exclusion: "!**/app.txt"},
+		{name: "single directory wildcard", exclusion: "!*/app.txt"},
+		{name: "unrelated wildcard", exclusion: "!other/*.txt", ignored: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			matcher, err := NewDockerPatternMatcher(root, []string{"src/", tc.exclusion})
+			assert.NilError(t, err)
+
+			ignored, err := matcher.MatchesEntireDir(dir)
+			assert.NilError(t, err)
+			assert.Equal(t, ignored, tc.ignored)
+
+			ignored, err = matcher.Matches(filepath.Join(dir, "app.txt"))
+			assert.NilError(t, err)
+			assert.Equal(t, ignored, tc.ignored)
 		})
 	}
 }

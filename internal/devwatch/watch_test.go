@@ -377,6 +377,162 @@ func TestInitialSyncFilesDirectory(t *testing.T) {
 	}})
 }
 
+func TestInitialSync_RespectsNestedIgnore(t *testing.T) {
+	hostDir := t.TempDir()
+	for _, name := range []string{
+		"src/app.txt",
+		"src/secret.txt",
+		"src/.git/config",
+		"src/Dockerfile",
+		"src/compose.yaml",
+	} {
+		path := filepath.Join(hostDir, filepath.FromSlash(name))
+		assert.NilError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+		assert.NilError(t, os.WriteFile(path, []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: hostDir}},
+	}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+		Ignore: []string{"src/secret.txt"},
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      filepath.Join(hostDir, "src", "app.txt"),
+		ContainerPath: "/app/src/app.txt",
+	}})
+}
+
+func TestInitialSync_RespectsIgnoreException(t *testing.T) {
+	hostDir := t.TempDir()
+	srcDir := filepath.Join(hostDir, "src")
+	assert.NilError(t, os.MkdirAll(srcDir, 0o755))
+	for _, name := range []string{"app.txt", "secret.txt"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(srcDir, name), []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{Name: "svc"}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+		Ignore: []string{"src/", "!src/app.txt"},
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      filepath.Join(srcDir, "app.txt"),
+		ContainerPath: "/app/src/app.txt",
+	}})
+}
+
+func TestInitialSync_RespectsWildcardIgnoreException(t *testing.T) {
+	for _, exception := range []string{"!**/app.txt", "!*/app.txt"} {
+		t.Run(exception, func(t *testing.T) {
+			hostDir := t.TempDir()
+			srcDir := filepath.Join(hostDir, "src")
+			assert.NilError(t, os.MkdirAll(srcDir, 0o755))
+			for _, name := range []string{"app.txt", "secret.txt"} {
+				assert.NilError(t, os.WriteFile(filepath.Join(srcDir, name), []byte("content"), 0o600))
+			}
+
+			syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+			err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{Name: "svc"}, types.Trigger{
+				Path:   hostDir,
+				Target: "/app",
+				Ignore: []string{"src/", exception},
+			}, syncer)
+			assert.NilError(t, err)
+			assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+				HostPath:      filepath.Join(srcDir, "app.txt"),
+				ContainerPath: "/app/src/app.txt",
+			}})
+		})
+	}
+}
+
+func TestInitialSync_RespectsIgnoredDirectory(t *testing.T) {
+	hostDir := t.TempDir()
+	ignoredDir := filepath.Join(hostDir, "ignored")
+	assert.NilError(t, os.MkdirAll(ignoredDir, 0o755))
+	assert.NilError(t, os.WriteFile(filepath.Join(ignoredDir, "secret.txt"), []byte("content"), 0o600))
+	visibleFile := filepath.Join(hostDir, "visible.txt")
+	assert.NilError(t, os.WriteFile(visibleFile, []byte("content"), 0o600))
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{Name: "svc"}, types.Trigger{
+		Path:   hostDir,
+		Target: "/app",
+		Ignore: []string{"ignored/"},
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      visibleFile,
+		ContainerPath: "/app/visible.txt",
+	}})
+}
+
+func TestInitialSync_RespectsDockerignorePath(t *testing.T) {
+	buildDir := t.TempDir()
+	watchDir := filepath.Join(buildDir, "src")
+	assert.NilError(t, os.MkdirAll(watchDir, 0o755))
+	assert.NilError(t, os.WriteFile(filepath.Join(buildDir, ".dockerignore"), []byte("src/secret.txt\n"), 0o600))
+	for _, name := range []string{"app.txt", "secret.txt"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(watchDir, name), []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: buildDir}},
+	}, types.Trigger{
+		Path:   watchDir,
+		Target: "/app",
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      filepath.Join(watchDir, "app.txt"),
+		ContainerPath: "/app/app.txt",
+	}})
+}
+
+func TestInitialSync_RespectsDockerignoreWildcardException(t *testing.T) {
+	buildDir := t.TempDir()
+	srcDir := filepath.Join(buildDir, "src")
+	assert.NilError(t, os.MkdirAll(srcDir, 0o755))
+	assert.NilError(t, os.WriteFile(filepath.Join(buildDir, ".dockerignore"), []byte(".dockerignore\nsrc/\n!**/app.txt\n"), 0o600))
+	for _, name := range []string{"app.txt", "secret.txt"} {
+		assert.NilError(t, os.WriteFile(filepath.Join(srcDir, name), []byte("content"), 0o600))
+	}
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{
+		Name: "svc", WorkloadSpec: types.WorkloadSpec{Build: &types.BuildConfig{Context: buildDir}},
+	}, types.Trigger{
+		Path:   buildDir,
+		Target: "/app",
+	}, syncer)
+	assert.NilError(t, err)
+	assert.DeepEqual(t, <-syncer.synced, []*sync.PathMapping{{
+		HostPath:      filepath.Join(srcDir, "app.txt"),
+		ContainerPath: "/app/src/app.txt",
+	}})
+}
+
+func TestInitialSync_RespectsRegularFileIgnore(t *testing.T) {
+	hostFile := filepath.Join(t.TempDir(), "secret.txt")
+	assert.NilError(t, os.WriteFile(hostFile, []byte("content"), 0o600))
+
+	syncer := &fakeSyncer{synced: make(chan []*sync.PathMapping, 1)}
+	err := (&Service{}).initialSync(t.Context(), types.ServiceConfig{Name: "svc"}, types.Trigger{
+		Path:   hostFile,
+		Target: "/app/secret.txt",
+		Ignore: []string{"secret.txt"},
+	}, syncer)
+	assert.NilError(t, err)
+	assert.Equal(t, len(<-syncer.synced), 0)
+}
+
 // #13725: single-file trigger path was also gated on the image-creation-time
 // check, preventing pre-existing files from being synced.
 func TestInitialSyncFilesRegularFile(t *testing.T) {

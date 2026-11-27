@@ -775,12 +775,20 @@ func (s *Service) initialSync(ctx context.Context, service types.ServiceConfig, 
 		return err
 	}
 
-	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{".git/"})
+	dotGitIgnore, err := watch.NewDockerPatternMatcher("/", []string{"**/.git/"})
 	if err != nil {
 		return err
 	}
 
-	triggerIgnore, err := watch.NewDockerPatternMatcher(trigger.Path, trigger.Ignore)
+	triggerRoot := trigger.Path
+	fi, err := os.Stat(trigger.Path)
+	if err != nil {
+		return err
+	}
+	if fi.Mode().IsRegular() {
+		triggerRoot = filepath.Dir(trigger.Path)
+	}
+	triggerIgnore, err := watch.NewDockerPatternMatcher(triggerRoot, trigger.Ignore)
 	if err != nil {
 		return err
 	}
@@ -790,6 +798,9 @@ func (s *Service) initialSync(ctx context.Context, service types.ServiceConfig, 
 	dockerFilePatterns = append(dockerFilePatterns, cli.DefaultOverrideFileNames...)
 	if service.Build != nil && service.Build.Dockerfile != "" {
 		dockerFilePatterns = append(dockerFilePatterns, filepath.Base(service.Build.Dockerfile))
+	}
+	for i := range dockerFilePatterns {
+		dockerFilePatterns[i] = "**/" + dockerFilePatterns[i]
 	}
 
 	dockerFileIgnore, err := watch.NewDockerPatternMatcher("/", dockerFilePatterns)
@@ -824,7 +835,7 @@ func (s *Service) initialSyncFiles(service types.ServiceConfig, trigger types.Tr
 		return initialSyncDirectory(trigger, service, ignore)
 	case mode.IsRegular():
 		// process file
-		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if !shouldIgnore(trigger.Path, ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
 			return []*sync.PathMapping{{
 				HostPath:      trigger.Path,
 				ContainerPath: trigger.Target,
@@ -847,15 +858,20 @@ func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ig
 			// walk starts at the root directory
 			return nil
 		}
-		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
-			// By definition sync ignores bind mounted paths
-			if d.IsDir() {
-				// skip folder
+		if d.IsDir() {
+			if checkIfPathAlreadyBindMounted(path, service.Volumes) {
 				return fs.SkipDir
 			}
-			return nil // skip file
+			ignored, err := ignore.MatchesEntireDir(path)
+			if err != nil {
+				return err
+			}
+			if ignored {
+				return fs.SkipDir
+			}
+			return nil
 		}
-		if d.IsDir() {
+		if shouldIgnore(path, ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
 			return nil
 		}
 		rel, err := filepath.Rel(trigger.Path, path)
