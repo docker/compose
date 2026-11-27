@@ -61,7 +61,12 @@ type ProjectLoadOptions struct {
 	Services []string
 	// Offline mode disables remote resource loading
 	Offline bool
+	// IncludeUnused keeps the resources no service uses (networks, volumes,
+	// secrets, configs), which are dropped by default
+	IncludeUnused bool
 	// All includes all resources (not just those used by services)
+	//
+	// Deprecated: use IncludeUnused, which means the same.
 	All bool
 	// Compatibility enables v1 compatibility mode
 	Compatibility bool
@@ -193,8 +198,9 @@ type Runner interface {
 	// run jobs, the error wraps ErrJobsNotSupported and nothing was done, so the
 	// caller can fall back to RunOneOffContainer.
 	RunJob(ctx context.Context, project *types.Project, name string, options RunOptions) (int, error)
-	// Exec executes a command in a running service container
-	Exec(ctx context.Context, projectName string, options RunOptions) (int, error)
+	// Exec executes a command in a running service container. It accepts
+	// ExecOptions, or a RunOptions for callers written before ExecOptions existed.
+	Exec(ctx context.Context, projectName string, options ExecOptionsProvider) (int, error)
 	// Attach STDIN,STDOUT,STDERR to a running service container
 	Attach(ctx context.Context, projectName string, options AttachOptions) error
 	// Copy copies a file/folder between a service container and the local filesystem
@@ -549,7 +555,12 @@ type KillOptions struct {
 	Services []string
 	// Signal to send to containers
 	Signal string
+	// IncludeStopped also targets the containers that are not running, instead
+	// of only the running ones. The one-off containers are targeted either way.
+	IncludeStopped bool
 	// All can be set to true to try to kill all found containers, independently of their state
+	//
+	// Deprecated: use IncludeStopped, which means the same.
 	All bool
 }
 
@@ -596,8 +607,53 @@ type RunOptions struct {
 	Privileged        bool
 	UseNetworkAliases bool
 	NoDeps            bool
-	// Index selects the replica to target; only used by Exec.
+	// Index selects the replica to target. It is only read by Exec, through
+	// ToExecOptions; prefer ExecOptions when calling Exec.
 	Index int
+}
+
+// ExecOptions group options of the Exec API
+type ExecOptions struct {
+	// Service is the service to run the command in
+	Service string
+	// Index selects the replica to target, starting at 1; 0 means the first one
+	Index int
+	// Command is the command to run, and its arguments
+	Command []string
+	// Environment holds additional KEY=VALUE variables for the command
+	Environment []string
+	Tty         bool
+	Interactive bool
+	Detach      bool
+	User        string
+	Privileged  bool
+	WorkingDir  string
+}
+
+// ExecOptionsProvider is implemented by the types that can describe an Exec
+// call: ExecOptions itself, and RunOptions so that existing callers keep
+// compiling. Prefer ExecOptions in new code.
+type ExecOptionsProvider interface {
+	ToExecOptions() ExecOptions
+}
+
+// ToExecOptions returns the options unchanged.
+func (o ExecOptions) ToExecOptions() ExecOptions { return o }
+
+// ToExecOptions keeps the fields that Exec honors; the others are ignored.
+func (o RunOptions) ToExecOptions() ExecOptions {
+	return ExecOptions{
+		Service:     o.Service,
+		Index:       o.Index,
+		Command:     o.Command,
+		Environment: o.Environment,
+		Tty:         o.Tty,
+		Interactive: o.Interactive,
+		Detach:      o.Detach,
+		User:        o.User,
+		Privileged:  o.Privileged,
+		WorkingDir:  o.WorkingDir,
+	}
 }
 
 // AttachOptions group options of the Attach API
@@ -671,16 +727,29 @@ func (e Event) String() string {
 
 // ListOptions group options of the ls API
 type ListOptions struct {
+	// IncludeStopped takes stopped containers into account, so that a project
+	// whose containers are all stopped is listed
+	IncludeStopped bool
 	// All takes stopped containers into account, so that a project whose
 	// containers are all stopped is listed
+	//
+	// Deprecated: use IncludeStopped, which means the same.
 	All bool
 }
 
 // PsOptions group options of the Ps API
 type PsOptions struct {
 	Project *types.Project
+	// IncludeStopped includes the stopped containers, which are left out by
+	// default
+	IncludeStopped bool
+	// IncludeOneOff includes the one-off containers (`compose run`), which are
+	// left out by default
+	IncludeOneOff bool
 	// All includes the stopped containers and the one-off containers, which
 	// are both left out by default
+	//
+	// Deprecated: use IncludeStopped and IncludeOneOff, which All sets together.
 	All      bool
 	Services []string
 }
@@ -689,7 +758,12 @@ type PsOptions struct {
 type CopyOptions struct {
 	Source      string
 	Destination string
+	// IncludeOneOff includes the one-off containers (`compose run`) of the
+	// service, which are left out by default. It only applies when Index is 0.
+	IncludeOneOff bool
 	// All includes the one-off containers of the service
+	//
+	// Deprecated: use IncludeOneOff, which means the same.
 	All        bool
 	Index      int
 	FollowLink bool

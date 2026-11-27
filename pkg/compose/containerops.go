@@ -32,7 +32,7 @@ func (s *composeService) containerOps() *containerops.Service {
 	return containerops.New(containerOpsBackend{engineBackend{s}})
 }
 
-func (s *composeService) Exec(ctx context.Context, projectName string, options api.RunOptions) (int, error) {
+func (s *composeService) Exec(ctx context.Context, projectName string, options api.ExecOptionsProvider) (int, error) {
 	return s.containerOps().Exec(ctx, projectName, options)
 }
 
