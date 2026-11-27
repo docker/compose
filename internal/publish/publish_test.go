@@ -923,6 +923,31 @@ func Test_checkForBindMount_flagsJobBindMount(t *testing.T) {
 	assert.Equal(t, findings["migrate"][0].Source, "/host/data")
 }
 
+// The bind mounts a service or a job declares in `mounts` are flagged as the ones of `volumes` are.
+func Test_checkForBindMount_flagsMounts(t *testing.T) {
+	project := &types.Project{
+		Services: types.Services{
+			"web": types.ServiceConfig{Name: "web", ContainerSpec: types.ContainerSpec{
+				Mounts: []types.ServiceMountConfig{
+					{Type: types.VolumeTypeBind, Source: "/host/web", Target: "/web"},
+					{Type: types.VolumeTypeTmpfs, Target: "/scratch"},
+				},
+			}},
+		},
+		Jobs: types.Jobs{
+			"migrate": types.JobConfig{Name: "migrate", ContainerSpec: types.ContainerSpec{
+				Mounts: []types.ServiceMountConfig{{Type: types.VolumeTypeBind, Source: "/host/job", Target: "/job"}},
+			}},
+		},
+	}
+
+	findings := (&Service{}).checkForBindMount(project)
+	assert.Equal(t, len(findings["web"]), 1)
+	assert.Equal(t, findings["web"][0].Source, "/host/web")
+	assert.Equal(t, len(findings["migrate"]), 1)
+	assert.Equal(t, findings["migrate"][0].Source, "/host/job")
+}
+
 // checkForSensitiveData must scan a job's env files, same as a service's.
 func Test_checkForSensitiveData_jobEnvFile(t *testing.T) {
 	dir := t.TempDir()

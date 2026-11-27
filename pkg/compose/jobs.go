@@ -375,6 +375,7 @@ func withOwnMutableFields(svc types.ServiceConfig) types.ServiceConfig {
 	maps.Copy(env, svc.Environment)
 	svc.Environment = env
 	svc.Volumes = slices.Clone(svc.Volumes)
+	svc.Mounts = slices.Clone(svc.Mounts)
 	svc.Configs = slices.Clone(svc.Configs)
 	return svc
 }

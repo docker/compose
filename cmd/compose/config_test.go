@@ -146,9 +146,10 @@ func TestResolveImageDigestsWithoutServices(t *testing.T) {
 // resolveImageDigests originally only walked model["services"].
 func TestResolveImageDigestsWithJobs(t *testing.T) {
 	const (
-		serviceDigest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-		jobDigest     = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
-		jobVolDigest  = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+		serviceDigest  = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+		jobDigest      = "sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+		jobVolDigest   = "sha256:eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+		jobToolsDigest = "sha256:ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
 	)
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
@@ -167,6 +168,10 @@ func TestResolveImageDigestsWithJobs(t *testing.T) {
 				"volumes": []any{
 					map[string]any{"type": "image", "source": "migrate-data:latest", "target": "/data"},
 				},
+				"mounts": []any{
+					map[string]any{"type": "image", "source": "migrate-tools:latest", "target": "/tools"},
+					map[string]any{"type": "tmpfs", "target": "/scratch"},
+				},
 			},
 		},
 	}
@@ -183,6 +188,10 @@ func TestResolveImageDigestsWithJobs(t *testing.T) {
 		Return(client.DistributionInspectResult{
 			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: jobVolDigest}},
 		}, nil)
+	apiClient.EXPECT().DistributionInspect(gomock.Any(), "docker.io/library/migrate-tools:latest", gomock.Any()).
+		Return(client.DistributionInspectResult{
+			DistributionInspect: registry.DistributionInspect{Descriptor: ocispec.Descriptor{Digest: jobToolsDigest}},
+		}, nil)
 
 	err := resolveImageDigests(t.Context(), cli, model)
 	assert.NilError(t, err)
@@ -194,6 +203,10 @@ func TestResolveImageDigestsWithJobs(t *testing.T) {
 	assert.Equal(t, job["image"], "docker.io/library/migrate:latest@"+jobDigest)
 	volumes := job["volumes"].([]any)
 	assert.Equal(t, volumes[0].(map[string]any)["source"], "docker.io/library/migrate-data:latest@"+jobVolDigest)
+	mounts := job["mounts"].([]any)
+	assert.Equal(t, mounts[0].(map[string]any)["source"], "docker.io/library/migrate-tools:latest@"+jobToolsDigest)
+	_, hasSource := mounts[1].(map[string]any)["source"]
+	assert.Assert(t, !hasSource, "a mount that isn't an image is left as it is")
 }
 
 func TestImagesOnly(t *testing.T) {
@@ -212,6 +225,10 @@ func TestImagesOnly(t *testing.T) {
 						{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
 						{Type: types.VolumeTypeBind, Source: "/host", Target: "/bind"},
 					},
+					Mounts: []types.ServiceMountConfig{
+						{Type: types.VolumeTypeImage, Source: "docker.io/library/mountimage@" + testDigest, Target: "/mounted"},
+						{Type: types.VolumeTypeBind, Source: "/host", Target: "/bound"},
+					},
 				},
 			},
 		},
@@ -227,6 +244,9 @@ func TestImagesOnly(t *testing.T) {
 					Image: "docker.io/library/nginx@" + testDigest,
 					Volumes: []types.ServiceVolumeConfig{
 						{Type: types.VolumeTypeImage, Source: "docker.io/library/someimage@" + testDigest, Target: "/data"},
+					},
+					Mounts: []types.ServiceMountConfig{
+						{Type: types.VolumeTypeImage, Source: "docker.io/library/mountimage@" + testDigest, Target: "/mounted"},
 					},
 				},
 			},
@@ -283,11 +303,18 @@ func TestLockModel(t *testing.T) {
 					map[string]any{"type": "image", "source": "docker.io/library/someimage@" + testDigest, "target": "/data"},
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
 				},
+				"mounts": []any{
+					map[string]any{"type": "image", "source": "docker.io/library/mountimage@" + testDigest, "target": "/mounted"},
+					map[string]any{"type": "tmpfs", "target": "/scratch"},
+				},
 			},
 			"b": map[string]any{
 				"image": "docker.io/library/alpine@" + testDigest,
 				"volumes": []any{
 					map[string]any{"type": "bind", "source": "/host", "target": "/bind"},
+				},
+				"mounts": []any{
+					map[string]any{"type": "tmpfs", "target": "/scratch"},
 				},
 			},
 		},
@@ -303,6 +330,9 @@ func TestLockModel(t *testing.T) {
 				// volumes keeps its []any raw-model type after filtering
 				"volumes": []any{
 					map[string]any{"type": "image", "source": "docker.io/library/someimage@" + testDigest, "target": "/data"},
+				},
+				"mounts": []any{
+					map[string]any{"type": "image", "source": "docker.io/library/mountimage@" + testDigest, "target": "/mounted"},
 				},
 			},
 			"b": map[string]any{

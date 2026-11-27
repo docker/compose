@@ -2392,3 +2392,77 @@ func runningContainer(t *testing.T, svc types.ServiceConfig, id string) Observed
 		},
 	}
 }
+
+// useMountsForVolumes moves the volumes of the services of a project to `mounts`, and brings the
+// config-hash the observed containers carry along: it is the same project, declared the other way.
+func useMountsForVolumes(t *testing.T, project *types.Project, observed *ObservedState) {
+	t.Helper()
+	for name, svc := range project.Services {
+		for _, v := range svc.Volumes {
+			svc.Mounts = append(svc.Mounts, types.ServiceMountConfig{Type: v.Type, Source: v.Source, Target: v.Target})
+		}
+		svc.Volumes = nil
+		project.Services[name] = svc
+		hash := mustServiceHash(t, svc)
+		for i := range observed.Containers[name] {
+			observed.Containers[name][i].ConfigHash = hash
+			observed.Containers[name][i].Summary.Labels[api.ConfigHashLabel] = hash
+		}
+	}
+}
+
+// A volume mounted through `mounts` is held by its service as one mounted through `volumes` is: the
+// service is removed before the volume is, and created after it.
+func TestReconcileVolumes_DivergedConfirmedForMounts(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	useMountsForVolumes(t, project, observed)
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), yesPrompt)
+	assert.NilError(t, err)
+
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 service:db0:1, StopContainer, mounted volume config changed
+[1] -> #2 service:db0:1, RemoveContainer, mounted volume config changed
+[2] -> #3 volume:data, RemoveVolume, config hash diverged
+[3] -> #4 volume:data, CreateVolume, recreate after config change
+[4] -> #5 service:db0:1, CreateContainer, no existing container
+`)+"\n")
+}
+
+// A container that doesn't mount the volume its `mounts` declare is not up to date.
+func TestReconcileVolumes_MissingMountedVolumeRecreatesForMounts(t *testing.T) {
+	project, observed := divergedVolumeProject(t, 1, 1)
+	observed.Volumes["data"] = []ObservedVolume{{Name: "myproject_data", ConfigHash: mustVolumeHash(t, project.Volumes["data"])}}
+	useMountsForVolumes(t, project, observed)
+	ctr := observed.Containers["db0"][0]
+	ctr.Summary.Mounts = nil
+	observed.Containers["db0"][0] = ctr
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Assert(t, strings.Contains(plan.String(), "CreateContainer"), plan.String())
+}
+
+// The volume a `mounts` entry uses is created before the service that mounts it.
+func TestReconcileVolumes_CreatedBeforeTheServiceMountingIt(t *testing.T) {
+	project := &types.Project{
+		Name:    "myproject",
+		Volumes: types.Volumes{"data": {Name: "myproject_data"}},
+		Services: types.Services{"db": {Name: "db", ContainerSpec: types.ContainerSpec{
+			Mounts: []types.ServiceMountConfig{{Type: "volume", Source: "data", Target: "/data"}},
+		}}},
+	}
+	observed := &ObservedState{
+		ProjectName: "myproject",
+		Containers:  map[string][]ObservedContainer{},
+		Networks:    map[string][]ObservedNetwork{},
+		Volumes:     map[string][]ObservedVolume{},
+	}
+
+	plan, err := reconcile(t.Context(), project, observed, defaultReconcileOptions(), noPrompt)
+	assert.NilError(t, err)
+	assert.Equal(t, plan.String(), strings.TrimSpace(`
+[] -> #1 volume:data, CreateVolume, not found
+[1] -> #2 service:db:1, CreateContainer, no existing container
+`)+"\n")
+}

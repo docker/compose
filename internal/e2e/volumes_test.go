@@ -268,3 +268,29 @@ func TestDownVolumesOfSelectedServices(t *testing.T) {
 			VolumeExists(s.Project()+"_data"),
 			VolumeExists(s.Project()+"_shared"))
 }
+
+func TestMounts(t *testing.T) {
+	s := NewScenario(t, "the mounts a service declares must be made as declared, and a change of one must recreate the service")
+	s.Step("up creates the service and the volume its mount uses",
+		ComposeCmd("up", "-d"),
+		Eventually(ServiceState("app", "running"), 10*time.Second),
+		VolumeExists(s.Project()+"_cache")).
+		Step("the bind mount shows the host content",
+			DockerCmd("exec", s.Project()+"-app-1", "cat", "/data/hello"),
+			OutputContains("hello")).
+		Step("the bind mount is read-only, as declared",
+			DockerCmd("exec", s.Project()+"-app-1", "sh", "-c", "touch /data/new 2>&1 || echo read-only"),
+			OutputContains("read-only")).
+		Step("the volume mount is writable",
+			DockerCmd("exec", s.Project()+"-app-1", "sh", "-c", "echo data > /cache/file && cat /cache/file"),
+			OutputContains("data")).
+		Step("the tmpfs mount is a tmpfs",
+			DockerCmd("exec", s.Project()+"-app-1", "grep", " /scratch ", "/proc/mounts"),
+			OutputContains("tmpfs")).
+		Step("an unchanged up leaves the service alone",
+			ComposeCmd("up", "-d"),
+			NotRecreated("app")).
+		Step("moving a mount recreates the service",
+			ComposeCmd("up", "-d").WithEnv("CACHE_TARGET=/other"),
+			Recreated("app"))
+}

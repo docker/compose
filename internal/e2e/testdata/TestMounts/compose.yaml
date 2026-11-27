@@ -1,0 +1,18 @@
+services:
+  app:
+    image: alpine
+    init: true
+    command: sleep infinity
+    mounts:
+      - type: bind
+        source: ./data
+        target: /data
+        read_only: true
+      - type: volume
+        source: cache
+        target: ${CACHE_TARGET:-/cache}
+      - type: tmpfs
+        target: /scratch
+
+volumes:
+  cache:

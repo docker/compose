@@ -737,11 +737,19 @@ func (s *Service) checkOnlyBuildSection(project *types.Project) (bool, error) {
 
 func (s *Service) checkForBindMount(project *types.Project) map[string][]types.ServiceVolumeConfig {
 	allFindings := map[string][]types.ServiceVolumeConfig{}
-	record := func(name string, volumes []types.ServiceVolumeConfig) {
+	record := func(name string, spec types.ContainerSpec) {
 		bindMounts := []types.ServiceVolumeConfig{}
-		for _, volume := range volumes {
+		for _, volume := range spec.Volumes {
 			if volume.Type == types.VolumeTypeBind {
 				bindMounts = append(bindMounts, volume)
+			}
+		}
+		// the bind mounts declared in `mounts` are published as the ones of `volumes` are
+		for _, m := range spec.Mounts {
+			if m.Type == types.VolumeTypeBind {
+				bindMounts = append(bindMounts, types.ServiceVolumeConfig{
+					Type: m.Type, Source: m.Source, Target: m.Target, ReadOnly: m.ReadOnly,
+				})
 			}
 		}
 		if len(bindMounts) > 0 {
@@ -749,10 +757,10 @@ func (s *Service) checkForBindMount(project *types.Project) map[string][]types.S
 		}
 	}
 	for serviceName, config := range project.Services {
-		record(serviceName, config.Volumes)
+		record(serviceName, config.ContainerSpec)
 	}
 	for name, job := range project.Jobs {
-		record(name, job.Volumes)
+		record(name, job.ContainerSpec)
 	}
 	return allFindings
 }

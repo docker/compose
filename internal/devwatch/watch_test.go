@@ -602,6 +602,23 @@ func TestCheckIfPathAlreadyBindMounted(t *testing.T) {
 	}
 }
 
+// A bind mount declared in `mounts` mounts a host path as one declared in `volumes` does.
+func TestBindMountsOfIncludesMounts(t *testing.T) {
+	hostDir := t.TempDir()
+	service := types.ServiceConfig{ContainerSpec: types.ContainerSpec{
+		Volumes: []types.ServiceVolumeConfig{{Type: types.VolumeTypeBind, Source: "/elsewhere", Target: "/e", Bind: &types.ServiceVolumeBind{}}},
+		Mounts: []types.ServiceMountConfig{
+			{Type: types.VolumeTypeBind, Source: hostDir, Target: "/data"},
+			{Type: types.VolumeTypeTmpfs, Target: "/scratch"},
+		},
+	}}
+
+	assert.Assert(t, checkIfPathAlreadyBindMounted(filepath.Join(hostDir, "sub"), bindMountsOf(service)))
+	assert.Assert(t, checkIfPathAlreadyBindMounted("/elsewhere", bindMountsOf(service)))
+	assert.Assert(t, !checkIfPathAlreadyBindMounted(filepath.Join(filepath.Dir(hostDir), "outside"), bindMountsOf(service)))
+	assert.Equal(t, len(service.Volumes), 1, "the volumes of the service are left as they are")
+}
+
 // initial_sync applies to every sync+x action, sync+exec included.
 func TestWatchTriggerPaths_InitialSyncExec(t *testing.T) {
 	hostDir := t.TempDir()

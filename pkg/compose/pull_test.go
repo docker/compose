@@ -172,6 +172,38 @@ func TestPullRequiredImagesUsesContentDigest(t *testing.T) {
 	assert.Equal(t, images[ref].ID, "sha256:image")
 }
 
+// TestPullRequiredImagesDedupsImageMounts verifies an image mounted both through
+// `volumes` and `mounts` (or by several services) is pulled once.
+func TestPullRequiredImagesDedupsImageMounts(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+	mockAPI, tested := newTestComposeService(t, mockCtrl, "1.48")
+
+	const ref = "data:1"
+	mockAPI.EXPECT().
+		ImagePull(anyCancellableContext(), ref, gomock.Any()).
+		Return(fakePullResponse{}, nil).
+		Times(1)
+	mockAPI.EXPECT().
+		ImageInspect(anyCancellableContext(), ref, gomock.Any()).
+		Return(client.ImageInspectResult{InspectResponse: image.InspectResponse{ID: "sha256:data"}}, nil).
+		AnyTimes()
+
+	project := &types.Project{
+		Name: "demo",
+		Services: types.Services{
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{
+				Image:      "web:1",
+				Volumes:    []types.ServiceVolumeConfig{{Type: types.VolumeTypeImage, Source: ref, Target: "/a"}},
+				Mounts:     []types.ServiceMountConfig{{Type: types.VolumeTypeImage, Source: ref, Target: "/b"}},
+				PullPolicy: types.PullPolicyNever,
+			}},
+		},
+	}
+	images := map[string]api.ImageSummary{"web:1": {ID: "sha256:web"}}
+	assert.NilError(t, tested.pullRequiredImages(t.Context(), project, images, true))
+}
+
 // TestAddPreStartHookPulls_DedupsSharedHookImage verifies a hook image shared by
 // several services is scheduled at most once.
 func TestAddPreStartHookPulls_DedupsSharedHookImage(t *testing.T) {

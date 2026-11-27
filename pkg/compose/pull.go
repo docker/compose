@@ -389,17 +389,15 @@ func (s *composeService) pullRequiredImages(ctx context.Context, project *types.
 			needPull[name] = service
 			scheduled[service.Image] = true
 		}
-		for i, vol := range service.Volumes {
-			if vol.Type == types.VolumeTypeImage {
-				if _, ok := images[vol.Source]; !ok {
-					// Hack: create a fake ServiceConfig so we pull missing volume image
-					n := fmt.Sprintf("%s:volume %d", name, i)
-					needPull[n] = types.ServiceConfig{
-						Name:          n,
-						ContainerSpec: types.ContainerSpec{Image: vol.Source},
-					}
-					scheduled[vol.Source] = true
+		for i, source := range imageVolumeSources(service) {
+			if _, ok := images[source]; !ok && !scheduled[source] {
+				// Hack: create a fake ServiceConfig so we pull missing volume image
+				n := fmt.Sprintf("%s:volume %d", name, i)
+				needPull[n] = types.ServiceConfig{
+					Name:          n,
+					ContainerSpec: types.ContainerSpec{Image: source},
 				}
+				scheduled[source] = true
 			}
 		}
 	}

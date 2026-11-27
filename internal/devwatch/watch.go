@@ -310,7 +310,7 @@ func prepareRebuildTriggers(project *types.Project, serviceName string, service 
 func (s *Service) watchTriggerPaths(ctx context.Context, service types.ServiceConfig, config *types.DevelopConfig, syncer sync.Syncer) ([]string, error) {
 	var paths []string
 	for _, trigger := range config.Watch {
-		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if isSync(trigger) && checkIfPathAlreadyBindMounted(trigger.Path, bindMountsOf(service)) {
 			logrus.Warnf("path '%s' also declared by a bind mount volume, this path won't be monitored!\n", trigger.Path)
 			continue
 		}
@@ -438,6 +438,20 @@ func (s *Service) watchEvents(ctx context.Context, project *types.Project, optio
 			logrus.Debugf("batch complete: duration[%s] count[%d]", time.Since(start), len(batch))
 		}
 	}
+}
+
+// bindMountsOf returns the volumes of a service, and its bind mounts as the volumes they are
+// equivalent to for what the watch needs to know: where a host path is mounted.
+func bindMountsOf(service types.ServiceConfig) []types.ServiceVolumeConfig {
+	volumes := slices.Clone(service.Volumes)
+	for _, m := range service.Mounts {
+		if m.Type == types.VolumeTypeBind {
+			volumes = append(volumes, types.ServiceVolumeConfig{
+				Type: m.Type, Source: m.Source, Target: m.Target, ReadOnly: m.ReadOnly, Bind: &types.ServiceVolumeBind{},
+			})
+		}
+	}
+	return volumes
 }
 
 func checkIfPathAlreadyBindMounted(watchPath string, volumes []types.ServiceVolumeConfig) bool {
@@ -820,7 +834,7 @@ func (s *Service) initialSyncFiles(service types.ServiceConfig, trigger types.Tr
 		return initialSyncDirectory(trigger, service, ignore)
 	case mode.IsRegular():
 		// process file
-		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, service.Volumes) {
+		if !shouldIgnore(filepath.Base(trigger.Path), ignore) && !checkIfPathAlreadyBindMounted(trigger.Path, bindMountsOf(service)) {
 			return []*sync.PathMapping{{
 				HostPath:      trigger.Path,
 				ContainerPath: trigger.Target,
@@ -834,6 +848,7 @@ func (s *Service) initialSyncFiles(service types.ServiceConfig, trigger types.Tr
 // ignored and bind-mounted paths.
 func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ignore watch.PathMatcher) ([]*sync.PathMapping, error) {
 	var pathsToCopy []*sync.PathMapping
+	bindMounts := bindMountsOf(service)
 	err := filepath.WalkDir(trigger.Path, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			// handle possible path err, just in case...
@@ -843,7 +858,7 @@ func initialSyncDirectory(trigger types.Trigger, service types.ServiceConfig, ig
 			// walk starts at the root directory
 			return nil
 		}
-		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, service.Volumes) {
+		if shouldIgnore(filepath.Base(path), ignore) || checkIfPathAlreadyBindMounted(path, bindMounts) {
 			// By definition sync ignores bind mounted paths
 			if d.IsDir() {
 				// skip folder

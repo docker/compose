@@ -137,21 +137,48 @@ func (s *composeService) ensureImagesExists(ctx context.Context, project *types.
 	return nil
 }
 
+// imageVolumeSources returns the images a service mounts as `type: image`, those of its
+// `volumes` first and then those of its `mounts`.
+func imageVolumeSources(service types.ServiceConfig) []string {
+	var sources []string
+	for _, vol := range service.Volumes {
+		if vol.Type == types.VolumeTypeImage {
+			sources = append(sources, vol.Source)
+		}
+	}
+	for _, m := range service.Mounts {
+		if m.Type == types.VolumeTypeImage {
+			sources = append(sources, m.Source)
+		}
+	}
+	return sources
+}
+
 func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.ImageSummary, projectName string) {
 	var digests []string
+	// the same for an image mounted by a volume and one mounted by a mount: it is the source
+	// that is resolved, to the name of the local image, and its content that is tracked
+	resolve := func(source, target string) (string, bool) {
+		imgName := source
+		img, ok := images[imgName]
+		if !ok {
+			// check if source is another service in the project
+			imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: source}, projectName)
+			// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
+			if img, ok = images[imgName]; !ok {
+				return "", false
+			}
+		}
+		digests = append(digests, target+"="+img.ID)
+		return imgName, true
+	}
 	for i, vol := range service.Volumes {
 		if vol.Type != types.VolumeTypeImage {
 			continue
 		}
-		imgName := vol.Source
-		img, ok := images[imgName]
+		imgName, ok := resolve(vol.Source, vol.Target)
 		if !ok {
-			// check if source is another service in the project
-			imgName = api.GetImageNameOrDefault(types.ServiceConfig{Name: vol.Source}, projectName)
-			// If we still can't find it, it might be an external image that wasn't pulled yet or doesn't exist
-			if img, ok = images[imgName]; !ok {
-				continue
-			}
+			continue
 		}
 		// The daemon only resolves a `type=image` mount Source that is a name/tag
 		// or a top-level image ID, not a per-platform manifest digest (which is
@@ -170,7 +197,15 @@ func resolveImageVolumes(service *types.ServiceConfig, images map[string]api.Ima
 		// close the race but reintroduce either the mount failure (#14005) or
 		// the attestation-churn recreates (#13636).
 		service.Volumes[i].Source = imgName
-		digests = append(digests, vol.Target+"="+img.ID)
+	}
+	for i, m := range service.Mounts {
+		if m.Type != types.VolumeTypeImage {
+			continue
+		}
+		if imgName, ok := resolve(m.Source, m.Target); ok {
+			// see above: the name of the local image, not its digest
+			service.Mounts[i].Source = imgName
+		}
 	}
 	if len(digests) > 0 {
 		sort.Strings(digests)
@@ -193,10 +228,8 @@ func (s *composeService) getLocalImagesDigests(ctx context.Context, project *typ
 	imageNames := utils.Set[string]{}
 	for _, s := range project.Services {
 		imageNames.Add(api.GetImageNameOrDefault(s, project.Name))
-		for _, volume := range s.Volumes {
-			if volume.Type == types.VolumeTypeImage {
-				imageNames.Add(volume.Source)
-			}
+		for _, source := range imageVolumeSources(s) {
+			imageNames.Add(source)
 		}
 		for _, img := range api.GetDependentImages(s, project.Name) {
 			imageNames.Add(img)

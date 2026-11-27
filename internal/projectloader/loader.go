@@ -19,10 +19,7 @@ package projectloader
 import (
 	"context"
 	"errors"
-	"fmt"
-	"maps"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/compose-spec/compose-go/v2/cli"
@@ -134,10 +131,6 @@ func (s *Service) postProcessProject(project *types.Project, options api.Project
 		return nil, err
 	}
 
-	if err := checkMountsSupported(project); err != nil {
-		return nil, err
-	}
-
 	// Add custom labels
 	for name, s := range project.Services {
 		s.CustomLabels = map[string]string{
@@ -165,29 +158,4 @@ func (s *Service) postProcessProject(project *types.Project, options api.Project
 	}
 
 	return project, nil
-}
-
-// checkMountsSupported refuses a project that declares `mounts`, in a service, one of its
-// pre_start hooks or a job: the attribute is in the model, but nothing pulls the images of its
-// mounts, orders the volumes they use or creates them yet. It is said before anything is done,
-// so that no network is created and no container replaced for a project that can't be applied,
-// and rather than leaving the mounts out without a word.
-func checkMountsSupported(project *types.Project) error {
-	for _, name := range slices.Sorted(maps.Keys(project.Services)) {
-		service := project.Services[name]
-		if len(service.Mounts) > 0 {
-			return fmt.Errorf("service %q: the `mounts` attribute is not supported yet", name)
-		}
-		for i, hook := range service.PreStart {
-			if len(hook.Mounts) > 0 {
-				return fmt.Errorf("service %q: pre_start[%d]: the `mounts` attribute is not supported yet", name, i)
-			}
-		}
-	}
-	for _, name := range slices.Sorted(maps.Keys(project.Jobs)) {
-		if len(project.Jobs[name].Mounts) > 0 {
-			return fmt.Errorf("job %q: the `mounts` attribute is not supported yet", name)
-		}
-	}
-	return nil
 }

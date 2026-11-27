@@ -135,6 +135,14 @@ func ServiceOptions(service types.ServiceConfig) SpanOptions {
 	}
 	attrs = append(attrs, attribute.StringSlice("service.volumes", volNames))
 
+	if len(service.Mounts) > 0 {
+		mountSources := make([]string, len(service.Mounts))
+		for i := range service.Mounts {
+			mountSources[i] = service.Mounts[i].Source
+		}
+		attrs = append(attrs, attribute.StringSlice("service.mounts", mountSources))
+	}
+
 	return []trace.SpanStartEventOption{
 		trace.WithAttributes(attrs...),
 	}

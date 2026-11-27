@@ -323,3 +323,15 @@ volumes:
 		})
 	}
 }
+
+// An anonymous volume has no name: it is not the volume of the project whose name is empty.
+func Test_bindStringForMountAnonymousVolume(t *testing.T) {
+	service := composetypes.ServiceConfig{Name: "test", ContainerSpec: composetypes.ContainerSpec{
+		Volumes: []composetypes.ServiceVolumeConfig{{Type: composetypes.VolumeTypeVolume, Target: "/data"}},
+	}}
+	project := composetypes.Project{Volumes: composetypes.Volumes{"empty": composetypes.VolumeConfig{}}}
+
+	bind, ok, err := bindStringForMount(project, service, mountTypes.Mount{Type: mountTypes.TypeVolume, Target: "/data"})
+	assert.NilError(t, err)
+	assert.Assert(t, !ok, "got the bind string %q", bind)
+}
