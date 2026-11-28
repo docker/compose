@@ -971,3 +971,58 @@ func Test_pushApplicationIndex_walksJobImages(t *testing.T) {
 	err = pushApplicationIndex(t.Context(), nil, named, v1.Descriptor{}, project)
 	assert.ErrorContains(t, err, "must be lowercase")
 }
+
+func Test_loadUnresolvedFile_shortFormPorts(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		port string
+	}{
+		{"with variable and default", "${DASHBOARD_PORT:-3000}:3000"},
+		{"with variable no default", "${PORT:-80}:80"},
+		{"container only with variable", "${PORT:-8080}"},
+		{"container only literal", "8080"},
+		{"host port literal", "3000:3000"},
+		{"host IP and custom protocol", "${HOST_IP:-127.0.0.1}:${PORT:-8080}:80/udp"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			project := loadProjectForTest(t, map[string]string{
+				"compose.yaml": fmt.Sprintf(`name: test
+services:
+  whoami:
+    image: traefik/whoami
+    ports:
+      - %s
+`, tc.port),
+			})
+			unresolved, err := loadUnresolvedFile(t.Context(), project, project.ComposeFiles[0])
+			_ = unresolved
+			assert.NilError(t, err)
+			assert.Assert(t, unresolved != nil)
+		})
+	}
+}
+
+func Test_publish_shortFormPortMapping(t *testing.T) {
+	project := loadProjectForTest(t, map[string]string{
+		"compose.yaml": `name: test
+services:
+  whoami:
+    image: traefik/whoami
+    ports:
+      - ${DASHBOARD_PORT:-3000}:3000
+`,
+	})
+	svc := &Service{
+		backend: &fakeBackend{
+			prompt: func(string, bool) (bool, error) { return true, nil },
+		},
+	}
+
+	accept, err := svc.preChecks(t.Context(), project, api.PublishOptions{})
+	assert.NilError(t, err)
+	assert.Assert(t, accept)
+
+	layers, err := svc.createLayers(t.Context(), project, api.PublishOptions{})
+	assert.NilError(t, err)
+	assert.Assert(t, len(layers) > 0)
+}
