@@ -38,6 +38,8 @@ type fakeLowLevelClient struct {
 	mu         sync.Mutex
 	containers []container.Summary
 	execCmds   [][]string
+	// execErrs[i] is what the i-th Exec call returns
+	execErrs   []error
 	untarCount int
 	// untarErrs[i] is what the i-th Untar call returns
 	untarErrs []error
@@ -53,7 +55,12 @@ func (f *fakeLowLevelClient) ContainersForService(_ context.Context, _ string, _
 }
 
 func (f *fakeLowLevelClient) Exec(_ context.Context, _ string, cmd []string, _ io.Reader) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.execCmds = append(f.execCmds, cmd)
+	if len(f.execCmds) <= len(f.execErrs) {
+		return f.execErrs[len(f.execCmds)-1]
+	}
 	return nil
 }
 
@@ -290,6 +297,38 @@ func TestSync_SplitsALargeDeletionIntoSeveralExecs(t *testing.T) {
 		deleted = append(deleted, cmd[2:]...)
 	}
 	assert.DeepEqual(t, deleted, want)
+}
+
+// The first `rm` that fails ends the deletion in that container: the chunks after it are not
+// run, the failure is reported once, and the files to copy are still copied.
+func TestSync_StopsDeletingAtTheFirstFailingExec(t *testing.T) {
+	tmpDir := t.TempDir()
+	existingFile := filepath.Join(tmpDir, "keep.txt")
+	assert.NilError(t, os.WriteFile(existingFile, []byte("data"), 0o644))
+
+	client := &fakeLowLevelClient{
+		containers: []container.Summary{{ID: "ctr1"}},
+		execErrs:   []error{nil, errors.New("exec failed")},
+	}
+	syncer := NewTar("proj", client, 0)
+
+	paths := []*PathMapping{{HostPath: existingFile, ContainerPath: "/app/keep.txt"}}
+	var deletedPaths []string
+	for i := range 12000 {
+		containerPath := fmt.Sprintf("/app/%s/file-%05d.txt", strings.Repeat("d", 180), i)
+		paths = append(paths, &PathMapping{HostPath: "/no/such/path", ContainerPath: containerPath})
+		deletedPaths = append(deletedPaths, containerPath)
+	}
+	assert.Assert(t, len(deleteCommands(deletedPaths)) > 2, "the deletion must leave chunks after the failing one")
+
+	err := syncer.Sync(t.Context(), "svc", paths)
+
+	assert.ErrorContains(t, err, "deleting paths in ctr1: exec failed")
+	assert.Equal(t, strings.Count(err.Error(), "deleting paths"), 1, "the failure must be reported once")
+	assert.Equal(t, len(client.execCmds), 2, "no rm expected after the failing one")
+	assert.Equal(t, client.untarCount, 1, "the files must still be copied")
+	_, copied := client.untarHeaders[0]["app/keep.txt"]
+	assert.Check(t, copied, "the existing file must be in the copy: %v", client.untarHeaders[0])
 }
 
 // A directory that arrives already populated keeps its own header: left implied, the engine

@@ -170,11 +170,8 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	}
 
 	if options.Volumes {
-		var scope []string
-		if len(options.Services) > 0 {
-			scope = tornDown
-		}
-		ops = append(ops, s.ensureVolumesDown(ctx, project, scope, limiter)...)
+		scoped := len(options.Services) > 0
+		ops = append(ops, s.ensureVolumesDown(ctx, project, scoped, tornDown, limiter)...)
 	}
 
 	if !resourceToRemove && len(ops) == 0 {
@@ -195,15 +192,18 @@ func (s *composeService) down(ctx context.Context, projectName string, options a
 	return eg.Wait()
 }
 
-// With services given, a volume another service uses is kept: the engine
-// refuses to remove it only while a container holds it.
-func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, services []string, limiter *semaphore.Weighted) []downOp {
+// A scoped down, run with services given, keeps a volume that a service other
+// than the ones it tore down uses: the engine refuses to remove it only while a
+// container holds it. scoped is explicit rather than inferred from services, so
+// that a scoped down with no service torn down keeps every volume in use instead
+// of removing them all.
+func (s *composeService) ensureVolumesDown(ctx context.Context, project *types.Project, scoped bool, services []string, limiter *semaphore.Weighted) []downOp {
 	var ops []downOp
 	for key, vol := range project.Volumes {
 		if vol.External {
 			continue
 		}
-		if len(services) > 0 && usedByOtherServices(project, key, services) {
+		if scoped && usedByOtherServices(project, key, services) {
 			continue
 		}
 		volumeName := vol.Name

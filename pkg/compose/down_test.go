@@ -634,7 +634,7 @@ func TestEnsureVolumesDown_SkipsVolumeNotOwnedByProject(t *testing.T) {
 	apiClient.EXPECT().VolumeRemove(gomock.Any(), "own-data", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
 	// no VolumeRemove expectation for shared-data and unlabeled-data — a call for either fails the test
 
-	for _, op := range svc.ensureVolumesDown(t.Context(), project, nil, nil) {
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, false, nil, nil) {
 		assert.NilError(t, op())
 	}
 
@@ -679,7 +679,7 @@ func TestEnsureVolumesDown_KeepsVolumeWhenInspectFails(t *testing.T) {
 		Return(client.VolumeInspectResult{}, errors.New("engine unavailable"))
 	// no VolumeRemove expectation — a call for prj-data fails the test
 
-	ops := svc.ensureVolumesDown(t.Context(), project, nil, nil)
+	ops := svc.ensureVolumesDown(t.Context(), project, false, nil, nil)
 	assert.Equal(t, len(ops), 1)
 	assert.Error(t, ops[0](), "failed to inspect volume prj-data: engine unavailable")
 }
@@ -716,9 +716,35 @@ func TestEnsureVolumesDown_KeepsVolumesOfOtherServices(t *testing.T) {
 	apiClient.EXPECT().VolumeRemove(gomock.Any(), "prj_cache", client.VolumeRemoveOptions{Force: true}).Return(client.VolumeRemoveResult{}, nil)
 	// no expectation for prj_data and prj_shared — a call for either fails the test
 
-	for _, op := range svc.ensureVolumesDown(t.Context(), project, []string{"web"}, nil) {
+	for _, op := range svc.ensureVolumesDown(t.Context(), project, true, []string{"web"}, nil) {
 		assert.NilError(t, op())
 	}
+}
+
+// A scoped down that tore no service down must keep the volumes in use rather
+// than take the empty list of services for an unscoped down and remove them all.
+func TestEnsureVolumesDown_ScopedWithNoServiceKeepsVolumesInUse(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	_, cli := prepareMocks(mockCtrl)
+	svcIface, err := NewComposeService(cli)
+	assert.NilError(t, err)
+	svc := svcIface.(*composeService)
+
+	project := &types.Project{
+		Name: "prj",
+		Services: types.Services{
+			"web": {Name: "web", ContainerSpec: types.ContainerSpec{Volumes: []types.ServiceVolumeConfig{{Source: "cache"}}}},
+		},
+		Volumes: types.Volumes{
+			"cache": {Name: "prj_cache"},
+		},
+	}
+	// no VolumeInspect or VolumeRemove expectation — a call for prj_cache fails the test
+
+	ops := svc.ensureVolumesDown(t.Context(), project, true, nil, nil)
+	assert.Equal(t, len(ops), 0)
 }
 
 func TestDownRemoveImages(t *testing.T) {
