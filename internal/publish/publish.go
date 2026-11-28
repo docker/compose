@@ -294,23 +294,7 @@ func processFile(ctx context.Context, file string, project *types.Project, extFi
 		return nil, err
 	}
 
-	base, err := loader.LoadWithContext(ctx, types.ConfigDetails{
-		WorkingDir:  project.WorkingDir,
-		Environment: project.Environment,
-		ConfigFiles: []types.ConfigFile{
-			{
-				Filename: file,
-				Content:  f,
-			},
-		},
-	}, func(options *loader.Options) {
-		options.SkipValidation = true
-		options.SkipExtends = true
-		options.SkipConsistencyCheck = true
-		options.ResolvePaths = true
-		options.SkipInclude = true
-		options.Profiles = project.Profiles
-	})
+	base, err := loadUnresolvedFile(ctx, project, file)
 	if err != nil {
 		return nil, err
 	}
@@ -679,13 +663,15 @@ func buildConfigContentPromptMessage(configs []string) string {
 
 // loadUnresolvedFile loads a single compose file with interpolation and
 // environment resolution skipped, so callers can inspect raw user-provided
-// values. Used by both checkEnvironmentVariables and composeFileAsByteReader.
+// values. Used by checkEnvironmentVariables, composeFileAsByteReader, and
+// processFile.
 func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath string) (*types.Project, error) {
-	return loader.LoadWithContext(ctx, types.ConfigDetails{
+	configDetails := types.ConfigDetails{
 		WorkingDir:  project.WorkingDir,
 		Environment: project.Environment,
 		ConfigFiles: []types.ConfigFile{{Filename: filePath}},
-	}, func(options *loader.Options) {
+	}
+	loadOpts := func(options *loader.Options) {
 		options.SkipValidation = true
 		options.SkipExtends = true
 		options.SkipConsistencyCheck = true
@@ -697,7 +683,222 @@ func loadUnresolvedFile(ctx context.Context, project *types.Project, filePath st
 		options.SkipInterpolation = true
 		options.SkipResolveEnvironment = true
 		options.Profiles = project.Profiles
-	})
+	}
+
+	opts := loader.ToOptions(&configDetails, []func(*loader.Options){loadOpts})
+
+	dict, err := loader.LoadModelWithContext(ctx, configDetails, loadOpts)
+	if err != nil {
+		return nil, err
+	}
+
+	normalizeUnresolvedPorts(dict)
+
+	return loader.ModelToProject(dict, opts, configDetails)
+}
+
+// normalizeUnresolvedPorts converts raw short-form port strings that were left
+// unparsed by compose-go (typically because SkipInterpolation left variable
+// expressions like ${DASHBOARD_PORT:-3000}:3000 unexpanded) into maps so that
+// mapstructure can decode them into types.ServicePortConfig without error.
+func normalizeUnresolvedPorts(dict map[string]any) {
+	normalizePortsSection := func(workloads any) {
+		m, ok := workloads.(map[string]any)
+		if !ok {
+			return
+		}
+		for _, workload := range m {
+			wMap, ok := workload.(map[string]any)
+			if !ok {
+				continue
+			}
+			ports, ok := wMap["ports"].([]any)
+			if !ok {
+				continue
+			}
+			var normalized []any
+			for _, p := range ports {
+				switch v := p.(type) {
+				case map[string]any:
+					normalized = append(normalized, v)
+				case string:
+					parsed, err := types.ParsePortConfig(v)
+					if err == nil {
+						for _, cfg := range parsed {
+							normalized = append(normalized, portConfigToMap(cfg))
+						}
+					} else {
+						normalized = append(normalized, parseUnresolvedShortPort(v))
+					}
+				case int:
+					normalized = append(normalized, map[string]any{
+						"target":   uint32(v),
+						"protocol": "tcp",
+						"mode":     "ingress",
+					})
+				default:
+					normalized = append(normalized, p)
+				}
+			}
+			wMap["ports"] = normalized
+		}
+	}
+
+	normalizePortsSection(dict["services"])
+	normalizePortsSection(dict["jobs"])
+}
+
+func portConfigToMap(cfg types.ServicePortConfig) map[string]any {
+	m := map[string]any{
+		"target":   cfg.Target,
+		"protocol": cfg.Protocol,
+		"mode":     cfg.Mode,
+	}
+	if cfg.Published != "" {
+		m["published"] = cfg.Published
+	}
+	if cfg.HostIP != "" {
+		m["host_ip"] = cfg.HostIP
+	}
+	if cfg.Name != "" {
+		m["name"] = cfg.Name
+	}
+	if cfg.AppProtocol != "" {
+		m["app_protocol"] = cfg.AppProtocol
+	}
+	return m
+}
+
+func parseUnresolvedShortPort(v string) map[string]any {
+	v, protocol := splitPortProtocol(v)
+
+	var hostIP, published string
+	targetStr := v
+
+	if strings.HasPrefix(v, "[") {
+		if closeIdx := strings.Index(v, "]"); closeIdx != -1 {
+			hostIP = v[1:closeIdx]
+			rest := strings.TrimPrefix(v[closeIdx+1:], ":")
+			parts := splitPortParts(rest)
+			if len(parts) >= 2 {
+				published = parts[0]
+				targetStr = parts[1]
+			} else if len(parts) == 1 {
+				targetStr = parts[0]
+			}
+		}
+	} else {
+		parts := splitPortParts(v)
+		switch len(parts) {
+		case 1:
+			targetStr = parts[0]
+		case 2:
+			published = parts[0]
+			targetStr = parts[1]
+		case 3:
+			hostIP = parts[0]
+			published = parts[1]
+			targetStr = parts[2]
+		default:
+			if len(parts) > 3 {
+				targetStr = parts[len(parts)-1]
+				published = strings.Join(parts[:len(parts)-1], ":")
+			}
+		}
+	}
+
+	var target uint32
+	if val, err := strconv.ParseUint(targetStr, 10, 32); err == nil {
+		target = uint32(val)
+	} else {
+		target = extractDefaultPort(targetStr)
+	}
+
+	res := map[string]any{
+		"mode":     "ingress",
+		"protocol": protocol,
+		"target":   target,
+	}
+	if published != "" {
+		res["published"] = published
+	}
+	if hostIP != "" {
+		res["host_ip"] = hostIP
+	}
+	return res
+}
+
+func splitPortProtocol(s string) (string, string) {
+	depth := 0
+	for i, r := range s {
+		switch r {
+		case '{':
+			depth++
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+		case '/':
+			if depth == 0 {
+				return s[:i], s[i+1:]
+			}
+		}
+	}
+	return s, "tcp"
+}
+
+func splitPortParts(s string) []string {
+	var parts []string
+	var cur strings.Builder
+	depth := 0
+	for _, r := range s {
+		switch r {
+		case '{':
+			depth++
+			cur.WriteRune(r)
+		case '}':
+			if depth > 0 {
+				depth--
+			}
+			cur.WriteRune(r)
+		case ':':
+			if depth == 0 {
+				parts = append(parts, cur.String())
+				cur.Reset()
+			} else {
+				cur.WriteRune(r)
+			}
+		default:
+			cur.WriteRune(r)
+		}
+	}
+	parts = append(parts, cur.String())
+	return parts
+}
+
+func extractDefaultPort(s string) uint32 {
+	// Look for ${VAR:-default} or ${VAR-default}
+	for _, sep := range []string{":-", "-"} {
+		if idx := strings.Index(s, sep); idx != -1 {
+			def := s[idx+len(sep):]
+			def = strings.TrimSuffix(def, "}")
+			// If default is a range like 8080-8085, take first port
+			if rangeIdx := strings.Index(def, "-"); rangeIdx != -1 {
+				def = def[:rangeIdx]
+			}
+			if val, err := strconv.ParseUint(def, 10, 32); err == nil {
+				return uint32(val)
+			}
+		}
+	}
+	// If range like 80-85 (without braces)
+	if rangeIdx := strings.Index(s, "-"); rangeIdx != -1 && !strings.Contains(s, "{") {
+		first := s[:rangeIdx]
+		if val, err := strconv.ParseUint(first, 10, 32); err == nil {
+			return uint32(val)
+		}
+	}
+	return 0
 }
 
 func envFileLayers(files map[string]string) []v1.Descriptor {
